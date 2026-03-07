@@ -1,0 +1,82 @@
+diff --git a/build/GridItem.js b/build/GridItem.js
+index a7eb5360bc8ff3ed76c3f5f6a6c5ecad0902e073..ea64228c64a860548bb75bee614bca388b74104d 100644
+--- a/build/GridItem.js
++++ b/build/GridItem.js
+@@ -88,6 +88,7 @@ function _toPrimitive(t, r) { if ("object" != typeof t || !t) return t; var e =
+ 
+   resizeHandles?: ResizeHandleAxis[],
+   resizeHandle?: ResizeHandle,
++  lockAspectRatio?: boolean,
+ 
+   onDrag?: GridItemCallback<GridDragEvent>,
+   onDragStart?: GridItemCallback<GridDragEvent>,
+@@ -432,7 +433,8 @@ class GridItem extends _react.default.Component /*:: <Props, State>*/{
+       maxH,
+       transformScale,
+       resizeHandles,
+-      resizeHandle
++      resizeHandle,
++      lockAspectRatio
+     } = this.props;
+     const positionParams = this.getPositionParams();
+ 
+@@ -459,6 +461,7 @@ class GridItem extends _react.default.Component /*:: <Props, State>*/{
+       onResizeStart: this.curryResizeHandler(position, this.onResizeStart),
+       onResize: this.curryResizeHandler(position, this.onResize),
+       transformScale: transformScale,
++      lockAspectRatio: lockAspectRatio,
+       resizeHandles: resizeHandles,
+       handle: resizeHandle
+     }, child);
+@@ -598,6 +601,7 @@ _defineProperty(GridItem, "propTypes", {
+   // Resize handle options
+   resizeHandles: _ReactGridLayoutPropTypes.resizeHandleAxesType,
+   resizeHandle: _ReactGridLayoutPropTypes.resizeHandleType,
++  lockAspectRatio: _propTypes.default.bool,
+   // Functions
+   onDragStop: _propTypes.default.func,
+   onDragStart: _propTypes.default.func,
+@@ -634,5 +638,6 @@ _defineProperty(GridItem, "defaultProps", {
+   minW: 1,
+   maxH: Infinity,
+   maxW: Infinity,
+-  transformScale: 1
++  transformScale: 1,
++  lockAspectRatio: false
+ });
+diff --git a/build/ReactGridLayout.js b/build/ReactGridLayout.js
+index b72bb4681889f430cd2bed822829e5c43ec96e09..ec49f85bf22428dcdcf22297494c880dffc2aae9 100644
+--- a/build/ReactGridLayout.js
++++ b/build/ReactGridLayout.js
+@@ -668,6 +668,7 @@ class ReactGridLayout extends React.Component /*:: <Props, State>*/{
+       maxH: l.maxH,
+       maxW: l.maxW,
+       static: l.static,
++      lockAspectRatio: l.lockAspectRatio,
+       droppingPosition: isDroppingItem ? droppingPosition : undefined,
+       resizeHandles: resizeHandlesOptions,
+       resizeHandle: resizeHandle
+diff --git a/build/utils.js b/build/utils.js
+index 362faca871f6905d876a8a0978557e6af856c467..b8970d719a800a8398c0f4961ab477e508de0f70 100644
+--- a/build/utils.js
++++ b/build/utils.js
+@@ -68,7 +68,8 @@ function _toPrimitive(t, r) { if ("object" != typeof t || !t) return t; var e =
+   isDraggable?: ?boolean,
+   isResizable?: ?boolean,
+   resizeHandles?: Array<ResizeHandleAxis>,
+-  isBounded?: ?boolean
++  isBounded?: ?boolean,
++  lockAspectRatio?: ?boolean
+ };*/
+ /*:: export type Layout = $ReadOnlyArray<LayoutItem>;*/
+ /*:: export type Position = {
+@@ -192,7 +193,8 @@ function cloneLayoutItem(layoutItem /*: LayoutItem*/) /*: LayoutItem*/{
+     isDraggable: layoutItem.isDraggable,
+     isResizable: layoutItem.isResizable,
+     resizeHandles: layoutItem.resizeHandles,
+-    isBounded: layoutItem.isBounded
++    isBounded: layoutItem.isBounded,
++    lockAspectRatio: layoutItem.lockAspectRatio
+   };
+ }
+ 

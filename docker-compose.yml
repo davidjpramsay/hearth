@@ -1,0 +1,19 @@
+services:
+  hearth:
+    image: ${HEARTH_IMAGE:-ghcr.io/davidjpramsay/hearth:latest}
+    container_name: hearth
+    ports:
+      - "3000:3000"
+    environment:
+      APP_NAME: ${APP_NAME:-Hearth}
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATA_DIR: /app/data
+      BACKUP_DIR: /app/data/backups
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      BACKUP_INTERVAL_MINUTES: ${BACKUP_INTERVAL_MINUTES:-360}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      ESV_API_KEY: ${ESV_API_KEY:-}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

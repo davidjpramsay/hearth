@@ -1,0 +1,112 @@
+import type { ReactNode } from "react";
+
+interface ModuleFrameProps {
+  title: string;
+  subtitle?: string;
+  loading?: boolean;
+  error?: string | null;
+  empty?: boolean;
+  emptyMessage?: string;
+  statusLabel?: string;
+  lastUpdatedMs?: number | null;
+  onRemove?: () => void;
+  onSelect?: () => void;
+  children: ReactNode;
+}
+
+const formatLastUpdated = (timestampMs: number | null | undefined): string | null => {
+  if (!timestampMs) {
+    return null;
+  }
+
+  const formatter = new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+  return formatter.format(new Date(timestampMs));
+};
+
+export const ModuleFrame = ({
+  title,
+  subtitle,
+  loading = false,
+  error = null,
+  empty = false,
+  emptyMessage = "No data available",
+  statusLabel,
+  lastUpdatedMs,
+  onRemove,
+  onSelect,
+  children,
+}: ModuleFrameProps) => {
+  const formattedLastUpdated = formatLastUpdated(lastUpdatedMs);
+  const showStatusMeta =
+    loading || Boolean(error) || Boolean(statusLabel) || Boolean(formattedLastUpdated);
+  const statusClassName = error
+    ? "status-dot status-dot--error"
+    : loading
+      ? "status-dot status-dot--loading"
+      : "status-dot status-dot--ok";
+
+  return (
+    <div
+      onMouseDownCapture={() => onSelect?.()}
+      onTouchStartCapture={() => onSelect?.()}
+      className="module-frame"
+    >
+      <div className="module-drag-handle module-frame__header">
+        <div className="min-w-0">
+          <span className="module-frame__title">{title}</span>
+          {subtitle ? <p className="module-frame__subtitle">{subtitle}</p> : null}
+        </div>
+        <div className="flex items-center gap-2">
+          {showStatusMeta ? (
+            <div className="module-frame__meta">
+              {statusLabel ? <span className="text-accent">{statusLabel}</span> : null}
+              {formattedLastUpdated ? (
+                <span className="text-muted">Updated {formattedLastUpdated}</span>
+              ) : null}
+              <span className={statusClassName} aria-hidden="true" />
+            </div>
+          ) : null}
+          {onRemove ? (
+            <button
+              type="button"
+              onTouchStart={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onMouseDown={(event) => {
+                // Prevent grid drag from swallowing the click.
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onRemove();
+              }}
+              className="module-frame__remove module-no-drag"
+            >
+              Remove
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="module-frame__body module-no-drag">
+        {error ? (
+          <div className="module-frame__feedback module-frame__feedback--error">{error}</div>
+        ) : empty ? (
+          <div className="module-frame__feedback module-frame__feedback--empty">
+            {emptyMessage}
+          </div>
+        ) : (
+          children
+        )}
+      </div>
+    </div>
+  );
+};

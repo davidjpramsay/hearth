@@ -1,0 +1,149 @@
+import { z } from "zod";
+import { defineModule } from "@hearth/module-sdk";
+import { useModuleQuery } from "../data/useModuleQuery";
+import { ModuleFrame } from "../ui/ModuleFrame";
+
+const settingsSchema = z.object({
+  pollSeconds: z.number().int().min(5).max(300).default(30),
+  showMemory: z.boolean().default(true),
+});
+
+const statusSchema = z.object({
+  ok: z.boolean(),
+  service: z.string(),
+  uptimeSeconds: z.number().nonnegative(),
+  timestamp: z.string(),
+  memory: z
+    .object({
+      rss: z.number().nonnegative(),
+      heapUsed: z.number().nonnegative(),
+      heapTotal: z.number().nonnegative(),
+    })
+    .optional(),
+});
+
+type Settings = z.infer<typeof settingsSchema>;
+
+const formatBytes = (value: number): string => {
+  const units = ["B", "KB", "MB", "GB"];
+  let unitIndex = 0;
+  let current = value;
+
+  while (current >= 1024 && unitIndex < units.length - 1) {
+    current /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${current.toFixed(1)} ${units[unitIndex]}`;
+};
+
+const SettingsPanel = ({
+  settings,
+  onChange,
+}: {
+  settings: Settings;
+  onChange: (next: Settings) => void;
+}) => (
+  <div className="space-y-4 rounded-lg border border-slate-700 bg-slate-900 p-4 text-sm text-slate-200">
+    <h3 className="text-base font-semibold">Server status settings</h3>
+    <label className="block space-y-2">
+      <span>Polling interval (seconds)</span>
+      <input
+        className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
+        type="number"
+        min={5}
+        max={300}
+        step={1}
+        value={settings.pollSeconds}
+        onChange={(event) =>
+          onChange({
+            ...settings,
+            pollSeconds: Number(event.target.value) || settings.pollSeconds,
+          })
+        }
+      />
+    </label>
+    <label className="flex items-center justify-between">
+      <span>Show memory stats</span>
+      <input
+        type="checkbox"
+        checked={settings.showMemory}
+        onChange={(event) =>
+          onChange({
+            ...settings,
+            showMemory: event.target.checked,
+          })
+        }
+      />
+    </label>
+  </div>
+);
+
+export const moduleDefinition = defineModule({
+  manifest: {
+    id: "server-status",
+    name: "Server status",
+    version: "1.0.0",
+    description: "REST-backed module using the server adapter layer",
+    icon: "activity",
+    defaultSize: { w: 4, h: 3 },
+    categories: ["system", "examples"],
+    permissions: ["network"],
+    dataSources: [{ id: "server-status-rest", kind: "rest", pollMs: 30_000 }],
+  },
+  settingsSchema,
+  dataSchema: statusSchema,
+  runtime: {
+    Component: ({ settings }) => {
+      const status = useModuleQuery({
+        key: `server-status:${settings.pollSeconds}`,
+        queryFn: async () => {
+          const response = await fetch("/api/modules/server-status", {
+            method: "GET",
+          });
+
+          if (!response.ok) {
+            throw new Error(`Server status request failed (${response.status})`);
+          }
+
+          return statusSchema.parse(await response.json());
+        },
+        intervalMs: settings.pollSeconds * 1000,
+        staleMs: Math.max(1000, settings.pollSeconds * 1000 - 1000),
+      });
+
+      return (
+        <ModuleFrame
+          title="Server status"
+          loading={status.loading}
+          error={status.error}
+          lastUpdatedMs={status.lastUpdatedMs}
+          statusLabel={status.data?.ok ? "Healthy" : "Degraded"}
+          empty={!status.data && !status.loading && !status.error}
+          emptyMessage="No server status data available"
+        >
+          {status.data ? (
+            <div className="space-y-3 rounded-lg border border-slate-700 bg-slate-950/60 p-3 text-slate-100">
+              <div className="text-sm text-slate-300">Service: {status.data.service}</div>
+              <div className="text-sm text-slate-300">
+                Uptime: {Math.floor(status.data.uptimeSeconds)}s
+              </div>
+              {settings.showMemory && status.data.memory ? (
+                <div className="text-xs text-slate-400">
+                  <p>RSS: {formatBytes(status.data.memory.rss)}</p>
+                  <p>Heap used: {formatBytes(status.data.memory.heapUsed)}</p>
+                  <p>Heap total: {formatBytes(status.data.memory.heapTotal)}</p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </ModuleFrame>
+      );
+    },
+  },
+  admin: {
+    SettingsPanel,
+  },
+});
+
+export default moduleDefinition;

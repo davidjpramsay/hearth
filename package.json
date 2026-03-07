@@ -1,0 +1,19 @@
+{
+  "name": "hearth",
+  "private": true,
+  "packageManager": "pnpm@9.12.3",
+  "scripts": {
+    "dev": "pnpm --filter @hearth/shared build && pnpm --filter @hearth/module-sdk build && pnpm --filter @hearth/core build && pnpm -r --parallel --filter @hearth/shared --filter @hearth/module-sdk --filter @hearth/core --filter @hearth/server --filter @hearth/web dev",
+    "build": "pnpm -r build",
+    "start": "pnpm --filter @hearth/server start",
+    "create-module": "node scripts/create-module.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "react-grid-layout@1.5.3": "patches/react-grid-layout@1.5.3.patch"
+    }
+  }
+}
