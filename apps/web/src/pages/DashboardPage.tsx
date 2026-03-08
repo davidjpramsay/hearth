@@ -15,6 +15,10 @@ import {
   inferLayoutRows,
   sanitizeGridItems,
 } from "../layout/grid-math";
+import {
+  getDisplaySettingsCogVisible,
+  subscribeToDisplaySettingsCogVisibility,
+} from "../preferences/display-settings-cog";
 import { moduleRegistry } from "../registry/module-registry";
 
 const FALLBACK_VIEWPORT = {
@@ -278,6 +282,9 @@ export const DashboardPage = () => {
     ReportScreenProfileLayoutOption[]
   >([]);
   const [devicePanelOpen, setDevicePanelOpen] = useState(false);
+  const [displaySettingsCogVisible, setDisplaySettingsCogVisible] = useState<boolean>(() =>
+    getDisplaySettingsCogVisible(),
+  );
   const [nextCycleAtMs, setNextCycleAtMs] = useState<number | null>(null);
   const activeLayoutRef = useRef<LayoutRecord | null>(null);
   const photoOrientationRef = useRef<PhotosOrientation | null>(null);
@@ -441,6 +448,17 @@ export const DashboardPage = () => {
       window.removeEventListener("resize", updateViewport);
     };
   }, []);
+
+  useEffect(
+    () => subscribeToDisplaySettingsCogVisibility(setDisplaySettingsCogVisible),
+    [],
+  );
+
+  useEffect(() => {
+    if (!displaySettingsCogVisible) {
+      setDevicePanelOpen(false);
+    }
+  }, [displaySettingsCogVisible]);
 
   useEffect(() => {
     const handlePhotosOrientation = (event: Event) => {
@@ -662,7 +680,7 @@ export const DashboardPage = () => {
           </p>
         ) : null}
 
-        {devicePanelOpen ? (
+        {displaySettingsCogVisible && devicePanelOpen ? (
           <button
             type="button"
             aria-label="Close screen routing panel"
@@ -671,109 +689,113 @@ export const DashboardPage = () => {
           />
         ) : null}
 
-        <div className="absolute bottom-3 right-3 z-30">
-          <button
-            type="button"
-            onClick={() => setDevicePanelOpen((current) => !current)}
-            aria-label="Display source settings"
-            title="Display source settings"
-            className={`flex h-9 w-9 items-center justify-center rounded-full border bg-slate-900/85 text-slate-200 transition ${
-              devicePanelOpen
-                ? "border-cyan-400/80 text-cyan-200"
-                : "border-slate-500/70 hover:border-cyan-400/80"
-            }`}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-5 w-5"
-              aria-hidden="true"
+        {displaySettingsCogVisible ? (
+          <div className="absolute bottom-3 right-3 z-30">
+            <button
+              type="button"
+              onClick={() => setDevicePanelOpen((current) => !current)}
+              aria-label="Display source settings"
+              title="Display source settings"
+              className={`flex h-9 w-9 items-center justify-center rounded-full border bg-slate-900/85 text-slate-200 transition ${
+                devicePanelOpen
+                  ? "border-cyan-400/80 text-cyan-200"
+                  : "border-slate-500/70 hover:border-cyan-400/80"
+              }`}
             >
-              <path d="M12 15.75A3.75 3.75 0 1 0 12 8.25a3.75 3.75 0 0 0 0 7.5Z" />
-              <path d="M19.5 15a1.5 1.5 0 0 0 .3 1.65l.06.06a1.8 1.8 0 0 1-2.55 2.55l-.06-.06A1.5 1.5 0 0 0 15.6 19.5a1.5 1.5 0 0 0-.9 1.35V21a1.8 1.8 0 0 1-3.6 0v-.09a1.5 1.5 0 0 0-.9-1.35 1.5 1.5 0 0 0-1.65.3l-.06.06a1.8 1.8 0 0 1-2.55-2.55l.06-.06A1.5 1.5 0 0 0 4.5 15.6a1.5 1.5 0 0 0-1.35-.9H3a1.8 1.8 0 0 1 0-3.6h.15a1.5 1.5 0 0 0 1.35-.9 1.5 1.5 0 0 0-.3-1.65l-.06-.06a1.8 1.8 0 0 1 2.55-2.55l.06.06A1.5 1.5 0 0 0 8.4 4.5a1.5 1.5 0 0 0 .9-1.35V3a1.8 1.8 0 0 1 3.6 0v.15a1.5 1.5 0 0 0 .9 1.35 1.5 1.5 0 0 0 1.65-.3l.06-.06a1.8 1.8 0 0 1 2.55 2.55l-.06.06A1.5 1.5 0 0 0 19.5 8.4a1.5 1.5 0 0 0 1.35.9H21a1.8 1.8 0 0 1 0 3.6h-.15a1.5 1.5 0 0 0-1.35.9Z" />
-            </svg>
-          </button>
-
-          {devicePanelOpen ? (
-            <div className="mt-2 w-64 rounded-md border border-slate-600 bg-slate-900/95 p-3 text-xs text-slate-200 shadow-xl">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
-                Display source
-              </p>
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                Source type
-              </label>
-              <select
-                className="w-full rounded border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
-                value={deviceTargetSelection.kind}
-                onChange={(event) =>
-                  handleRoutingModeChange(
-                    event.target.value === "layout" ? "layout" : "set",
-                  )
-                }
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5"
+                aria-hidden="true"
               >
-                <option value="set">Follow Set</option>
-                <option value="layout">Pin Layout</option>
-              </select>
+                <path d="M12 15.75A3.75 3.75 0 1 0 12 8.25a3.75 3.75 0 0 0 0 7.5Z" />
+                <path d="M19.5 15a1.5 1.5 0 0 0 .3 1.65l.06.06a1.8 1.8 0 0 1-2.55 2.55l-.06-.06A1.5 1.5 0 0 0 15.6 19.5a1.5 1.5 0 0 0-.9 1.35V21a1.8 1.8 0 0 1-3.6 0v-.09a1.5 1.5 0 0 0-.9-1.35 1.5 1.5 0 0 0-1.65.3l-.06.06a1.8 1.8 0 0 1-2.55-2.55l.06-.06A1.5 1.5 0 0 0 4.5 15.6a1.5 1.5 0 0 0-1.35-.9H3a1.8 1.8 0 0 1 0-3.6h.15a1.5 1.5 0 0 0 1.35-.9 1.5 1.5 0 0 0-.3-1.65l-.06-.06a1.8 1.8 0 0 1 2.55-2.55l.06.06A1.5 1.5 0 0 0 8.4 4.5a1.5 1.5 0 0 0 .9-1.35V3a1.8 1.8 0 0 1 3.6 0v.15a1.5 1.5 0 0 0 .9 1.35 1.5 1.5 0 0 0 1.65-.3l.06-.06a1.8 1.8 0 0 1 2.55 2.55l-.06.06A1.5 1.5 0 0 0 19.5 8.4a1.5 1.5 0 0 0 1.35.9H21a1.8 1.8 0 0 1 0 3.6h-.15a1.5 1.5 0 0 0-1.35.9Z" />
+              </svg>
+            </button>
 
-              {deviceTargetSelection.kind === "set" ? (
-                <>
-                  <p className="mb-2 mt-3 text-[11px] text-slate-400">Using set: {selectedSetName}</p>
-                  <select
-                    className="w-full rounded border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
-                    value={deviceTargetSelection.setId ?? ""}
-                    onChange={(event) =>
-                      updateDeviceTargetSelection({
-                        kind: "set",
-                        setId: event.target.value || null,
-                      })
-                    }
-                  >
-                    {deviceFamilyOptions.length === 0 ? (
-                      <option value="">No sets available</option>
-                    ) : null}
-                    {deviceFamilyOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </select>
-                </>
-              ) : (
-                <>
-                  <p className="mb-2 mt-3 text-[11px] text-slate-400">
-                    Pinned layout: {selectedLayoutName}
-                  </p>
-                  <select
-                    className="w-full rounded border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
-                    value={deviceTargetSelection.layoutName ?? ""}
-                    onChange={(event) =>
-                      updateDeviceTargetSelection({
-                        kind: "layout",
-                        layoutName: event.target.value || null,
-                      })
-                    }
-                  >
-                    {deviceLayoutOptions.length === 0 ? (
-                      <option value="">No layouts available</option>
-                    ) : null}
-                    {deviceLayoutOptions.map((option) => (
-                      <option key={option.name} value={option.name}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </select>
-                </>
-              )}
-              <p className="mt-2 text-[11px] text-slate-400">
-                Saved per device/browser.
-              </p>
-            </div>
-          ) : null}
-        </div>
+            {devicePanelOpen ? (
+              <div className="mt-2 w-64 rounded-md border border-slate-600 bg-slate-900/95 p-3 text-xs text-slate-200 shadow-xl">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+                  Display source
+                </p>
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  Source type
+                </label>
+                <select
+                  className="w-full rounded border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
+                  value={deviceTargetSelection.kind}
+                  onChange={(event) =>
+                    handleRoutingModeChange(
+                      event.target.value === "layout" ? "layout" : "set",
+                    )
+                  }
+                >
+                  <option value="set">Follow Set</option>
+                  <option value="layout">Pin Layout</option>
+                </select>
+
+                {deviceTargetSelection.kind === "set" ? (
+                  <>
+                    <p className="mb-2 mt-3 text-[11px] text-slate-400">
+                      Using set: {selectedSetName}
+                    </p>
+                    <select
+                      className="w-full rounded border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
+                      value={deviceTargetSelection.setId ?? ""}
+                      onChange={(event) =>
+                        updateDeviceTargetSelection({
+                          kind: "set",
+                          setId: event.target.value || null,
+                        })
+                      }
+                    >
+                      {deviceFamilyOptions.length === 0 ? (
+                        <option value="">No sets available</option>
+                      ) : null}
+                      {deviceFamilyOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                ) : (
+                  <>
+                    <p className="mb-2 mt-3 text-[11px] text-slate-400">
+                      Pinned layout: {selectedLayoutName}
+                    </p>
+                    <select
+                      className="w-full rounded border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
+                      value={deviceTargetSelection.layoutName ?? ""}
+                      onChange={(event) =>
+                        updateDeviceTargetSelection({
+                          kind: "layout",
+                          layoutName: event.target.value || null,
+                        })
+                      }
+                    >
+                      {deviceLayoutOptions.length === 0 ? (
+                        <option value="">No layouts available</option>
+                      ) : null}
+                      {deviceLayoutOptions.map((option) => (
+                        <option key={option.name} value={option.name}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+                <p className="mt-2 text-[11px] text-slate-400">
+                  Saved per device/browser.
+                </p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {!activeLayout ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/70 text-center text-slate-300">

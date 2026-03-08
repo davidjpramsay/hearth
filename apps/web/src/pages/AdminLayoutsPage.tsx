@@ -12,6 +12,7 @@ import {
   updateScreenProfileLayouts,
 } from "../api/client";
 import { clearAuthToken, getAuthToken } from "../auth/storage";
+import { DisplaySettingsCogToggle } from "../components/DisplaySettingsCogToggle";
 import { PageShell } from "../components/PageShell";
 import { buildDuplicateLayoutName } from "./layout-name-utils";
 import { analyzeSetRuntimeHealth } from "./layout-set-runtime-health";
@@ -1064,6 +1065,7 @@ export const AdminLayoutsPage = () => {
     <PageShell
       title="Layouts"
       subtitle="Create and manage dashboard layouts."
+      headerControls={<DisplaySettingsCogToggle />}
       rightActions={
         <>
           <button

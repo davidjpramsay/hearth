@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getLayouts, updateLayout } from "../api/client";
 import { clearAuthToken, getAuthToken } from "../auth/storage";
+import { DisplaySettingsCogToggle } from "../components/DisplaySettingsCogToggle";
 import { ModuleFrame } from "../components/ModuleFrame";
 import { ThemePicker } from "../components/ThemePicker";
 import {
@@ -567,6 +568,7 @@ export const AdminLayoutEditorPage = () => {
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <ThemePicker className="min-w-[180px]" />
+          <DisplaySettingsCogToggle className="min-w-[220px]" />
           <button
             type="button"
             onClick={() => navigate("/chores")}

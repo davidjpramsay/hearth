@@ -4,6 +4,7 @@ import { ThemePicker } from "./ThemePicker";
 interface PageShellProps {
   title: string;
   subtitle?: string;
+  headerControls?: ReactNode;
   rightActions?: ReactNode;
   showThemePicker?: boolean;
   children: ReactNode;
@@ -12,6 +13,7 @@ interface PageShellProps {
 export const PageShell = ({
   title,
   subtitle,
+  headerControls,
   rightActions,
   showThemePicker = true,
   children,
@@ -33,6 +35,7 @@ export const PageShell = ({
       </div>
       <div className="flex flex-wrap items-end gap-3">
         {showThemePicker ? <ThemePicker /> : null}
+        {headerControls}
         {rightActions}
       </div>
     </header>
