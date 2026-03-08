@@ -20,8 +20,10 @@ This project is optimized for always-on kiosk use, including lower-power hardwar
 - Photo metadata parsing is cached by `(path, mtimeMs, size)`.
 - Metadata reads use header-first parsing; full file reads are fallback-only.
 - Multi-folder collections merge folder caches without duplicating file metadata scans.
+- Photo image responses now use long-lived browser cache headers (`public, max-age=31536000, immutable`).
+- Photo image ids are derived from path + `mtimeMs` + size, so updated files naturally get new URLs.
 
-Impact: avoids repeated full image reads and repeated metadata parsing on unchanged files.
+Impact: avoids repeated full image reads and repeated metadata parsing on unchanged files, and lets cache-capable display clients reuse already-loaded images instead of refetching them across weaker Wi-Fi links.
 
 ## Weather Module
 
@@ -73,6 +75,8 @@ Impact: lower unnecessary schedule expansion and predictable week rollover behav
 - Use one active Photos module for orientation-triggered switching.
 - Avoid extremely deep photo folder trees if unnecessary.
 - In auto photo switching mode, keep portrait/landscape target lists short and intentional (typically 1-3 each) to reduce abrupt context churn.
+- Deploy updated server builds when photo-serving behavior changes; browser cache improvements only take effect after the app server is updated.
+- Browser caching helps repeat photo loads, but it does not replace client-side network quality work on unstable kiosk hardware.
 
 ## Benchmark Checklist
 

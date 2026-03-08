@@ -105,7 +105,8 @@ export const registerPhotoRoutes = (
 
     const extension = extname(imagePath).toLowerCase();
     const mimeType = MIME_TYPES[extension] ?? "application/octet-stream";
-    reply.header("Cache-Control", "no-cache");
+    // Image ids are hashed from path + mtime + size, so unchanged URLs are safe to reuse aggressively.
+    reply.header("Cache-Control", "public, max-age=31536000, immutable");
     reply.type(mimeType);
     return reply.send(createReadStream(imagePath));
   });

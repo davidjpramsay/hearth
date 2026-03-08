@@ -66,6 +66,7 @@ pnpm --filter @hearth/module-sdk test
 
 ## Recent Changelog
 
+- March 8, 2026: photo image responses now send long-lived immutable cache headers, allowing cache-capable kiosk browsers to reuse already-loaded images on repeat views instead of refetching them each time.
 - March 6, 2026: added SDK `count-down` module with date/time countdown modes, completion pulse effect, and resilient empty-event fallback rendering.
 - March 6, 2026: Bible Verse module now centers short verses and uses one-way looped slow-scroll for long verses with fixed heading/footer.
 - March 6, 2026: set-designer edge reconnect/disconnect state and canvas node positions are now persisted and applied in display runtime resolution; Layout Sets include runtime health + test-path simulation that uses the same effective logic.

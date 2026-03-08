@@ -583,7 +583,7 @@ export const moduleDefinition = defineModule({
                             : "border-slate-800/80 bg-slate-900/30"
                         } ${
                           isToday
-                            ? "outline outline-2 outline-cyan-300/90 shadow-[0_0_0_1px_rgba(103,232,249,0.45)]"
+                            ? "border-cyan-300/90 shadow-[inset_0_0_0_2px_rgba(103,232,249,0.9)]"
                             : ""
                         }`}
                       >
