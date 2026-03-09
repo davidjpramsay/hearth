@@ -15,6 +15,7 @@ import {
 } from "../api/client";
 import { clearAuthToken, getAuthToken } from "../auth/storage";
 import { useNavigate } from "react-router-dom";
+import { AdminNavActions } from "../components/admin/AdminNavActions";
 import { PageShell } from "../components/PageShell";
 import type {
   ChoreRecord,
@@ -134,6 +135,12 @@ const formatDateLabel = (date: string): string =>
     day: "numeric",
   }).format(new Date(`${date}T00:00:00`));
 
+const formatWeekButtonDateLabel = (date: string): string =>
+  new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(`${date}T00:00:00`));
+
 export const AdminChoresPage = () => {
   const token = getAuthToken();
   const navigate = useNavigate();
@@ -214,11 +221,20 @@ export const AdminChoresPage = () => {
     };
   }, [loadData]);
 
+  const today = todayDate();
   const currentWeekRange = useMemo(
-    () => getWeekRangeForPayday(todayDate(), payoutConfig.paydayDayOfWeek),
-    [payoutConfig.paydayDayOfWeek, board?.generatedAt],
+    () => getWeekRangeForPayday(today, payoutConfig.paydayDayOfWeek),
+    [payoutConfig.paydayDayOfWeek, today, board?.generatedAt],
   );
-  const activeSelectedDate = clampIsoDateToRange(selectedDate, currentWeekRange);
+  const selectableWeekRange = useMemo(
+    () => ({
+      startDate: currentWeekRange.startDate,
+      endDate:
+        currentWeekRange.endDate < today ? currentWeekRange.endDate : today,
+    }),
+    [currentWeekRange.endDate, currentWeekRange.startDate, today],
+  );
+  const activeSelectedDate = clampIsoDateToRange(selectedDate, selectableWeekRange);
 
   useEffect(() => {
     if (selectedDate !== activeSelectedDate) {
@@ -226,9 +242,32 @@ export const AdminChoresPage = () => {
     }
   }, [activeSelectedDate, selectedDate]);
 
+  const boardEntriesByDate = useMemo(
+    () => new Map((board?.board ?? []).map((entry) => [entry.date, entry])),
+    [board],
+  );
   const choresOnSelectedDay = useMemo(
-    () => board?.board.find((entry) => entry.date === activeSelectedDate)?.items ?? [],
-    [activeSelectedDate, board],
+    () => boardEntriesByDate.get(activeSelectedDate)?.items ?? [],
+    [activeSelectedDate, boardEntriesByDate],
+  );
+  const weekDayButtons = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_entry, index) => {
+        const date = toIsoDate(addDays(parseIsoDate(currentWeekRange.startDate), index));
+        const items = boardEntriesByDate.get(date)?.items ?? [];
+        const completedCount = items.filter((item) => item.completed).length;
+
+        return {
+          date,
+          label: dayLabels[parseIsoDate(date).getUTCDay()] ?? formatDateLabel(date),
+          shortDate: formatWeekButtonDateLabel(date),
+          completedCount,
+          totalCount: items.length,
+          hasOccurred: date <= selectableWeekRange.endDate,
+          isSelected: date === activeSelectedDate,
+        };
+      }),
+    [activeSelectedDate, boardEntriesByDate, currentWeekRange.startDate, selectableWeekRange.endDate],
   );
 
   const onLogout = () => {
@@ -370,24 +409,7 @@ export const AdminChoresPage = () => {
     <PageShell
       title="Chores"
       subtitle="Manage children, schedules, completions, and weekly payout totals."
-      rightActions={
-        <>
-          <button
-            type="button"
-            onClick={() => navigate("/admin/layouts")}
-            className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
-          >
-            Layouts
-          </button>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
-          >
-            Logout
-          </button>
-        </>
-      }
+      rightActions={<AdminNavActions current="chores" onLogout={onLogout} />}
     >
       {error ? (
         <p className="mb-4 rounded border border-rose-500/70 bg-rose-500/10 px-3 py-2 text-rose-200">
@@ -749,21 +771,58 @@ export const AdminChoresPage = () => {
 
       <section className="mt-4 grid gap-4 lg:grid-cols-[2fr_1fr]">
         <article className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-slate-100">Completion tracker</h2>
-            <label className="flex items-center gap-2 text-sm text-slate-300">
-              <span>Date</span>
-              <input
-                type="date"
-                className="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100"
-                value={activeSelectedDate}
-                min={currentWeekRange.startDate}
-                max={currentWeekRange.endDate}
-                onChange={(event) =>
-                  setSelectedDate(clampIsoDateToRange(event.target.value, currentWeekRange))
-                }
-              />
-            </label>
+          <div className="mb-3 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-slate-100">Completion tracker</h2>
+              <p className="text-sm text-slate-300">
+                {formatDateLabel(currentWeekRange.startDate)} to{" "}
+                {formatDateLabel(currentWeekRange.endDate)}
+              </p>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
+              {weekDayButtons.map((day) => (
+                <button
+                  key={day.date}
+                  type="button"
+                  disabled={!day.hasOccurred}
+                  onClick={() => setSelectedDate(day.date)}
+                  className={`rounded-lg border px-3 py-2 text-left transition ${
+                    day.isSelected
+                      ? "border-cyan-500 bg-cyan-500/15 text-cyan-100"
+                      : day.hasOccurred
+                        ? "border-slate-700 bg-slate-950/70 text-slate-100 hover:border-slate-500"
+                        : "cursor-not-allowed border-slate-800 bg-slate-950/30 text-slate-500 opacity-60"
+                  }`}
+                >
+                  <p className="text-sm font-semibold">{day.label}</p>
+                  <p
+                    className={`text-xs ${
+                      day.isSelected
+                        ? "text-cyan-100/80"
+                        : day.hasOccurred
+                          ? "text-slate-400"
+                          : "text-slate-500"
+                    }`}
+                  >
+                    {day.shortDate}
+                  </p>
+                  <p
+                    className={`mt-1 text-[11px] ${
+                      day.isSelected
+                        ? "text-cyan-100/80"
+                        : day.hasOccurred
+                          ? "text-slate-400"
+                          : "text-slate-500"
+                    }`}
+                  >
+                    {day.hasOccurred
+                      ? `${day.completedCount}/${day.totalCount} complete`
+                      : "Upcoming"}
+                  </p>
+                </button>
+              ))}
+            </div>
           </div>
 
           {loading ? <p className="text-sm text-slate-300">Loading day...</p> : null}

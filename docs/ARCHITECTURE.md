@@ -37,7 +37,7 @@ Fastify backend and persistence.
 - SQLite repositories
 - Auth and admin APIs
 - Module backend endpoints (calendar, photos, weather, chores, bible verse)
-- SSE broadcast endpoint (`/api/events/layouts`)
+- SSE broadcast endpoint (`/api/events/layouts`) for layout, chores, and device updates
 
 ### `apps/web`
 
@@ -51,27 +51,31 @@ React frontend with two routes:
 ### Display
 
 1. Browser loads `/`
-2. Reports viewport + photo orientation + screen session id to `/api/display/screen-profile/report`
-3. Receives a resolved layout for that specific screen/device
-4. Resolves module tiles from registry
-5. Subscribes to `/api/events/layouts` (SSE)
-6. Re-resolves layout on `layout-updated`, resize, photo orientation changes, and auto-cycle ticks
-7. Publishes active display context (`set` vs `layout`) including active cycle seconds and resolved photo collection id
+2. Uses a stable device id persisted in browser storage
+3. Reports photo orientation, device id, and legacy local fallback preferences to `/api/display/screen-profile/report`
+4. Server registers or looks up that device, applies server-managed theme/routing, and resolves a layout for that specific display
+5. Browser applies the resolved theme and renders module tiles from registry
+6. Subscribes to `/api/events/layouts` (SSE)
+7. Re-resolves layout on `layout-updated`, `display-device-updated`, resize, photo orientation changes, and auto-cycle ticks
+8. Publishes active display context (`set` vs `layout`) including active cycle seconds and resolved photo collection id
 
 ### Admin
 
 1. Admin auth token from `/api/auth/login`
 2. CRUD layout/module config via `/api/layouts*`
-3. On save/activate, server publishes SSE layout update
-4. Display clients re-render automatically
+3. Manage per-device theme/routing via `/api/display/devices*`
+4. On save/activate/update, server publishes SSE updates
+5. Display clients re-render automatically
 
 ## Layout Switching
 
 Current behavior:
 
-- Per-screen routing is explicit:
+- Per-screen routing is server-managed through a persisted device record:
+  - `targetSelection = null` to inherit default routing/fallback behavior
   - `targetSelection.kind = "set"` to follow a layout set
   - `targetSelection.kind = "layout"` to pin one layout directly
+- Per-screen theme is also server-managed on that same device record.
 - In set mode:
   - the server resolves sequence from the set's logic graph
   - before resolving, runtime applies persisted edge overrides/disconnections from the set designer
@@ -87,6 +91,7 @@ Current behavior:
   - set logic is bypassed and the selected layout is returned directly
   - Photos modules use their own configured slide interval
 - Set mapping is stored in `settings.screen_profile_layouts` and references **unique layout names**.
+- Device overrides are stored in the `devices` table and keyed by stable device id.
 - Admin set designer includes runtime health checks and test-path simulation using the same effective graph (base graph + persisted edge state).
 - `switchMode` is normalized to `auto` for compatibility; manual mode is no longer used.
 - Global `active` layout is still maintained as fallback if a routing target is missing.
@@ -132,6 +137,7 @@ Primary tables:
 - `layouts`
 - `layout_versions`
 - `settings`
+- `devices`
 - `module_state`
 - `module_configs`
 - `members`

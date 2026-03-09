@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { config } from "./config.js";
 import { createDatabase } from "./db.js";
 import { ChoresRepository } from "./repositories/chores-repository.js";
+import { DeviceRepository } from "./repositories/device-repository.js";
 import { LayoutRepository } from "./repositories/layout-repository.js";
 import { ModuleStateRepository } from "./repositories/module-state-repository.js";
 import { SettingsRepository } from "./repositories/settings-repository.js";
@@ -26,6 +27,7 @@ const layoutRepository = new LayoutRepository(database, {
   calendarEncryptionSecret: config.calendarEncryptionSecret,
 });
 const choresRepository = new ChoresRepository(database);
+const deviceRepository = new DeviceRepository(database);
 const moduleStateRepository = new ModuleStateRepository(database);
 const settingsRepository = new SettingsRepository(database);
 if (!settingsRepository.getAdminPasswordHash()) {
@@ -52,11 +54,16 @@ const backupService = new DatabaseBackupService(database, {
 const services = {
   layoutRepository,
   choresRepository,
+  deviceRepository,
   settingsRepository,
   moduleStateRepository,
   calendarFeedService: new CalendarFeedService(),
   photosSlideshowService: new PhotosSlideshowService(moduleStateRepository),
-  screenProfileService: new ScreenProfileService(layoutRepository, settingsRepository),
+  screenProfileService: new ScreenProfileService(
+    layoutRepository,
+    settingsRepository,
+    deviceRepository,
+  ),
   layoutEventBus,
   moduleAdapterService,
 };

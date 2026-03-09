@@ -1,35 +1,29 @@
 import GridLayout from "react-grid-layout";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  reportScreenTargetSelectionSchema,
   type GridItem,
   type LayoutRecord,
   type ModuleInstance,
   type PhotosOrientation,
-  type ReportScreenProfileLayoutOption,
-  type ReportScreenProfileSetOption,
-  type ReportScreenTargetSelection,
 } from "@hearth/shared";
 import { reportScreenProfile } from "../api/client";
+import { getOrCreateDeviceId } from "../device/device-id";
 import {
   inferLayoutRows,
   sanitizeGridItems,
 } from "../layout/grid-math";
 import {
-  getDisplaySettingsCogVisible,
-  subscribeToDisplaySettingsCogVisibility,
-} from "../preferences/display-settings-cog";
+  getDashboardDeviceBootstrapStateFromResolution,
+  getInitialDashboardDeviceBootstrapState,
+} from "./dashboard-device-bootstrap";
 import { moduleRegistry } from "../registry/module-registry";
+import { applyTheme } from "../theme/theme";
 
 const FALLBACK_VIEWPORT = {
   width: 1920,
   height: 1080,
 };
 const ORIENTATION_SWITCH_HOLDOFF_MS = 0;
-const SCREEN_SESSION_ID_STORAGE_KEY = "hearth:screen-session-id";
-const DEVICE_LAYOUT_FAMILY_STORAGE_KEY = "hearth:device-layout-family";
-const DEVICE_SCREEN_TARGET_SELECTION_STORAGE_KEY =
-  "hearth:device-screen-target-selection";
 const DISPLAY_SOURCE_KIND_STORAGE_KEY = "hearth:display-source-kind";
 const DISPLAY_CYCLE_SECONDS_STORAGE_KEY = "hearth:display-cycle-seconds";
 const DISPLAY_PHOTO_COLLECTION_ID_STORAGE_KEY = "hearth:display-photo-collection-id";
@@ -40,70 +34,6 @@ interface DisplayCycleContextEventDetail {
   cycleSeconds: number | null;
   photoCollectionId: string | null;
 }
-
-const getLegacyDeviceLayoutFamily = (): string | null => {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const stored = window.localStorage.getItem(DEVICE_LAYOUT_FAMILY_STORAGE_KEY)?.trim();
-    if (stored) {
-      return stored;
-    }
-  } catch {
-    // Ignore localStorage read failures.
-  }
-
-  return null;
-};
-
-const getDeviceTargetSelection = (): ReportScreenTargetSelection => {
-  if (typeof window === "undefined") {
-    return {
-      kind: "set",
-      setId: null,
-    };
-  }
-
-  try {
-    const stored = window.localStorage.getItem(DEVICE_SCREEN_TARGET_SELECTION_STORAGE_KEY);
-    if (stored) {
-      const parsedStored = JSON.parse(stored);
-      const parsedSelection = reportScreenTargetSelectionSchema.safeParse(parsedStored);
-      if (parsedSelection.success) {
-        return parsedSelection.data;
-      }
-    }
-  } catch {
-    // Ignore localStorage read failures.
-  }
-
-  return {
-    kind: "set",
-    setId: getLegacyDeviceLayoutFamily(),
-  };
-};
-
-const persistDeviceTargetSelection = (targetSelection: ReportScreenTargetSelection): void => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(
-      DEVICE_SCREEN_TARGET_SELECTION_STORAGE_KEY,
-      JSON.stringify(targetSelection),
-    );
-    if (targetSelection.kind === "set" && targetSelection.setId) {
-      window.localStorage.setItem(DEVICE_LAYOUT_FAMILY_STORAGE_KEY, targetSelection.setId);
-    } else {
-      window.localStorage.removeItem(DEVICE_LAYOUT_FAMILY_STORAGE_KEY);
-    }
-  } catch {
-    // Ignore localStorage write failures.
-  }
-};
 
 const publishDisplayCycleContext = (detail: DisplayCycleContextEventDetail): void => {
   if (typeof window === "undefined") {
@@ -151,80 +81,6 @@ const publishDisplayCycleContext = (detail: DisplayCycleContextEventDetail): voi
   );
 };
 
-const areSameTargetSelection = (
-  left: ReportScreenTargetSelection,
-  right: ReportScreenTargetSelection,
-): boolean => {
-  if (left.kind === "set") {
-    if (right.kind !== "set") {
-      return false;
-    }
-    return left.setId === right.setId;
-  }
-
-  if (right.kind !== "layout") {
-    return false;
-  }
-
-  return left.layoutName === right.layoutName;
-};
-
-const normalizeTargetSelection = (input: {
-  targetSelection: ReportScreenTargetSelection;
-  availableSets: ReportScreenProfileSetOption[];
-  availableLayouts: ReportScreenProfileLayoutOption[];
-}): ReportScreenTargetSelection => {
-  const targetSelection = input.targetSelection;
-
-  if (targetSelection.kind === "set") {
-    const hasSet =
-      targetSelection.setId !== null &&
-      input.availableSets.some((set) => set.id === targetSelection.setId);
-
-    return {
-      kind: "set",
-      setId: hasSet ? targetSelection.setId : (input.availableSets[0]?.id ?? null),
-    };
-  }
-
-  const hasLayout =
-    targetSelection.layoutName !== null &&
-    input.availableLayouts.some(
-      (layout) => layout.name === targetSelection.layoutName,
-    );
-
-  return {
-    kind: "layout",
-    layoutName: hasLayout ? targetSelection.layoutName : (input.availableLayouts[0]?.name ?? null),
-  };
-};
-
-const createScreenSessionId = (): string => {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
-};
-
-const getOrCreateScreenSessionId = (): string => {
-  if (typeof window === "undefined") {
-    return "server-session";
-  }
-
-  try {
-    const existing = window.localStorage.getItem(SCREEN_SESSION_ID_STORAGE_KEY)?.trim();
-    if (existing) {
-      return existing;
-    }
-
-    const generated = createScreenSessionId();
-    window.localStorage.setItem(SCREEN_SESSION_ID_STORAGE_KEY, generated);
-    return generated;
-  } catch {
-    return createScreenSessionId();
-  }
-};
 
 const getViewportSize = (): { width: number; height: number } => {
   if (typeof window === "undefined") {
@@ -252,6 +108,23 @@ interface PhotosOrientationEventDetail {
   eventToken?: string | null;
 }
 
+interface DisplayDeviceUpdatedEventDetail {
+  deviceId: string;
+}
+
+const parseEventSourcePayload = <T,>(event: Event): T | null => {
+  const data = (event as MessageEvent<unknown>).data;
+  if (typeof data !== "string") {
+    return null;
+  }
+
+  try {
+    return JSON.parse(data) as T;
+  } catch {
+    return null;
+  }
+};
+
 const areSameLayoutSnapshot = (
   left: LayoutRecord | null,
   right: LayoutRecord | null,
@@ -273,25 +146,13 @@ export const DashboardPage = () => {
   const [viewportSize, setViewportSize] = useState(getViewportSize);
   const [photoOrientationHint, setPhotoOrientationHint] =
     useState<PhotosOrientation | null>(null);
-  const [deviceTargetSelection, setDeviceTargetSelection] =
-    useState<ReportScreenTargetSelection>(getDeviceTargetSelection);
-  const [deviceFamilyOptions, setDeviceFamilyOptions] = useState<ReportScreenProfileSetOption[]>(
-    [],
-  );
-  const [deviceLayoutOptions, setDeviceLayoutOptions] = useState<
-    ReportScreenProfileLayoutOption[]
-  >([]);
-  const [devicePanelOpen, setDevicePanelOpen] = useState(false);
-  const [displaySettingsCogVisible, setDisplaySettingsCogVisible] = useState<boolean>(() =>
-    getDisplaySettingsCogVisible(),
-  );
   const [nextCycleAtMs, setNextCycleAtMs] = useState<number | null>(null);
   const activeLayoutRef = useRef<LayoutRecord | null>(null);
   const photoOrientationRef = useRef<PhotosOrientation | null>(null);
-  const deviceTargetSelectionRef = useRef<ReportScreenTargetSelection>(deviceTargetSelection);
   const latestResolveRequestIdRef = useRef(0);
   const lastPhotoEventKeyRef = useRef<string | null>(null);
-  const screenSessionIdRef = useRef<string>(getOrCreateScreenSessionId());
+  const deviceIdRef = useRef<string>(getOrCreateDeviceId());
+  const deviceBootstrapRef = useRef(getInitialDashboardDeviceBootstrapState());
   const lastOrientationSwitchAtRef = useRef(0);
   const primaryPhotosInstanceId = useMemo(
     () =>
@@ -308,57 +169,39 @@ export const DashboardPage = () => {
     photoOrientationRef.current = photoOrientationHint;
   }, [photoOrientationHint]);
 
-  useEffect(() => {
-    deviceTargetSelectionRef.current = deviceTargetSelection;
-  }, [deviceTargetSelection]);
-
-  const updateDeviceTargetSelection = useCallback(
-    (nextSelection: ReportScreenTargetSelection) => {
-      const parsedSelection = reportScreenTargetSelectionSchema.parse(nextSelection);
-      persistDeviceTargetSelection(parsedSelection);
-      deviceTargetSelectionRef.current = parsedSelection;
-      setDeviceTargetSelection(parsedSelection);
-    },
-    [],
-  );
-
   const resolveLayout = useCallback(
     async (input?: { orientation?: PhotosOrientation | null }) => {
       const requestId = latestResolveRequestIdRef.current + 1;
       latestResolveRequestIdRef.current = requestId;
       const orientation = input?.orientation ?? photoOrientationRef.current;
-      const currentTargetSelection = deviceTargetSelectionRef.current;
+      const bootstrapState = deviceBootstrapRef.current;
 
       try {
         const resolution = await reportScreenProfile({
-          targetSelection: currentTargetSelection,
+          targetSelection: bootstrapState.targetSelection,
           selectedFamily:
-            currentTargetSelection.kind === "set"
-              ? currentTargetSelection.setId
+            bootstrapState.targetSelection.kind === "set"
+              ? bootstrapState.targetSelection.setId
               : null,
           photoOrientation: orientation,
-          screenSessionId: screenSessionIdRef.current,
+          reportedThemeId: bootstrapState.reportedThemeId,
+          screenSessionId: deviceIdRef.current,
         });
         if (requestId !== latestResolveRequestIdRef.current) {
           return;
         }
-        setDeviceFamilyOptions(resolution.availableSets);
-        setDeviceLayoutOptions(resolution.availableLayouts);
-        const normalizedSelection = normalizeTargetSelection({
-          targetSelection: currentTargetSelection,
-          availableSets: resolution.availableSets,
-          availableLayouts: resolution.availableLayouts,
-        });
-        if (!areSameTargetSelection(normalizedSelection, currentTargetSelection)) {
-          updateDeviceTargetSelection(normalizedSelection);
-        }
+        deviceBootstrapRef.current =
+          getDashboardDeviceBootstrapStateFromResolution(resolution);
+        applyTheme(resolution.device.themeId);
         setNextCycleAtMs(resolution.nextCycleAtMs);
         publishDisplayCycleContext({
-          sourceKind: normalizedSelection.kind,
+          sourceKind: resolution.resolvedTargetSelection.kind,
           cycleSeconds:
-            normalizedSelection.kind === "set" ? resolution.autoCycleSeconds : null,
+            resolution.resolvedTargetSelection.kind === "set"
+              ? resolution.autoCycleSeconds
+              : null,
           photoCollectionId:
-            normalizedSelection.kind === "set"
+            resolution.resolvedTargetSelection.kind === "set"
               ? resolution.selectedPhotoCollectionId
               : null,
         });
@@ -380,7 +223,7 @@ export const DashboardPage = () => {
         setError(loadError instanceof Error ? loadError.message : "Failed to load");
       }
     },
-    [updateDeviceTargetSelection],
+    [],
   );
 
   useEffect(() => {
@@ -391,10 +234,7 @@ export const DashboardPage = () => {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [
-    resolveLayout,
-    deviceTargetSelection,
-  ]);
+  }, [resolveLayout]);
 
   useEffect(() => {
     if (nextCycleAtMs === null) {
@@ -420,9 +260,18 @@ export const DashboardPage = () => {
     const handleChoresUpdated = () => {
       window.dispatchEvent(new CustomEvent("hearth:chores-updated"));
     };
+    const handleDeviceUpdated = (event: Event) => {
+      const detail = parseEventSourcePayload<DisplayDeviceUpdatedEventDetail>(event);
+      if (!detail || detail.deviceId !== deviceIdRef.current) {
+        return;
+      }
+
+      void resolveLayout({ orientation: photoOrientationRef.current });
+    };
 
     eventSource.addEventListener("layout-updated", handleLayoutChange);
     eventSource.addEventListener("chores-updated", handleChoresUpdated);
+    eventSource.addEventListener("display-device-updated", handleDeviceUpdated);
 
     eventSource.onerror = () => {
       window.setTimeout(() => {
@@ -433,6 +282,7 @@ export const DashboardPage = () => {
     return () => {
       eventSource.removeEventListener("layout-updated", handleLayoutChange);
       eventSource.removeEventListener("chores-updated", handleChoresUpdated);
+      eventSource.removeEventListener("display-device-updated", handleDeviceUpdated);
       eventSource.close();
     };
   }, [resolveLayout]);
@@ -448,17 +298,6 @@ export const DashboardPage = () => {
       window.removeEventListener("resize", updateViewport);
     };
   }, []);
-
-  useEffect(
-    () => subscribeToDisplaySettingsCogVisibility(setDisplaySettingsCogVisible),
-    [],
-  );
-
-  useEffect(() => {
-    if (!displaySettingsCogVisible) {
-      setDevicePanelOpen(false);
-    }
-  }, [displaySettingsCogVisible]);
 
   useEffect(() => {
     const handlePhotosOrientation = (event: Event) => {
@@ -583,36 +422,6 @@ export const DashboardPage = () => {
 
   const activeHasPlacedModules =
     activeRenderedModules.length > 0 && activeTranslatedLayoutItems.length > 0;
-  const selectedSetName =
-    deviceTargetSelection.kind === "set"
-      ? (deviceFamilyOptions.find((option) => option.id === deviceTargetSelection.setId)?.name ??
-        "Not selected")
-      : "Not selected";
-  const selectedLayoutName =
-    deviceTargetSelection.kind === "layout"
-      ? (deviceLayoutOptions.find((option) => option.name === deviceTargetSelection.layoutName)
-          ?.name ??
-        "Not selected")
-      : "Not selected";
-
-  const handleRoutingModeChange = (kind: "set" | "layout") => {
-    if (kind === deviceTargetSelection.kind) {
-      return;
-    }
-
-    if (kind === "set") {
-      updateDeviceTargetSelection({
-        kind: "set",
-        setId: deviceFamilyOptions[0]?.id ?? null,
-      });
-      return;
-    }
-
-    updateDeviceTargetSelection({
-      kind: "layout",
-      layoutName: deviceLayoutOptions[0]?.name ?? null,
-    });
-  };
 
   const renderLayoutLayer = (input: {
     renderedModules: typeof activeRenderedModules;
@@ -680,138 +489,21 @@ export const DashboardPage = () => {
           </p>
         ) : null}
 
-        {displaySettingsCogVisible && devicePanelOpen ? (
-          <button
-            type="button"
-            aria-label="Close screen routing panel"
-            className="absolute inset-0 z-20 bg-transparent"
-            onClick={() => setDevicePanelOpen(false)}
-          />
-        ) : null}
-
-        {displaySettingsCogVisible ? (
-          <div className="absolute bottom-3 right-3 z-30">
-            <button
-              type="button"
-              onClick={() => setDevicePanelOpen((current) => !current)}
-              aria-label="Display source settings"
-              title="Display source settings"
-              className={`flex h-9 w-9 items-center justify-center rounded-full border bg-slate-900/85 text-slate-200 transition ${
-                devicePanelOpen
-                  ? "border-cyan-400/80 text-cyan-200"
-                  : "border-slate-500/70 hover:border-cyan-400/80"
-              }`}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-5 w-5"
-                aria-hidden="true"
-              >
-                <path d="M12 15.75A3.75 3.75 0 1 0 12 8.25a3.75 3.75 0 0 0 0 7.5Z" />
-                <path d="M19.5 15a1.5 1.5 0 0 0 .3 1.65l.06.06a1.8 1.8 0 0 1-2.55 2.55l-.06-.06A1.5 1.5 0 0 0 15.6 19.5a1.5 1.5 0 0 0-.9 1.35V21a1.8 1.8 0 0 1-3.6 0v-.09a1.5 1.5 0 0 0-.9-1.35 1.5 1.5 0 0 0-1.65.3l-.06.06a1.8 1.8 0 0 1-2.55-2.55l.06-.06A1.5 1.5 0 0 0 4.5 15.6a1.5 1.5 0 0 0-1.35-.9H3a1.8 1.8 0 0 1 0-3.6h.15a1.5 1.5 0 0 0 1.35-.9 1.5 1.5 0 0 0-.3-1.65l-.06-.06a1.8 1.8 0 0 1 2.55-2.55l.06.06A1.5 1.5 0 0 0 8.4 4.5a1.5 1.5 0 0 0 .9-1.35V3a1.8 1.8 0 0 1 3.6 0v.15a1.5 1.5 0 0 0 .9 1.35 1.5 1.5 0 0 0 1.65-.3l.06-.06a1.8 1.8 0 0 1 2.55 2.55l-.06.06A1.5 1.5 0 0 0 19.5 8.4a1.5 1.5 0 0 0 1.35.9H21a1.8 1.8 0 0 1 0 3.6h-.15a1.5 1.5 0 0 0-1.35.9Z" />
-              </svg>
-            </button>
-
-            {devicePanelOpen ? (
-              <div className="mt-2 w-64 rounded-md border border-slate-600 bg-slate-900/95 p-3 text-xs text-slate-200 shadow-xl">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
-                  Display source
-                </p>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                  Source type
-                </label>
-                <select
-                  className="w-full rounded border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
-                  value={deviceTargetSelection.kind}
-                  onChange={(event) =>
-                    handleRoutingModeChange(
-                      event.target.value === "layout" ? "layout" : "set",
-                    )
-                  }
-                >
-                  <option value="set">Follow Set</option>
-                  <option value="layout">Pin Layout</option>
-                </select>
-
-                {deviceTargetSelection.kind === "set" ? (
-                  <>
-                    <p className="mb-2 mt-3 text-[11px] text-slate-400">
-                      Using set: {selectedSetName}
-                    </p>
-                    <select
-                      className="w-full rounded border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
-                      value={deviceTargetSelection.setId ?? ""}
-                      onChange={(event) =>
-                        updateDeviceTargetSelection({
-                          kind: "set",
-                          setId: event.target.value || null,
-                        })
-                      }
-                    >
-                      {deviceFamilyOptions.length === 0 ? (
-                        <option value="">No sets available</option>
-                      ) : null}
-                      {deviceFamilyOptions.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.name}
-                        </option>
-                      ))}
-                    </select>
-                  </>
-                ) : (
-                  <>
-                    <p className="mb-2 mt-3 text-[11px] text-slate-400">
-                      Pinned layout: {selectedLayoutName}
-                    </p>
-                    <select
-                      className="w-full rounded border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
-                      value={deviceTargetSelection.layoutName ?? ""}
-                      onChange={(event) =>
-                        updateDeviceTargetSelection({
-                          kind: "layout",
-                          layoutName: event.target.value || null,
-                        })
-                      }
-                    >
-                      {deviceLayoutOptions.length === 0 ? (
-                        <option value="">No layouts available</option>
-                      ) : null}
-                      {deviceLayoutOptions.map((option) => (
-                        <option key={option.name} value={option.name}>
-                          {option.name}
-                        </option>
-                      ))}
-                    </select>
-                  </>
-                )}
-                <p className="mt-2 text-[11px] text-slate-400">
-                  Saved per device/browser.
-                </p>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
         {!activeLayout ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/70 text-center text-slate-300">
             <h1 className="font-display text-4xl font-bold text-slate-100">Hearth</h1>
             <p className="text-lg text-slate-200">Hearth — Home is where the Hearth is.</p>
             <p>
-              No display layout is configured for this screen. Use /admin to map a layout set or
-              select a single layout.
+              No display layout is configured for this screen. Use Admin &gt; Devices to assign a
+              set or pinned layout for this display.
             </p>
           </div>
         ) : !activeHasPlacedModules ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-6 text-center text-amber-100">
             <h1 className="font-display text-3xl font-semibold">Layout is empty</h1>
             <p className="max-w-2xl text-base text-amber-100/90">
-              The active layout has no placed modules. Open `/admin` to add modules to this
-              layout or set a different layout as active.
+              The active layout has no placed modules. Open Admin &gt; Layouts to add modules to
+              this layout or choose a different device assignment.
             </p>
           </div>
         ) : gridDisplayMetrics ? (

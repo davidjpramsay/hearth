@@ -1,4 +1,5 @@
 import {
+  displayThemeIdSchema,
   applyLayoutSetLogicEdgeState,
   getPhotoCollectionIdFromActionParams,
   reportScreenProfileRequestSchema,
@@ -19,6 +20,7 @@ import {
   resolveLayoutLogicAction,
   resolveLayoutLogicCondition,
 } from "../layout-logic/registry.js";
+import type { DeviceRepository } from "../repositories/device-repository.js";
 import type { LayoutRepository } from "../repositories/layout-repository.js";
 import type { SettingsRepository } from "../repositories/settings-repository.js";
 
@@ -67,6 +69,23 @@ interface SessionCycleState {
   lastSeenAtMs: number;
 }
 
+interface DeviceTargetCatalog {
+  availableSets: { id: string; name: string }[];
+  availableLayouts: ReportScreenProfileLayoutOption[];
+  availableSetIds: Set<string>;
+  availableLayoutNames: Set<string>;
+}
+
+type ValidateManagedDeviceTargetSelectionResult =
+  | {
+      ok: true;
+      targetSelection: ReportScreenTargetSelection | null;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
 const toSequenceKey = (
   family: string,
   targets: AutoLayoutTarget[],
@@ -75,8 +94,100 @@ const toSequenceKey = (
     .map(
       (target) =>
         `${target.layoutName}:${clampCycleSeconds(target.cycleSeconds ?? DEFAULT_TARGET_CYCLE_SECONDS)}`,
-    )
+      )
     .join("|")}`;
+
+const createDeviceTargetCatalog = (input: {
+  mapping: ScreenProfileLayouts;
+  layoutNames: string[];
+}): DeviceTargetCatalog => {
+  const availableSets = toAvailableSets(input.mapping);
+  const availableLayouts = toAvailableLayouts(input.layoutNames);
+
+  return {
+    availableSets,
+    availableLayouts,
+    availableSetIds: new Set(availableSets.map((set) => set.id)),
+    availableLayoutNames: new Set(availableLayouts.map((layout) => layout.name)),
+  };
+};
+
+const normalizeConfiguredTargetSelection = (input: {
+  targetSelection: ReportScreenTargetSelection | null;
+  targetCatalog: DeviceTargetCatalog;
+}): ReportScreenTargetSelection | null => {
+  const { targetSelection, targetCatalog } = input;
+
+  if (!targetSelection) {
+    return null;
+  }
+
+  if (targetSelection.kind === "set") {
+    return targetSelection.setId !== null &&
+      targetCatalog.availableSetIds.has(targetSelection.setId)
+      ? targetSelection
+      : null;
+  }
+
+  return targetSelection.layoutName !== null &&
+    targetCatalog.availableLayoutNames.has(targetSelection.layoutName)
+    ? targetSelection
+    : null;
+};
+
+const validateManagedDeviceTargetSelection = (input: {
+  targetSelection: ReportScreenTargetSelection | null;
+  targetCatalog: DeviceTargetCatalog;
+}): ValidateManagedDeviceTargetSelectionResult => {
+  const { targetSelection, targetCatalog } = input;
+
+  if (targetSelection === null) {
+    return {
+      ok: true,
+      targetSelection: null,
+    };
+  }
+
+  if (targetSelection.kind === "set") {
+    if (targetSelection.setId === null) {
+      return {
+        ok: false,
+        message: "Choose a set or switch routing to Inherit default.",
+      };
+    }
+
+    if (!targetCatalog.availableSetIds.has(targetSelection.setId)) {
+      return {
+        ok: false,
+        message: `Set not found: ${targetSelection.setId}`,
+      };
+    }
+
+    return {
+      ok: true,
+      targetSelection,
+    };
+  }
+
+  if (targetSelection.layoutName === null) {
+    return {
+      ok: false,
+      message: "Choose a layout or switch routing to Inherit default.",
+    };
+  }
+
+  if (!targetCatalog.availableLayoutNames.has(targetSelection.layoutName)) {
+    return {
+      ok: false,
+      message: `Layout not found: ${targetSelection.layoutName}`,
+    };
+  }
+
+  return {
+    ok: true,
+    targetSelection,
+  };
+};
 
 export class ScreenProfileService {
   private readonly sessionCycles = new Map<string, SessionCycleState>();
@@ -84,21 +195,65 @@ export class ScreenProfileService {
   constructor(
     private readonly layoutRepository: LayoutRepository,
     private readonly settingsRepository: SettingsRepository,
+    private readonly deviceRepository: DeviceRepository,
   ) {}
+
+  validateManagedDeviceTargetSelection(
+    targetSelection: ReportScreenTargetSelection | null,
+  ): ValidateManagedDeviceTargetSelectionResult {
+    return validateManagedDeviceTargetSelection({
+      targetSelection,
+      targetCatalog: this.getDeviceTargetCatalog(),
+    });
+  }
 
   reportScreenProfile(input: ReportScreenProfileRequest): ReportScreenProfileResponse {
     const payload = reportScreenProfileRequestSchema.parse(input);
     const nowMs = Date.now();
     this.pruneStaleSessions(nowMs);
     const mapping = this.settingsRepository.getScreenProfileLayouts();
-    const availableSets = toAvailableSets(mapping);
-    const availableLayouts = toAvailableLayouts(
-      this.layoutRepository.listLayouts(false).map((layout) => layout.name),
-    );
-    const requestedTargetSelection = toRequestedTargetSelection(payload);
+    const layoutNames = this.layoutRepository
+      .listLayouts(false)
+      .map((layout) => layout.name);
+    const targetCatalog = createDeviceTargetCatalog({
+      mapping,
+      layoutNames,
+    });
+    const { availableSets, availableLayouts } = targetCatalog;
+    const requestedTargetSelection = normalizeConfiguredTargetSelection({
+      targetSelection: toRequestedTargetSelection(payload),
+      targetCatalog,
+    });
+    const reportedThemeResult = displayThemeIdSchema.safeParse(payload.reportedThemeId);
+    const trackedDevice =
+      payload.screenSessionId !== "default"
+        ? this.deviceRepository.recordSeen({
+            deviceId: payload.screenSessionId,
+            reportedTargetSelection: requestedTargetSelection,
+            reportedThemeId: payload.reportedThemeId,
+          })
+        : {
+            id: payload.screenSessionId,
+            name: "Current display",
+            themeId: reportedThemeResult.success ? reportedThemeResult.data : "default",
+            targetSelection: requestedTargetSelection,
+            createdAt: "",
+            updatedAt: "",
+            lastSeenAt: "",
+          };
+    const deviceTargetSelection = normalizeConfiguredTargetSelection({
+      targetSelection: trackedDevice.targetSelection,
+      targetCatalog,
+    });
+    const effectiveTargetSelection =
+      deviceTargetSelection ??
+      reportScreenTargetSelectionSchema.parse({
+        kind: "set",
+        setId: null,
+      });
     const requestedSetId =
-      requestedTargetSelection.kind === "set"
-        ? requestedTargetSelection.setId
+      effectiveTargetSelection.kind === "set"
+        ? effectiveTargetSelection.setId
         : null;
     const selectedSet =
       (requestedSetId
@@ -110,13 +265,13 @@ export class ScreenProfileService {
       : screenFamilyLayoutTargetSchema.parse({});
     const requestedPhotoOrientation = payload.photoOrientation ?? null;
     const appliedPhotoOrientation =
-      requestedTargetSelection.kind === "set"
+      effectiveTargetSelection.kind === "set"
         ? toAutoOrientation(requestedPhotoOrientation)
         : null;
     const resolution =
-      requestedTargetSelection.kind === "layout"
+      effectiveTargetSelection.kind === "layout"
         ? {
-            layoutName: requestedTargetSelection.layoutName,
+            layoutName: effectiveTargetSelection.layoutName,
             nextCycleAtMs: null,
             selectedCycleSeconds: null,
             selectedPhotoCollectionId: null,
@@ -134,6 +289,16 @@ export class ScreenProfileService {
     const autoCycleSeconds =
       resolution.selectedCycleSeconds ?? Math.max(3, mapping.autoCycleSeconds);
     const nextCycleAtMs = resolution.nextCycleAtMs;
+    const resolvedTargetSelection =
+      effectiveTargetSelection.kind === "layout"
+        ? reportScreenTargetSelectionSchema.parse({
+            kind: "layout",
+            layoutName: effectiveTargetSelection.layoutName,
+          })
+        : reportScreenTargetSelectionSchema.parse({
+            kind: "set",
+            setId: selectedSet?.id ?? null,
+          });
 
     if (targetLayout) {
       return reportScreenProfileResponseSchema.parse({
@@ -146,6 +311,13 @@ export class ScreenProfileService {
         selectedPhotoCollectionId: resolution.selectedPhotoCollectionId,
         requestedPhotoOrientation,
         appliedPhotoOrientation,
+        device: {
+          id: trackedDevice.id,
+          name: trackedDevice.name,
+          themeId: trackedDevice.themeId,
+          targetSelection: deviceTargetSelection,
+        },
+        resolvedTargetSelection,
         layout: targetLayout,
         reason: "resolved",
       });
@@ -163,6 +335,13 @@ export class ScreenProfileService {
         selectedPhotoCollectionId: resolution.selectedPhotoCollectionId,
         requestedPhotoOrientation,
         appliedPhotoOrientation,
+        device: {
+          id: trackedDevice.id,
+          name: trackedDevice.name,
+          themeId: trackedDevice.themeId,
+          targetSelection: deviceTargetSelection,
+        },
+        resolvedTargetSelection,
         layout: activeLayout,
         reason: "fallback-active",
       });
@@ -180,6 +359,13 @@ export class ScreenProfileService {
         selectedPhotoCollectionId: resolution.selectedPhotoCollectionId,
         requestedPhotoOrientation,
         appliedPhotoOrientation,
+        device: {
+          id: trackedDevice.id,
+          name: trackedDevice.name,
+          themeId: trackedDevice.themeId,
+          targetSelection: deviceTargetSelection,
+        },
+        resolvedTargetSelection,
         layout: firstLayout,
         reason: "fallback-first",
       });
@@ -195,8 +381,27 @@ export class ScreenProfileService {
       selectedPhotoCollectionId: resolution.selectedPhotoCollectionId,
       requestedPhotoOrientation,
       appliedPhotoOrientation,
+      device: {
+        id: trackedDevice.id,
+        name: trackedDevice.name,
+        themeId: trackedDevice.themeId,
+        targetSelection: deviceTargetSelection,
+      },
+      resolvedTargetSelection,
       layout: null,
       reason: "no-layout",
+    });
+  }
+
+  private getDeviceTargetCatalog(): DeviceTargetCatalog {
+    const mapping = this.settingsRepository.getScreenProfileLayouts();
+    const layoutNames = this.layoutRepository
+      .listLayouts(false)
+      .map((layout) => layout.name);
+
+    return createDeviceTargetCatalog({
+      mapping,
+      layoutNames,
     });
   }
 

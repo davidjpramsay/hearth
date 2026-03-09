@@ -15,9 +15,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getLayouts, updateLayout } from "../api/client";
 import { clearAuthToken, getAuthToken } from "../auth/storage";
-import { DisplaySettingsCogToggle } from "../components/DisplaySettingsCogToggle";
+import { AdminNavActions } from "../components/admin/AdminNavActions";
 import { ModuleFrame } from "../components/ModuleFrame";
-import { ThemePicker } from "../components/ThemePicker";
 import {
   getAdaptiveGridMetrics,
   getPhotoLayoutLock,
@@ -118,6 +117,10 @@ export const AdminLayoutEditorPage = () => {
   const saveTimeoutRef = useRef<number | null>(null);
   const latestQueuedSaveSeqRef = useRef(0);
   const previewHostRef = useRef<HTMLDivElement | null>(null);
+  const onLogout = useCallback(() => {
+    clearAuthToken();
+    navigate("/admin/login", { replace: true });
+  }, [navigate]);
 
   const loadData = useCallback(async () => {
     if (!token) {
@@ -567,25 +570,7 @@ export const AdminLayoutEditorPage = () => {
           </span>
         </div>
         <div className="flex flex-wrap items-end gap-2">
-          <ThemePicker className="min-w-[180px]" />
-          <DisplaySettingsCogToggle className="min-w-[220px]" />
-          <button
-            type="button"
-            onClick={() => navigate("/chores")}
-            className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
-          >
-            Chores
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              clearAuthToken();
-              navigate("/admin/login", { replace: true });
-            }}
-            className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
-          >
-            Logout
-          </button>
+          <AdminNavActions current="layouts" onLogout={onLogout} />
         </div>
       </header>
 

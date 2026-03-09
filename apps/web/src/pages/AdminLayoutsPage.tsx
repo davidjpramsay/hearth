@@ -12,7 +12,7 @@ import {
   updateScreenProfileLayouts,
 } from "../api/client";
 import { clearAuthToken, getAuthToken } from "../auth/storage";
-import { DisplaySettingsCogToggle } from "../components/DisplaySettingsCogToggle";
+import { AdminNavActions } from "../components/admin/AdminNavActions";
 import { PageShell } from "../components/PageShell";
 import { buildDuplicateLayoutName } from "./layout-name-utils";
 import { analyzeSetRuntimeHealth } from "./layout-set-runtime-health";
@@ -1065,25 +1065,7 @@ export const AdminLayoutsPage = () => {
     <PageShell
       title="Layouts"
       subtitle="Create and manage dashboard layouts."
-      headerControls={<DisplaySettingsCogToggle />}
-      rightActions={
-        <>
-          <button
-            type="button"
-            onClick={() => navigate("/chores")}
-            className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
-          >
-            Chores
-          </button>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
-          >
-            Logout
-          </button>
-        </>
-      }
+      rightActions={<AdminNavActions current="layouts" onLogout={onLogout} />}
     >
       <section className="mb-6 rounded-xl border border-slate-700 bg-slate-900/80 p-4">
         <form className="flex flex-wrap items-end gap-3" onSubmit={onCreateLayout}>

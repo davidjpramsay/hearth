@@ -1,21 +1,16 @@
 import type { ReactNode } from "react";
-import { ThemePicker } from "./ThemePicker";
 
 interface PageShellProps {
   title: string;
   subtitle?: string;
-  headerControls?: ReactNode;
   rightActions?: ReactNode;
-  showThemePicker?: boolean;
   children: ReactNode;
 }
 
 export const PageShell = ({
   title,
   subtitle,
-  headerControls,
   rightActions,
-  showThemePicker = true,
   children,
 }: PageShellProps) => (
   <main
@@ -33,11 +28,7 @@ export const PageShell = ({
         <h1 className="font-display text-3xl font-bold text-slate-100">{title}</h1>
         {subtitle ? <p className="mt-1 text-slate-300">{subtitle}</p> : null}
       </div>
-      <div className="flex flex-wrap items-end gap-3">
-        {showThemePicker ? <ThemePicker /> : null}
-        {headerControls}
-        {rightActions}
-      </div>
+      <div className="flex flex-wrap items-end gap-3">{rightActions}</div>
     </header>
     {children}
   </main>

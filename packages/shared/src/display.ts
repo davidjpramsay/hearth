@@ -952,12 +952,46 @@ export const reportScreenTargetSelectionSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 
+export const displayThemeIdSchema = z.enum([
+  "default",
+  "nord",
+  "solarized",
+  "monokai",
+]);
+
+export const displayDeviceIdSchema = z.string().trim().min(1).max(128);
+export const displayDeviceNameSchema = z.string().trim().min(1).max(80);
+
+export const displayDeviceRuntimeSchema = z.object({
+  id: displayDeviceIdSchema,
+  name: displayDeviceNameSchema,
+  themeId: displayThemeIdSchema.default("default"),
+  targetSelection: reportScreenTargetSelectionSchema.nullable().default(null),
+});
+
+export const displayDeviceSchema = displayDeviceRuntimeSchema.extend({
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  lastSeenAt: z.string(),
+});
+
+export const displayDevicesResponseSchema = z.object({
+  devices: z.array(displayDeviceSchema).max(512).default([]),
+});
+
+export const updateDisplayDeviceRequestSchema = z.object({
+  name: displayDeviceNameSchema,
+  themeId: displayThemeIdSchema,
+  targetSelection: reportScreenTargetSelectionSchema.nullable().default(null),
+});
+
 export const reportScreenProfileRequestSchema = z.object({
   targetSelection: reportScreenTargetSelectionSchema.optional(),
   // Legacy field kept for compatibility. Prefer targetSelection.kind === "set".
   selectedFamily: screenFamilySchema.nullable().optional().default(null),
   photoOrientation: photosOrientationSchema.nullable().optional().default(null),
   photoEventToken: z.number().int().min(0).optional(),
+  reportedThemeId: displayThemeIdSchema.optional(),
   screenSessionId: z.string().trim().min(1).max(128).optional().default("default"),
 });
 
@@ -987,6 +1021,8 @@ export const reportScreenProfileResponseSchema = z.object({
   selectedPhotoCollectionId: photoCollectionIdSchema.nullable(),
   requestedPhotoOrientation: photosOrientationSchema.nullable(),
   appliedPhotoOrientation: autoPhotoOrientationSchema.nullable(),
+  device: displayDeviceRuntimeSchema,
+  resolvedTargetSelection: reportScreenTargetSelectionSchema,
   layout: layoutRecordSchema.nullable(),
   reason: reportScreenProfileReasonSchema,
 });
@@ -999,6 +1035,13 @@ export type AutoLayoutTarget = z.infer<typeof autoLayoutTargetSchema>;
 export type ScreenFamilyLayoutTarget = z.infer<typeof screenFamilyLayoutTargetSchema>;
 export type ScreenProfileLayouts = z.infer<typeof screenProfileLayoutsSchema>;
 export type ReportScreenTargetSelection = z.infer<typeof reportScreenTargetSelectionSchema>;
+export type DisplayThemeId = z.infer<typeof displayThemeIdSchema>;
+export type DisplayDeviceId = z.infer<typeof displayDeviceIdSchema>;
+export type DisplayDeviceName = z.infer<typeof displayDeviceNameSchema>;
+export type DisplayDeviceRuntime = z.infer<typeof displayDeviceRuntimeSchema>;
+export type DisplayDevice = z.infer<typeof displayDeviceSchema>;
+export type DisplayDevicesResponse = z.infer<typeof displayDevicesResponseSchema>;
+export type UpdateDisplayDeviceRequest = z.infer<typeof updateDisplayDeviceRequestSchema>;
 export type ReportScreenProfileRequest = z.infer<typeof reportScreenProfileRequestSchema>;
 export type ReportScreenProfileReason = z.infer<typeof reportScreenProfileReasonSchema>;
 export type ReportScreenProfileSetOption = z.infer<typeof reportScreenProfileSetOptionSchema>;

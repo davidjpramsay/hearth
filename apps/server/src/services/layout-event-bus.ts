@@ -23,7 +23,17 @@ export interface ChoresUpdatedEvent {
   date?: string;
 }
 
-export type AppEvent = LayoutUpdatedEvent | ChoresUpdatedEvent;
+export interface DisplayDeviceUpdatedEvent {
+  type: "display-device-updated";
+  deviceId: string;
+  changedAt: string;
+  reason: "device-updated";
+}
+
+export type AppEvent =
+  | LayoutUpdatedEvent
+  | ChoresUpdatedEvent
+  | DisplayDeviceUpdatedEvent;
 
 type Listener = (event: AppEvent) => void;
 

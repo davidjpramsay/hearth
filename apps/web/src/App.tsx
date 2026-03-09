@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./auth/RequireAuth";
 import { AdminChoresPage } from "./pages/AdminChoresPage";
+import { AdminDevicesPage } from "./pages/AdminDevicesPage";
 import { AdminLayoutEditorPage } from "./pages/AdminLayoutEditorPage";
 import { AdminLayoutsPage } from "./pages/AdminLayoutsPage";
 import { AdminLoginPage } from "./pages/AdminLoginPage";
@@ -20,10 +21,26 @@ export const App = () => (
       }
     />
     <Route
+      path="/devices"
+      element={
+        <RequireAuth>
+          <AdminDevicesPage />
+        </RequireAuth>
+      }
+    />
+    <Route
       path="/admin/chores"
       element={
         <RequireAuth>
           <AdminChoresPage />
+        </RequireAuth>
+      }
+    />
+    <Route
+      path="/admin/devices"
+      element={
+        <RequireAuth>
+          <AdminDevicesPage />
         </RequireAuth>
       }
     />

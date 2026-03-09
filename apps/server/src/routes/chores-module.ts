@@ -2,6 +2,7 @@ import {
   choresBoardResponseSchema,
   choresModuleConfigSchema,
   choresModuleParamsSchema,
+  choresModuleSummaryQuerySchema,
   setChoreCompletionRequestSchema,
 } from "@hearth/shared";
 import type { FastifyInstance } from "fastify";
@@ -25,6 +26,14 @@ export const registerChoresModuleRoutes = (
       return reply.code(400).send({ message: params.error.message });
     }
 
+    const query = choresModuleSummaryQuerySchema.safeParse(request.query ?? {});
+    if (!query.success) {
+      return reply.code(400).send({ message: query.error.message });
+    }
+
+    const startDate = query.data.startDate ?? todayDate();
+    reply.header("cache-control", "no-store");
+
     const payoutConfig = services.settingsRepository.getChoresPayoutConfig();
     const moduleInstance = services.layoutRepository.findModuleInstance(
       params.data.instanceId,
@@ -34,12 +43,12 @@ export const registerChoresModuleRoutes = (
       return reply.send(
         choresBoardResponseSchema.parse({
           generatedAt: new Date().toISOString(),
-          startDate: todayDate(),
+          startDate,
           days: 1,
           payoutConfig,
           members: [],
           chores: [],
-          board: [{ date: todayDate(), items: [] }],
+          board: [{ date: startDate, items: [] }],
           stats: {
             dailyCompletionRate: 0,
             weeklyCompletedCount: 0,
@@ -55,7 +64,7 @@ export const registerChoresModuleRoutes = (
     const days = Math.max(1, config.previewDays + 1);
 
     const board = services.choresRepository.getBoard({
-      startDate: todayDate(),
+      startDate,
       days,
       enableMoneyTracking: config.enableMoneyTracking,
       payoutConfig,

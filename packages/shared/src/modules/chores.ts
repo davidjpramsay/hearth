@@ -118,6 +118,10 @@ export const choresBoardQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(31).default(7),
 });
 
+export const choresModuleSummaryQuerySchema = z.object({
+  startDate: isoDateSchema.optional(),
+});
+
 export const createChoreMemberRequestSchema = z.object({
   name: z.string().trim().min(1).max(80),
   avatarUrl: z.string().trim().max(2048).nullable().optional(),
@@ -192,6 +196,7 @@ export type ChoreBoardDay = z.infer<typeof choreBoardDaySchema>;
 export type ChoresStats = z.infer<typeof choresStatsSchema>;
 export type ChoresBoardResponse = z.infer<typeof choresBoardResponseSchema>;
 export type ChoresBoardQuery = z.infer<typeof choresBoardQuerySchema>;
+export type ChoresModuleSummaryQuery = z.infer<typeof choresModuleSummaryQuerySchema>;
 export type CreateChoreMemberRequest = z.infer<typeof createChoreMemberRequestSchema>;
 export type UpdateChoreMemberRequest = z.infer<typeof updateChoreMemberRequestSchema>;
 export type CreateChoreRequest = z.infer<typeof createChoreRequestSchema>;

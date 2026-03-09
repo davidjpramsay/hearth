@@ -9,7 +9,7 @@ This is the prioritized feature sequence for upcoming work.
 - Chore schedules are non-retrospective (start from creation date).
 - Auto-generated app secrets and rolling SQLite backups.
 - Calendar source URLs encrypted at rest.
-- Per-screen routing mode selection (`Follow Set` or `Pin Layout`) persisted per device/browser.
+- Server-managed Devices view for per-screen theme and routing assignment.
 - Set-driven layout logic graph with portrait/landscape branching and rule-level cycle timers.
 - Set-designer graph edits persist edge overrides/disconnections and canvas node positions.
 - Built-in Count Down SDK module with date/time countdown modes.
@@ -97,9 +97,9 @@ Done criteria:
 
 Status: Completed for current milestone.
 
-## Priority 6: Centralized Device Assignment Overrides
+## Priority 6: Centralized Device Assignment Overrides (Completed)
 
-Goal: move from browser-local routing persistence to optional server-managed device identity and assignment.
+Goal: move from browser-local routing persistence to server-managed device identity and assignment.
 
 Scope:
 
@@ -118,3 +118,5 @@ Done criteria:
 - A device can be assigned and persistently uses its configured layout behavior.
 - Devices can be switched back to "inherit defaults" without losing global routing config.
 - Multi-device installs can run different layouts simultaneously without conflicts.
+
+Status: Completed for current milestone.

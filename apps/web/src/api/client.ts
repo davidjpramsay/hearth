@@ -6,6 +6,8 @@ import {
   choresPayoutConfigSchema,
   createChoreMemberRequestSchema,
   createChoreRequestSchema,
+  displayDeviceSchema,
+  displayDevicesResponseSchema,
   layoutRecordSchema,
   layoutsResponseSchema,
   loginResponseSchema,
@@ -15,6 +17,7 @@ import {
   reportScreenProfileResponseSchema,
   screenProfileLayoutsSchema,
   setChoreCompletionRequestSchema,
+  updateDisplayDeviceRequestSchema,
   updateChoresPayoutConfigRequestSchema,
   type ChoreMember,
   type ChoreRecord,
@@ -23,6 +26,8 @@ import {
   type CreateChoreMemberRequest,
   type CreateChoreRequest,
   type CreateLayoutRequest,
+  type DisplayDevice,
+  type DisplayDevicesResponse,
   type LayoutRecord,
   type LoginResponse,
   type PhotoCollectionsResponse,
@@ -31,6 +36,7 @@ import {
   type ReportScreenProfileResponse,
   type ScreenProfileLayouts,
   type SetChoreCompletionRequest,
+  type UpdateDisplayDeviceRequest,
   type UpdateChoreMemberRequest,
   type UpdateChoreRequest,
   type UpdateChoresPayoutConfigRequest,
@@ -175,6 +181,33 @@ export const updateScreenProfileLayouts = async (
       body: JSON.stringify(screenProfileLayoutsSchema.parse(payload)),
     },
     (body) => screenProfileLayoutsSchema.parse(body),
+  );
+
+export const getDisplayDevices = async (
+  token: string,
+): Promise<DisplayDevicesResponse> =>
+  request(
+    "/display/devices",
+    {
+      method: "GET",
+      headers: withAuth(token),
+    },
+    (payload) => displayDevicesResponseSchema.parse(payload),
+  );
+
+export const updateDisplayDevice = async (
+  token: string,
+  deviceId: string,
+  payload: UpdateDisplayDeviceRequest,
+): Promise<DisplayDevice> =>
+  request(
+    `/display/devices/${encodeURIComponent(deviceId)}`,
+    {
+      method: "PUT",
+      headers: withAuth(token),
+      body: JSON.stringify(updateDisplayDeviceRequestSchema.parse(payload)),
+    },
+    (body) => displayDeviceSchema.parse(body),
   );
 
 export const getPhotoCollections = async (

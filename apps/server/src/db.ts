@@ -77,6 +77,16 @@ CREATE TABLE IF NOT EXISTS chore_completions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_chore_completions_date ON chore_completions(completion_date);
+
+CREATE TABLE IF NOT EXISTS devices (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  theme_id TEXT NOT NULL DEFAULT 'default',
+  target_selection_json TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 `;
 
 const ensureColumnExists = (

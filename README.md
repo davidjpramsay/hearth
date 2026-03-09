@@ -5,6 +5,7 @@ Hearth is a self-hosted family dashboard for a wall display or kiosk browser.
 It is built to run on low-power hardware (Raspberry Pi / mini PCs) and provides:
 
 - Visual layout editor (`/admin`)
+- Devices admin for per-display theme + routing assignment
 - Fullscreen display dashboard (`/`)
 - Modular tiles (Photos, Calendar, Clock, Chores, Weather, Bible verse, Welcome, Count Down)
 - SQLite persistence
@@ -184,10 +185,14 @@ Notes:
 
 ## Display + Layout Modes
 
-- Display routing is per-screen with two explicit modes:
-  - `Layout Set`: each device selects a set and follows that set's logic graph
-  - `Single Layout`: each device pins one specific layout (no set logic)
-- Device selection is saved in local storage, so each screen/browser can choose independently.
+- Display routing is per-screen and server-managed from Admin > Devices.
+- Devices register automatically after they open `/` once, then can be renamed and managed remotely.
+- Each device has three routing modes:
+  - `Inherit default`: use the default routing policy and fallback behavior
+  - `Layout Set`: follow one specific set and that set's logic graph
+  - `Single Layout`: pin one specific layout (no set logic)
+- Each device also has its own theme selection in Admin > Devices.
+- The display surface no longer exposes a local settings cog for routing/theme changes.
 - Set mode behavior:
   - each set runs its configured logic/cycle rules
   - manual path edits in the set designer (edge reconnect/disconnect) are persisted and applied at runtime
@@ -206,6 +211,7 @@ Notes:
   - managed in Admin > Layouts > Photo Collections
   - each collection can include multiple folders
   - folders are resolved under the parent library root: `DATA_DIR/photos/<folder>`
+- Device changes made in Admin > Devices are pushed to open displays through SSE and applied on the next layout resolve.
 - Photos playback sequencing is scoped per device/session:
   - devices do not advance each other's "next photo" state, even with the same folder/shuffle settings
   - on one device, sequence continuity is preserved across layout/set switches
@@ -332,6 +338,6 @@ Recommended for collection-based setups:
    - Keep improving layout transitions for smoothness on low-power devices.
    - Add optional transition presets and a simple on/off control if needed.
 
-4. Centralized device assignment
-   - Move device routing assignment from browser-local selection to optional server-managed device identity.
-   - Support explicit per-device `Follow Set` / `Pin Layout` assignment from admin UI.
+4. Device management polish
+   - Add richer device diagnostics such as online/offline visibility and last-resolve status.
+   - Add bulk device actions and faster multi-screen reassignment workflows.

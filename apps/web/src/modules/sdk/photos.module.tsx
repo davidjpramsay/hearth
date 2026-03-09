@@ -10,9 +10,9 @@ import {
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
 import { getAuthToken } from "../../auth/storage";
+import { getDeviceId } from "../../device/device-id";
 
 const LAYOUT_CROSSFADE_DATA_ATTRIBUTE = "data-hearth-layout-crossfade";
-const SCREEN_SESSION_ID_STORAGE_KEY = "hearth:screen-session-id";
 const DISPLAY_SOURCE_KIND_STORAGE_KEY = "hearth:display-source-kind";
 const DISPLAY_CYCLE_SECONDS_STORAGE_KEY = "hearth:display-cycle-seconds";
 const DISPLAY_PHOTO_COLLECTION_ID_STORAGE_KEY = "hearth:display-photo-collection-id";
@@ -24,19 +24,6 @@ interface DisplayCycleContextEventDetail {
   cycleSeconds: number | null;
   photoCollectionId: string | null;
 }
-
-const getScreenSessionId = (): string | null => {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const stored = window.localStorage.getItem(SCREEN_SESSION_ID_STORAGE_KEY)?.trim();
-    return stored && stored.length > 0 ? stored : null;
-  } catch {
-    return null;
-  }
-};
 
 const clampIntervalSeconds = (value: number): number =>
   Math.max(3, Math.min(3600, Math.round(value)));
@@ -197,7 +184,7 @@ const loadNextFrame = async (
   collectionId?: string | null,
   sourceKind?: "set" | "layout" | null,
 ): Promise<ReturnType<typeof photosModuleNextResponseSchema.parse>> => {
-  const screenSessionId = getScreenSessionId();
+  const screenSessionId = getDeviceId();
   const queryParams = new URLSearchParams();
   if (screenSessionId) {
     queryParams.set("screenSessionId", screenSessionId);

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   choresBoardResponseSchema,
   choresModuleConfigSchema,
+  choresModuleSummaryQuerySchema,
   choresPayoutConfigSchema,
   type ChoreBoardItem,
   type ChoresBoardResponse,
@@ -33,10 +34,25 @@ const emptyBoard = (): ChoresBoardResponse =>
     },
   });
 
-const fetchSummary = async (instanceId: string): Promise<ChoresBoardResponse> => {
+const fetchSummary = async (
+  instanceId: string,
+  options: { startDate?: string } = {},
+): Promise<ChoresBoardResponse> => {
+  const query = choresModuleSummaryQuerySchema.parse(options);
+  const params = new URLSearchParams();
+  if (query.startDate) {
+    params.set("startDate", query.startDate);
+  }
+  const queryString = params.toString();
+
   const response = await fetch(
-    `/api/modules/chores/${encodeURIComponent(instanceId)}/summary`,
-    { method: "GET" },
+    `/api/modules/chores/${encodeURIComponent(instanceId)}/summary${
+      queryString.length > 0 ? `?${queryString}` : ""
+    }`,
+    {
+      method: "GET",
+      cache: "no-store",
+    },
   );
 
   if (!response.ok) {
@@ -108,7 +124,9 @@ export const moduleDefinition = defineModule({
 
         const load = async () => {
           try {
-            const summary = await fetchSummary(instanceId);
+            const summary = await fetchSummary(instanceId, {
+              startDate: localIsoDate(),
+            });
             if (!active) {
               return;
             }
@@ -221,10 +239,14 @@ export const moduleDefinition = defineModule({
             date: item.date,
             completed,
           });
-          const summary = await fetchSummary(instanceId);
+          const summary = await fetchSummary(instanceId, {
+            startDate: localIsoDate(),
+          });
           setBoard(summary);
         } catch (toggleError) {
-          const summary = await fetchSummary(instanceId).catch(() => null);
+          const summary = await fetchSummary(instanceId, {
+            startDate: localIsoDate(),
+          }).catch(() => null);
           if (summary) {
             setBoard(summary);
           }
