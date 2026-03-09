@@ -492,6 +492,7 @@ export class ScreenProfileService {
     const sequence = resolveDisplaySequenceFromLogicGraph({
       graph: effectiveLogicGraph,
       orientation: input.appliedPhotoOrientation,
+      includeActivePhotoCollectionInActionParams: true,
       evaluateCondition: resolveLayoutLogicCondition,
       resolveAction: resolveLayoutLogicAction,
     });
@@ -519,8 +520,8 @@ export class ScreenProfileService {
         ? clampCycleSeconds(selected.cycleSeconds ?? DEFAULT_TARGET_CYCLE_SECONDS)
         : null,
       selectedPhotoCollectionId:
-        input.familyTargets.photoActionCollectionId ??
         getPhotoCollectionIdFromActionParams(selected?.actionParams) ??
+        input.familyTargets.photoActionCollectionId ??
         null,
     };
   }

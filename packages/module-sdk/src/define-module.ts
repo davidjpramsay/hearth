@@ -28,6 +28,7 @@ const moduleManifestSchema = z.object({
     w: z.number().int().min(1),
     h: z.number().int().min(1),
   }),
+  timeMode: z.enum(["device-local", "site-local", "source-local"]).optional(),
   categories: z.array(z.string().trim().min(1)).optional(),
   permissions: z.array(z.string().trim().min(1)).optional(),
   dataSources: z.array(dataSourceSchema).optional(),

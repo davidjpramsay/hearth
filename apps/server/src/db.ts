@@ -1,6 +1,11 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
+import {
+  buildDefaultDeviceName,
+  normalizeDeviceName,
+  toUniqueDeviceName,
+} from "./repositories/device-name.js";
 
 const schemaSql = `
 CREATE TABLE IF NOT EXISTS settings (
@@ -58,6 +63,7 @@ CREATE TABLE IF NOT EXISTS chores (
   name TEXT NOT NULL,
   member_id INTEGER NOT NULL,
   schedule_json TEXT NOT NULL,
+  starts_on TEXT,
   value_amount REAL,
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -178,6 +184,62 @@ const ensureUniqueLayoutNames = (db: Database.Database): void => {
 const ensureLayoutNameUniqueIndex = (db: Database.Database): void => {
   db.exec(
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_layout_name_unique_nocase ON layouts(name COLLATE NOCASE);",
+  );
+};
+
+const ensureUniqueDeviceNames = (db: Database.Database): void => {
+  const rows = db
+    .prepare<[], { id: string; name: string }>(
+      `
+      SELECT id, name
+      FROM devices
+      ORDER BY created_at ASC, id ASC
+      `,
+    )
+    .all();
+
+  if (rows.length === 0) {
+    return;
+  }
+
+  const usedNames = new Set<string>();
+  const updates: Array<{ id: string; name: string }> = [];
+
+  for (const row of rows) {
+    const baseName = row.name.trim() || buildDefaultDeviceName(row.id);
+    const uniqueName = toUniqueDeviceName(baseName, usedNames);
+    usedNames.add(normalizeDeviceName(uniqueName));
+
+    if (uniqueName !== row.name) {
+      updates.push({ id: row.id, name: uniqueName });
+    }
+  }
+
+  if (updates.length === 0) {
+    return;
+  }
+
+  const transaction = db.transaction((entries: Array<{ id: string; name: string }>) => {
+    const statement = db.prepare<{ id: string; name: string }>(
+      `
+      UPDATE devices
+      SET name = @name,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = @id
+      `,
+    );
+
+    for (const entry of entries) {
+      statement.run(entry);
+    }
+  });
+
+  transaction(updates);
+};
+
+const ensureDeviceNameUniqueIndex = (db: Database.Database): void => {
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_name_unique_nocase ON devices(name COLLATE NOCASE);",
   );
 };
 
@@ -568,9 +630,17 @@ export const createDatabase = (filePath: string): Database.Database => {
     "weekly_allowance",
     "ALTER TABLE members ADD COLUMN weekly_allowance REAL NOT NULL DEFAULT 0",
   );
+  ensureColumnExists(
+    db,
+    "chores",
+    "starts_on",
+    "ALTER TABLE chores ADD COLUMN starts_on TEXT",
+  );
 
   ensureUniqueLayoutNames(db);
   ensureLayoutNameUniqueIndex(db);
+  ensureUniqueDeviceNames(db);
+  ensureDeviceNameUniqueIndex(db);
   seedDefaultLayoutsAndSettings(db);
 
   return db;

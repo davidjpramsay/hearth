@@ -551,54 +551,63 @@ body {
   -webkit-user-select: none;
 }
 
-.react-grid-item > .react-resizable-handle {
-  width: 24px;
-  height: 24px;
-  right: 4px;
-  bottom: 4px;
-  z-index: 30;
-  cursor: se-resize;
-  border-radius: 6px;
-  border: 1px solid rgba(34, 211, 238, 0.7);
-  background: linear-gradient(
-    135deg,
-    rgba(15, 23, 42, 0.85) 0%,
-    rgba(15, 23, 42, 0.55) 100%
-  );
-  box-shadow: 0 0 0 1px rgba(2, 6, 23, 0.75);
-  opacity: 1;
-  touch-action: none;
-}
-
-.react-grid-item > .react-resizable-handle::after {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  border-right: 2px solid rgba(103, 232, 249, 0.95);
-  border-bottom: 2px solid rgba(103, 232, 249, 0.95);
-}
-
-.react-grid-item > .react-resizable-handle::before {
-  content: "";
+.hearth-layout-resize-handle {
   position: absolute;
   right: 8px;
   bottom: 8px;
-  width: 10px;
-  height: 10px;
-  border-right: 2px solid rgba(165, 243, 252, 0.8);
-  border-bottom: 2px solid rgba(165, 243, 252, 0.8);
+  z-index: 30;
+  display: flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  cursor: se-resize;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 211, 238, 0.48);
+  background:
+    radial-gradient(circle at 30% 30%, rgba(125, 211, 252, 0.14), transparent 55%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.82));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(2, 6, 23, 0.72),
+    0 10px 24px rgba(2, 6, 23, 0.34);
+  opacity: 1;
+  touch-action: none;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
 }
 
-.react-grid-item > .react-resizable-handle:hover {
-  border-color: rgba(34, 211, 238, 0.95);
-  background: linear-gradient(
-    135deg,
-    rgba(15, 23, 42, 0.95) 0%,
-    rgba(30, 41, 59, 0.7) 100%
-  );
+.hearth-layout-resize-handle__grip {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      135deg,
+      transparent 0 22%,
+      rgba(103, 232, 249, 0.28) 22% 32%,
+      transparent 32% 46%,
+      rgba(103, 232, 249, 0.58) 46% 56%,
+      transparent 56% 70%,
+      rgba(165, 243, 252, 0.95) 70% 80%,
+      transparent 80% 100%
+    );
+  pointer-events: none;
+}
+
+.hearth-layout-resize-handle:hover {
+  border-color: rgba(103, 232, 249, 0.86);
+  background:
+    radial-gradient(circle at 30% 30%, rgba(125, 211, 252, 0.18), transparent 55%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.9));
   box-shadow:
-    0 0 0 1px rgba(14, 116, 144, 0.75),
-    0 0 12px rgba(34, 211, 238, 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 1px rgba(14, 116, 144, 0.78),
+    0 0 18px rgba(34, 211, 238, 0.22);
+  transform: translateY(-1px) scale(1.04);
 }
 
 .react-grid-item.react-grid-placeholder {
@@ -614,62 +623,12 @@ body {
 }
 
 @media (pointer: coarse) {
-  .react-grid-item > .react-resizable-handle {
-    width: 34px;
-    height: 34px;
-    right: 2px;
-    bottom: 2px;
+  .hearth-layout-resize-handle {
+    width: 40px;
+    height: 40px;
+    right: 4px;
+    bottom: 4px;
   }
-
-  .react-grid-item > .react-resizable-handle::after {
-    inset: 9px;
-  }
-
-  .react-grid-item > .react-resizable-handle::before {
-    right: 11px;
-    bottom: 11px;
-    width: 12px;
-    height: 12px;
-  }
-}
-
-.react-flow__controls {
-  overflow: hidden;
-  border: 1px solid rgba(34, 211, 238, 0.45);
-  border-radius: 10px;
-  background: rgba(15, 23, 42, 0.92);
-  box-shadow:
-    0 0 0 1px rgba(14, 116, 144, 0.25),
-    0 8px 18px rgba(2, 6, 23, 0.55);
-}
-
-.react-flow__controls-button {
-  width: 34px;
-  height: 34px;
-  border: 0;
-  border-bottom: 1px solid rgba(34, 211, 238, 0.28);
-  background: rgba(15, 23, 42, 0.92);
-  color: rgba(186, 230, 253, 0.95);
-}
-
-.react-flow__controls-button:last-child {
-  border-bottom: 0;
-}
-
-.react-flow__controls-button:hover {
-  background: rgba(30, 41, 59, 0.98);
-  color: rgba(103, 232, 249, 0.98);
-}
-
-.react-flow__controls-button:disabled {
-  color: rgba(148, 163, 184, 0.55);
-  background: rgba(15, 23, 42, 0.8);
-}
-
-.react-flow__controls-button svg {
-  width: 18px;
-  height: 18px;
-  stroke-width: 1.9;
 }
 
 .react-flow__selection,

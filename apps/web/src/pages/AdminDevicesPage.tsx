@@ -97,7 +97,7 @@ const toUpdatePayload = (draft: DeviceDraft): {
   themeId: ThemeId;
   targetSelection: ReportScreenTargetSelection | null;
 } => ({
-  name: draft.name.trim().slice(0, 80) || "Display",
+  name: draft.name.trim().slice(0, 80),
   themeId: draft.themeId,
   targetSelection:
     draft.routingMode === "inherit"
@@ -140,6 +140,18 @@ const formatLastSeen = (value: string): string => {
   return new Date(timestamp).toLocaleString();
 };
 
+const hasValidRoutingTarget = (draft: DeviceDraft): boolean => {
+  if (draft.routingMode === "inherit") {
+    return true;
+  }
+
+  if (draft.routingMode === "set") {
+    return draft.setId.trim().length > 0;
+  }
+
+  return draft.layoutName.trim().length > 0;
+};
+
 export const AdminDevicesPage = () => {
   const navigate = useNavigate();
   const [devices, setDevices] = useState<DisplayDevice[]>([]);
@@ -163,6 +175,8 @@ export const AdminDevicesPage = () => {
     [availableSetOptions],
   );
   const availableLayoutNames = useMemo(() => new Set(layoutNames), [layoutNames]);
+  const firstAvailableSetId = availableSetOptions[0]?.id ?? "";
+  const firstAvailableLayoutName = layoutNames[0] ?? "";
 
   const loadData = useCallback(async () => {
     const token = getAuthToken();
@@ -301,7 +315,10 @@ export const AdminDevicesPage = () => {
               availableSetIds,
               availableLayoutNames,
             });
-            const payload = toUpdatePayload(draft);
+            const payload = toUpdatePayload({
+              ...draft,
+              name: draft.name.trim().length > 0 ? draft.name : device.name,
+            });
             const baselinePayload = toUpdatePayload(
               toDeviceDraft({
                 device,
@@ -309,6 +326,7 @@ export const AdminDevicesPage = () => {
                 availableLayoutNames,
               }),
             );
+            const isValidDraft = hasValidRoutingTarget(draft);
             const isDirty = JSON.stringify(payload) !== JSON.stringify(baselinePayload);
             const isBusy = busyDeviceId === device.id;
 
@@ -327,7 +345,7 @@ export const AdminDevicesPage = () => {
                   </div>
                   <button
                     type="button"
-                    disabled={!isDirty || isBusy}
+                    disabled={!isDirty || !isValidDraft || isBusy}
                     onClick={() => void onSaveDevice(device.id)}
                     className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
                   >
@@ -348,6 +366,7 @@ export const AdminDevicesPage = () => {
                       }
                       className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
                     />
+                    <span className="text-xs text-slate-400">Device names must be unique.</span>
                   </label>
 
                   <label className="flex flex-col gap-2 text-sm text-slate-300">
@@ -375,10 +394,28 @@ export const AdminDevicesPage = () => {
                     <select
                       value={draft.routingMode}
                       onChange={(event) =>
-                        updateDraft(device.id, (current) => ({
-                          ...current,
-                          routingMode: event.target.value as DeviceRoutingMode,
-                        }))
+                        updateDraft(device.id, (current) => {
+                          const nextRoutingMode = event.target.value as DeviceRoutingMode;
+                          const nextSetId =
+                            current.setId.trim().length > 0 && availableSetIds.has(current.setId)
+                              ? current.setId
+                              : firstAvailableSetId;
+                          const nextLayoutName =
+                            current.layoutName.trim().length > 0 &&
+                            availableLayoutNames.has(current.layoutName)
+                              ? current.layoutName
+                              : firstAvailableLayoutName;
+
+                          return {
+                            ...current,
+                            routingMode: nextRoutingMode,
+                            setId: nextRoutingMode === "set" ? nextSetId : current.setId,
+                            layoutName:
+                              nextRoutingMode === "layout"
+                                ? nextLayoutName
+                                : current.layoutName,
+                          };
+                        })
                       }
                       className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
                     >
@@ -401,9 +438,9 @@ export const AdminDevicesPage = () => {
                         }
                         className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
                       >
-                        {availableSetOptions.length === 0 ? (
-                          <option value="">No sets available</option>
-                        ) : null}
+                        <option value="" disabled={availableSetOptions.length > 0}>
+                          {availableSetOptions.length === 0 ? "No sets available" : "Choose a set..."}
+                        </option>
                         {availableSetOptions.map((option) => (
                           <option key={option.id} value={option.id}>
                             {option.name}
@@ -424,9 +461,9 @@ export const AdminDevicesPage = () => {
                         }
                         className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
                       >
-                        {layoutNames.length === 0 ? (
-                          <option value="">No layouts available</option>
-                        ) : null}
+                        <option value="" disabled={layoutNames.length > 0}>
+                          {layoutNames.length === 0 ? "No layouts available" : "Choose a layout..."}
+                        </option>
                         {layoutNames.map((layoutName) => (
                           <option key={layoutName} value={layoutName}>
                             {layoutName}

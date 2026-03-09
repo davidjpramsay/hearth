@@ -248,6 +248,7 @@ export const moduleDefinition = defineModule({
     description: "Countdown timer with date or duration modes",
     icon: "timer",
     defaultSize: { w: 4, h: 2 },
+    timeMode: "device-local",
     categories: ["time"],
     permissions: [],
     dataSources: [{ id: "local-time", kind: "local" }],

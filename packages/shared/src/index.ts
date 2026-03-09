@@ -4,6 +4,7 @@ export * from "./layout.js";
 export * from "./layout-logic-registry.js";
 export * from "./module.js";
 export * from "./screen-profile-layout-normalizer.js";
+export * from "./time.js";
 export * from "./modules/bible-verse.js";
 export * from "./modules/calendar.js";
 export * from "./modules/chores.js";

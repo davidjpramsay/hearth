@@ -4,9 +4,10 @@ import {
   type ModuleInstance,
 } from "@hearth/shared";
 
-const TARGET_SHORT_SIDE_CELLS = 20;
-const GRID_SEARCH_ROW_PADDING = 48;
-const GRID_SEARCH_COL_PADDING = 12;
+const MIN_GRID_DIMENSION = 4;
+const TARGET_SHORT_SIDE_CELLS = 24;
+const SOFT_MAX_SHORT_SIDE_CELLS = 36;
+const GRID_SCALE_SEARCH_LIMIT = 48;
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -43,86 +44,103 @@ const findOpenSlot = (
   return null;
 };
 
-const isPortraitFullHeightSplitCompatible = (cols: number, rows: number): boolean => {
-  if (rows % 4 !== 0) {
-    return false;
-  }
-
-  // Enforces: (cols - (3/4 * rows)) is an even integer.
-  const leftoverTimes4 = 4 * cols - 3 * rows;
-  return leftoverTimes4 >= 0 && leftoverTimes4 % 8 === 0;
-};
-
 export interface AdaptiveGridMetrics {
   cols: number;
   rows: number;
   rowHeight: number;
 }
 
-export const getAdaptiveGridMetrics = (
+const greatestCommonDivisor = (left: number, right: number): number => {
+  let a = Math.abs(Math.round(left));
+  let b = Math.abs(Math.round(right));
+
+  while (b !== 0) {
+    const remainder = a % b;
+    a = b;
+    b = remainder;
+  }
+
+  return Math.max(1, a);
+};
+
+const reduceAspectUnits = (
   width: number,
   height: number,
+): { cols: number; rows: number } => {
+  const safeWidth = Math.max(1, Math.round(width));
+  const safeHeight = Math.max(1, Math.round(height));
+  const divisor = greatestCommonDivisor(safeWidth, safeHeight);
+
+  return {
+    cols: Math.max(1, safeWidth / divisor),
+    rows: Math.max(1, safeHeight / divisor),
+  };
+};
+
+const shortSideScore = (shortSide: number): number => {
+  const distanceFromTarget = Math.abs(shortSide - TARGET_SHORT_SIDE_CELLS);
+
+  if (shortSide < TARGET_SHORT_SIDE_CELLS) {
+    return distanceFromTarget * 2;
+  }
+
+  if (shortSide > SOFT_MAX_SHORT_SIDE_CELLS) {
+    return distanceFromTarget + (shortSide - SOFT_MAX_SHORT_SIDE_CELLS) * 3;
+  }
+
+  return distanceFromTarget;
+};
+
+export const getAdaptiveGridMetrics = (
+  input: {
+    canvasWidth: number;
+    canvasHeight: number;
+    aspectWidth: number;
+    aspectHeight: number;
+  },
 ): AdaptiveGridMetrics => {
-  const safeWidth = Math.max(1, width);
-  const safeHeight = Math.max(1, height);
-  const ratio = safeWidth / safeHeight;
-  const isLandscape = ratio >= 1;
-  const desiredRows = isLandscape ? TARGET_SHORT_SIDE_CELLS : TARGET_SHORT_SIDE_CELLS / ratio;
-  const minRows = Math.max(4, Math.floor(desiredRows - GRID_SEARCH_ROW_PADDING));
-  const maxRows = Math.max(minRows, Math.ceil(desiredRows + GRID_SEARCH_ROW_PADDING));
-  const enforcePortraitSplit = ratio >= 0.75;
+  const safeCanvasWidth = Math.max(1, input.canvasWidth);
+  const safeCanvasHeight = Math.max(1, input.canvasHeight);
+  const safeAspectWidth = Math.max(1, input.aspectWidth);
+  const safeAspectHeight = Math.max(1, input.aspectHeight);
+  const baseUnits = reduceAspectUnits(safeAspectWidth, safeAspectHeight);
+  let candidate: { cols: number; rows: number } | null = null;
+  let bestScore = Number.POSITIVE_INFINITY;
 
-  const pickCandidate = (enforceSplitRule: boolean): { cols: number; rows: number } | null => {
-    let best: { cols: number; rows: number } | null = null;
-    let bestScore = Number.POSITIVE_INFINITY;
+  for (let multiplier = 1; multiplier <= GRID_SCALE_SEARCH_LIMIT; multiplier += 1) {
+    const cols = baseUnits.cols * multiplier;
+    const rows = baseUnits.rows * multiplier;
 
-    for (let rows = minRows; rows <= maxRows; rows += 1) {
-      const approximateCols = ratio * rows;
-      const roundedCols = Math.round(approximateCols);
-
-      for (let delta = -GRID_SEARCH_COL_PADDING; delta <= GRID_SEARCH_COL_PADDING; delta += 1) {
-        const cols = roundedCols + delta;
-
-        if (cols < 4) {
-          continue;
-        }
-
-        if (isLandscape && cols < rows) {
-          continue;
-        }
-
-        if (!isLandscape && cols > rows) {
-          continue;
-        }
-
-        if (enforceSplitRule && !isPortraitFullHeightSplitCompatible(cols, rows)) {
-          continue;
-        }
-
-        const ratioError = Math.abs(cols / rows - ratio);
-        const shortSideError = Math.abs(Math.min(cols, rows) - TARGET_SHORT_SIDE_CELLS);
-        const colsError = Math.abs(cols - approximateCols);
-        const score = ratioError * 400 + shortSideError * 5 + colsError * 0.5;
-
-        if (score < bestScore) {
-          bestScore = score;
-          best = { cols, rows };
-        }
-      }
+    if (cols < MIN_GRID_DIMENSION || rows < MIN_GRID_DIMENSION) {
+      continue;
     }
 
-    return best;
+    const shortSide = Math.min(cols, rows);
+    const score = shortSideScore(shortSide) + multiplier * 0.01;
+
+    if (score < bestScore) {
+      bestScore = score;
+      candidate = { cols, rows };
+    }
+  }
+
+  const resolvedCandidate = candidate ?? {
+    cols: Math.max(MIN_GRID_DIMENSION, baseUnits.cols),
+    rows: Math.max(MIN_GRID_DIMENSION, baseUnits.rows),
   };
+  const rowHeight = Math.max(
+    1,
+    Math.min(
+      safeCanvasWidth / resolvedCandidate.cols,
+      safeCanvasHeight / resolvedCandidate.rows,
+    ),
+  );
 
-  const candidate =
-    pickCandidate(enforcePortraitSplit) ??
-    pickCandidate(false) ?? {
-      cols: Math.max(4, Math.round(ratio * Math.max(4, Math.round(desiredRows)))),
-      rows: Math.max(4, Math.round(desiredRows)),
-    };
-  const rowHeight = Math.max(1, Math.min(safeWidth / candidate.cols, safeHeight / candidate.rows));
-
-  return { cols: candidate.cols, rows: candidate.rows, rowHeight };
+  return {
+    cols: resolvedCandidate.cols,
+    rows: resolvedCandidate.rows,
+    rowHeight,
+  };
 };
 
 export interface PhotoLayoutLock {
@@ -237,11 +255,11 @@ const quantizePhotoSize = (input: {
 
 export const inferLayoutRows = (input: { rows?: number; items: GridItem[] }): number => {
   if (Number.isFinite(input.rows) && Number(input.rows) > 0) {
-    return Math.max(4, Math.round(Number(input.rows)));
+    return Math.max(MIN_GRID_DIMENSION, Math.round(Number(input.rows)));
   }
 
   const usedRows = input.items.reduce((maxRows, item) => Math.max(maxRows, item.y + item.h), 0);
-  return Math.max(4, usedRows || TARGET_SHORT_SIDE_CELLS);
+  return Math.max(MIN_GRID_DIMENSION, usedRows || TARGET_SHORT_SIDE_CELLS);
 };
 
 export const sanitizeGridItems = (input: {

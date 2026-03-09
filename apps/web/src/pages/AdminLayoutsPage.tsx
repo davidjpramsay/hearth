@@ -13,28 +13,30 @@ import {
 } from "../api/client";
 import { clearAuthToken, getAuthToken } from "../auth/storage";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
+import type { LogicBranchTrigger } from "../components/admin/logicNodeRegistry";
 import { PageShell } from "../components/PageShell";
 import { buildDuplicateLayoutName } from "./layout-name-utils";
-import { analyzeSetRuntimeHealth } from "./layout-set-runtime-health";
 import {
-  LayoutSetLogicCanvas,
-  type LogicBranchTrigger,
-} from "../components/admin/LayoutSetLogicCanvas";
+  analyzeSetRuntimeHealth,
+  type RuntimeHealthReport,
+} from "./layout-set-runtime-health";
+import { PhotoRouterBlockEditor } from "../components/admin/PhotoRouterBlockEditor";
 import {
-  createLayoutSetLogicGraphFromBranches,
-  createLayoutSetLogicGraphFromTargets,
+  compileLayoutSetAuthoringToLogicGraph,
   getLayoutSetLogicBranches,
+  getDefaultLayoutSetAuthoring,
+  getPrimaryPhotoRouterBlock,
   normalizeLayoutSetLogicEdgeState,
+  normalizeLayoutSetAuthoring,
+  normalizeLayoutSetLogicGraph,
   normalizeScreenProfileLayoutsConfig,
   photoCollectionsConfigSchema,
   screenProfileLayoutsSchema,
+  setPrimaryPhotoRouterBlock,
   toAutoLayoutTargetsFromLogicGraph,
-  DEFAULT_LANDSCAPE_LAYOUT_LOGIC_CONDITION_TYPE,
-  DEFAULT_LAYOUT_LOGIC_ACTION_TYPE,
   DEFAULT_LAYOUT_LOGIC_PHOTO_ACTION_TYPE,
-  PHOTO_COLLECTION_ACTION_PARAM_KEY,
-  DEFAULT_PORTRAIT_LAYOUT_LOGIC_CONDITION_TYPE,
   type AutoLayoutTarget,
+  type LayoutSetAuthoring,
   type PhotoCollectionsConfig,
   type LayoutRecord,
   type ScreenProfileLayouts,
@@ -229,6 +231,92 @@ const buildTargetsFromBranches = (branches: Record<LogicBranchTrigger, AutoLayou
     })),
   );
 
+type ScreenFamilyLayoutConfig = ScreenProfileLayouts["families"][string];
+
+const removeCollectionFromAuthoring = (
+  authoring: LayoutSetAuthoring,
+  collectionId: string,
+): LayoutSetAuthoring => {
+  const currentBlock = getPrimaryPhotoRouterBlock(authoring);
+
+  return setPrimaryPhotoRouterBlock({
+    authoring,
+    block: {
+      ...currentBlock,
+      photoActionCollectionId:
+        currentBlock.photoActionCollectionId === collectionId
+          ? null
+          : currentBlock.photoActionCollectionId,
+      nodes: currentBlock.nodes.map((node) => {
+        if (node.nodeType === "layout") {
+          const nextActionParams = { ...(node.actionParams ?? {}) };
+          if (nextActionParams.photoCollectionId === collectionId) {
+            delete nextActionParams.photoCollectionId;
+          }
+          return {
+            ...node,
+            actionParams: nextActionParams,
+          };
+        }
+
+        if (node.photoActionCollectionId === collectionId) {
+          return {
+            ...node,
+            photoActionCollectionId: null,
+          };
+        }
+
+        return node;
+      }),
+    },
+  });
+};
+
+const buildSetConfigFromAuthoring = (input: {
+  current: ScreenFamilyLayoutConfig;
+  nextAuthoring: LayoutSetAuthoring;
+  knownLayoutNames: Set<string>;
+}): ScreenFamilyLayoutConfig => {
+  const logicBlocks = normalizeLayoutSetAuthoring({
+    authoring: input.nextAuthoring,
+    knownLayoutNames: input.knownLayoutNames,
+  });
+  const nextGraph = normalizeLayoutSetLogicGraph({
+    graph: compileLayoutSetAuthoringToLogicGraph(logicBlocks),
+    knownLayoutNames: input.knownLayoutNames,
+  });
+  const nextTargets = toAutoLayoutTargetsFromLogicGraph(nextGraph);
+  const nextBranches = getLayoutSetLogicBranches(nextGraph);
+  const nextPortraitLayoutNames = unique(
+    [...nextBranches.alwaysRules, ...nextBranches.portraitRules].map(
+      (target) => target.layoutName,
+    ),
+  );
+  const nextLandscapeLayoutNames = unique(
+    [...nextBranches.alwaysRules, ...nextBranches.landscapeRules].map(
+      (target) => target.layoutName,
+    ),
+  );
+  const photoRouter = getPrimaryPhotoRouterBlock(logicBlocks);
+
+  return {
+    ...input.current,
+    staticLayoutName: nextTargets[0]?.layoutName ?? null,
+    photoActionType: photoRouter.photoActionType,
+    photoActionCollectionId: photoRouter.photoActionCollectionId ?? null,
+    logicBlocks,
+    logicGraph: nextGraph,
+    logicNodePositions: {},
+    logicEdgeOverrides: {},
+    logicDisconnectedEdgeIds: [],
+    autoLayoutTargets: nextTargets,
+    portraitPhotoLayoutName: nextPortraitLayoutNames[0] ?? null,
+    landscapePhotoLayoutName: nextLandscapeLayoutNames[0] ?? null,
+    portraitPhotoLayoutNames: nextPortraitLayoutNames,
+    landscapePhotoLayoutNames: nextLandscapeLayoutNames,
+  };
+};
+
 type SetEdgeStatePayload = {
   nodePositions: Record<
     string,
@@ -325,9 +413,6 @@ export const AdminLayoutsPage = () => {
   const persistCollectionsRevisionRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [refreshingPhotoFolders, setRefreshingPhotoFolders] = useState(false);
-  const [expandedRuntimeChecks, setExpandedRuntimeChecks] = useState<
-    Record<string, boolean>
-  >({});
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -720,34 +805,24 @@ export const AdminLayoutsPage = () => {
       await persistScreenRouting((current) => {
         const nextFamilies = Object.fromEntries(
           Object.entries(current.families).map(([setId, setConfig]) => {
-            const nextTargets = toAutoLayoutTargetsFromLogicGraph(
-              setConfig.logicGraph,
-            ).map((target) => {
-              const nextActionParams = { ...(target.actionParams ?? {}) };
-              if (nextActionParams[PHOTO_COLLECTION_ACTION_PARAM_KEY] === collectionId) {
-                delete nextActionParams[PHOTO_COLLECTION_ACTION_PARAM_KEY];
-              }
-              return {
-                ...target,
-                actionParams: nextActionParams,
-              };
-            });
+            const nextAuthoring = removeCollectionFromAuthoring(
+              setConfig.logicBlocks,
+              collectionId,
+            );
 
             return [
               setId,
-              {
-                ...setConfig,
-                defaultPhotoCollectionId:
-                  setConfig.defaultPhotoCollectionId === collectionId
-                    ? null
-                    : setConfig.defaultPhotoCollectionId,
-                photoActionCollectionId:
-                  setConfig.photoActionCollectionId === collectionId
-                    ? null
-                    : setConfig.photoActionCollectionId,
-                logicGraph: createLayoutSetLogicGraphFromTargets(nextTargets),
-                autoLayoutTargets: nextTargets,
-              },
+              buildSetConfigFromAuthoring({
+                current: {
+                  ...setConfig,
+                  defaultPhotoCollectionId:
+                    setConfig.defaultPhotoCollectionId === collectionId
+                      ? null
+                      : setConfig.defaultPhotoCollectionId,
+                },
+                nextAuthoring,
+                knownLayoutNames: new Set(layouts.map((layout) => layout.name)),
+              }),
             ];
           }),
         );
@@ -768,22 +843,24 @@ export const AdminLayoutsPage = () => {
     }
   };
 
-  const onUpdateSetRules = async (
+  const onUpdateSetAuthoring = async (
     family: string,
-    nextTargetsRaw: AutoLayoutTarget[],
+    nextAuthoringRaw: LayoutSetAuthoring,
   ) => {
-    const nextGraph = createLayoutSetLogicGraphFromTargets(nextTargetsRaw);
+    const knownLayoutNames = new Set(layouts.map((layout) => layout.name));
     const currentSetConfig = screenProfileLayoutsRef.current.families[family];
-    const nextEdgeState = normalizeLayoutSetLogicEdgeState({
-      graph: nextGraph,
-      edgeOverrides: currentSetConfig?.logicEdgeOverrides,
-      disconnectedEdgeIds: currentSetConfig?.logicDisconnectedEdgeIds,
+    if (!currentSetConfig) {
+      return;
+    }
+
+    const nextConfig = buildSetConfigFromAuthoring({
+      current: currentSetConfig,
+      nextAuthoring: nextAuthoringRaw,
+      knownLayoutNames,
     });
     const runtimeHealth = analyzeSetRuntimeHealth({
-      graph: nextGraph,
-      knownLayoutNames: new Set(layouts.map((layout) => layout.name)),
-      edgeOverrides: nextEdgeState.edgeOverrides,
-      disconnectedEdgeIds: nextEdgeState.disconnectedEdgeIds,
+      graph: nextConfig.logicGraph,
+      knownLayoutNames,
     });
     const blockingIssue = runtimeHealth.issues.find(
       (issue) => issue.severity === "error",
@@ -792,19 +869,6 @@ export const AdminLayoutsPage = () => {
       setError(`Set logic error: ${blockingIssue.message}`);
       return;
     }
-    const nextTargets = toAutoLayoutTargetsFromLogicGraph(nextGraph);
-    const nextBranches = getLayoutSetLogicBranches(nextGraph);
-    const nextPortraitLayoutNames = unique(
-      [...nextBranches.alwaysRules, ...nextBranches.portraitRules].map(
-        (target) => target.layoutName,
-      ),
-    );
-    const nextLandscapeLayoutNames = unique(
-      [...nextBranches.alwaysRules, ...nextBranches.landscapeRules].map(
-        (target) => target.layoutName,
-      ),
-    );
-    const nextStaticLayoutName = nextTargets[0]?.layoutName ?? null;
 
     try {
       await persistScreenRouting((current) => {
@@ -817,18 +881,7 @@ export const AdminLayoutsPage = () => {
           ...current,
           families: {
             ...current.families,
-            [family]: {
-              ...familyTargets,
-              staticLayoutName: nextStaticLayoutName,
-              logicGraph: nextGraph,
-              logicEdgeOverrides: nextEdgeState.edgeOverrides,
-              logicDisconnectedEdgeIds: nextEdgeState.disconnectedEdgeIds,
-              autoLayoutTargets: nextTargets,
-              portraitPhotoLayoutName: nextPortraitLayoutNames[0] ?? null,
-              landscapePhotoLayoutName: nextLandscapeLayoutNames[0] ?? null,
-              portraitPhotoLayoutNames: nextPortraitLayoutNames,
-              landscapePhotoLayoutNames: nextLandscapeLayoutNames,
-            },
+            [family]: nextConfig,
           },
         };
       });
@@ -837,7 +890,7 @@ export const AdminLayoutsPage = () => {
       setError(
         updateError instanceof Error
           ? updateError.message
-          : "Failed to update set rules",
+          : "Failed to update set routing",
       );
     }
   };
@@ -882,46 +935,38 @@ export const AdminLayoutsPage = () => {
     const nextName = `Layout set ${nextIndex}`;
     const nextId = toUniqueSetId(nextName, usedIds);
     const fallbackLayoutName = layoutOptions[0]?.name ?? null;
-    const fallbackGraph = createLayoutSetLogicGraphFromBranches({
-      alwaysRules: fallbackLayoutName
-        ? [
-            {
-              layoutName: fallbackLayoutName,
-              trigger: "always",
-              cycleSeconds: DEFAULT_TARGET_CYCLE_SECONDS,
-              actionType: DEFAULT_LAYOUT_LOGIC_ACTION_TYPE,
-              actionParams: {},
-              conditionType: null,
-              conditionParams: {},
-            },
-          ]
-        : [],
-      portraitRules: [],
-      landscapeRules: [],
+    const fallbackAuthoring = getDefaultLayoutSetAuthoring({
+      fallbackLayoutName,
+      photoActionType: DEFAULT_PHOTO_ACTION_TYPE,
+      photoActionCollectionId: null,
     });
-    const fallbackTargets = toAutoLayoutTargetsFromLogicGraph(fallbackGraph);
 
     try {
       await persistScreenRouting((current) => ({
         ...current,
         families: {
           ...current.families,
-            [nextId]: {
+          [nextId]: buildSetConfigFromAuthoring({
+            current: {
               name: nextName,
               staticLayoutName: fallbackLayoutName,
               defaultPhotoCollectionId: null,
               photoActionCollectionId: null,
               photoActionType: DEFAULT_PHOTO_ACTION_TYPE,
-              logicGraph: fallbackGraph,
+              logicBlocks: fallbackAuthoring,
+              logicGraph: compileLayoutSetAuthoringToLogicGraph(fallbackAuthoring),
               logicNodePositions: {},
               logicEdgeOverrides: {},
               logicDisconnectedEdgeIds: [],
-              autoLayoutTargets: fallbackTargets,
-            portraitPhotoLayoutName: fallbackLayoutName,
-            landscapePhotoLayoutName: fallbackLayoutName,
-            portraitPhotoLayoutNames: fallbackLayoutName ? [fallbackLayoutName] : [],
-            landscapePhotoLayoutNames: fallbackLayoutName ? [fallbackLayoutName] : [],
-          },
+              autoLayoutTargets: [],
+              portraitPhotoLayoutName: fallbackLayoutName,
+              landscapePhotoLayoutName: fallbackLayoutName,
+              portraitPhotoLayoutNames: fallbackLayoutName ? [fallbackLayoutName] : [],
+              landscapePhotoLayoutNames: fallbackLayoutName ? [fallbackLayoutName] : [],
+            },
+            nextAuthoring: fallbackAuthoring,
+            knownLayoutNames: new Set(layouts.map((layout) => layout.name)),
+          }),
         },
       }));
       setError(null);
@@ -1030,7 +1075,7 @@ export const AdminLayoutsPage = () => {
   );
 
   const runtimeHealthBySetId = useMemo(
-    () =>
+    (): Record<string, RuntimeHealthReport> =>
       Object.fromEntries(
         setEntries.map(([setId, setConfig]) => [
           setId,
@@ -1044,22 +1089,6 @@ export const AdminLayoutsPage = () => {
       ),
     [knownLayoutNames, setEntries],
   );
-
-  useEffect(() => {
-    const validSetIds = new Set(setEntries.map(([setId]) => setId));
-    setExpandedRuntimeChecks((current) => {
-      let changed = false;
-      const next: Record<string, boolean> = {};
-      for (const [setId, expanded] of Object.entries(current)) {
-        if (!validSetIds.has(setId)) {
-          changed = true;
-          continue;
-        }
-        next[setId] = expanded;
-      }
-      return changed ? next : current;
-    });
-  }, [setEntries]);
 
   return (
     <PageShell
@@ -1296,257 +1325,17 @@ export const AdminLayoutsPage = () => {
           </button>
         </div>
         <p className="mt-1 text-sm text-slate-300">
-          <span className="block">Build each set as top-down logic.</span>
+          <span className="block">Build each set as an action graph.</span>
           <span className="block">
-            Example: select next photo from photos library, check orientation,
-            show the layout for that orientation for N seconds, then loop back
-            to Start.
+            Start with a Photo Orientation node: choose a photo source, define portrait and
+            landscape conditions, drag action and layout nodes into the top-down canvas, wire
+            the paths, and the runtime compiles that into the execution graph automatically.
           </span>
         </p>
 
         <div className="mt-4 grid gap-3">
           {setEntries.map(([setId, setConfig]) => {
-            const setRules = toAutoLayoutTargetsFromLogicGraph(setConfig.logicGraph);
-            const branches = getLayoutSetLogicBranches(setConfig.logicGraph);
-            const portraitTargets = branches.portraitRules;
-            const landscapeTargets = branches.landscapeRules;
-            const alwaysTargets = branches.alwaysRules;
-            const fallbackLayoutName =
-              setRules[0]?.layoutName ?? layoutOptions[0]?.name ?? null;
             const runtimeHealth = runtimeHealthBySetId[setId];
-            const runtimeStatusLabel =
-              runtimeHealth?.status === "error"
-                ? "Runtime errors"
-                : runtimeHealth?.status === "warning"
-                  ? "Runtime warnings"
-                  : "Runtime healthy";
-            const runtimeStatusClass =
-              runtimeHealth?.status === "error"
-                ? "border-rose-500/50 bg-rose-500/10 text-rose-100"
-                : runtimeHealth?.status === "warning"
-                  ? "border-amber-500/50 bg-amber-500/10 text-amber-100"
-                  : "border-emerald-500/40 bg-emerald-500/10 text-emerald-100";
-            const showRuntimeDetails = expandedRuntimeChecks[setId] ?? false;
-
-            const onReplaceBranch = (
-              trigger: LogicBranchTrigger,
-              nextBranchTargets: AutoLayoutTarget[],
-            ) => {
-              const nextTargets = buildTargetsFromBranches({
-                always: trigger === "always" ? nextBranchTargets : alwaysTargets,
-                "portrait-photo":
-                  trigger === "portrait-photo" ? nextBranchTargets : portraitTargets,
-                "landscape-photo":
-                  trigger === "landscape-photo" ? nextBranchTargets : landscapeTargets,
-              });
-              void onUpdateSetRules(setId, nextTargets);
-            };
-
-            const onAddBranchStep = (input: {
-              trigger: LogicBranchTrigger;
-              actionType?: string;
-              actionParams?: Record<string, unknown>;
-              conditionType?: string | null;
-              conditionParams?: Record<string, unknown>;
-              insertIndex?: number;
-            }) => {
-              if (!fallbackLayoutName) {
-                return;
-              }
-              const current = getBranchTargets(setRules, input.trigger);
-              const nextRule: AutoLayoutTarget = {
-                layoutName: fallbackLayoutName,
-                trigger: input.trigger,
-                cycleSeconds:
-                  current[0]?.cycleSeconds ??
-                  setRules[0]?.cycleSeconds ??
-                  DEFAULT_TARGET_CYCLE_SECONDS,
-                actionType: input.actionType ?? DEFAULT_LAYOUT_LOGIC_ACTION_TYPE,
-                actionParams: input.actionParams ?? {},
-                conditionType:
-                  input.conditionType ??
-                  (input.trigger === "portrait-photo"
-                    ? DEFAULT_PORTRAIT_LAYOUT_LOGIC_CONDITION_TYPE
-                    : input.trigger === "landscape-photo"
-                      ? DEFAULT_LANDSCAPE_LAYOUT_LOGIC_CONDITION_TYPE
-                      : null),
-                conditionParams: input.conditionParams ?? {},
-              };
-              const requestedIndex =
-                typeof input.insertIndex === "number" &&
-                Number.isFinite(input.insertIndex)
-                  ? Math.floor(input.insertIndex)
-                  : input.trigger === "always"
-                    ? 0
-                    : current.length;
-              const insertIndex = Math.max(
-                0,
-                Math.min(current.length, requestedIndex),
-              );
-              const nextBranch = [...current];
-              nextBranch.splice(insertIndex, 0, nextRule);
-              onReplaceBranch(input.trigger, nextBranch);
-            };
-
-            const onUpdateBranchStep = (
-              trigger: LogicBranchTrigger,
-              index: number,
-              next: AutoLayoutTarget,
-            ) => {
-              const current = getBranchTargets(setRules, trigger);
-              if (!current[index]) {
-                return;
-              }
-              const nextBranch = [...current];
-              nextBranch[index] = {
-                ...next,
-                trigger,
-                actionType: next.actionType ?? DEFAULT_LAYOUT_LOGIC_ACTION_TYPE,
-                actionParams: next.actionParams ?? {},
-                conditionType:
-                  next.conditionType ??
-                  (trigger === "portrait-photo"
-                    ? DEFAULT_PORTRAIT_LAYOUT_LOGIC_CONDITION_TYPE
-                    : trigger === "landscape-photo"
-                      ? DEFAULT_LANDSCAPE_LAYOUT_LOGIC_CONDITION_TYPE
-                      : null),
-                conditionParams: next.conditionParams ?? {},
-              };
-              onReplaceBranch(trigger, nextBranch);
-            };
-
-            const onRemoveBranchStep = (
-              trigger: LogicBranchTrigger,
-              index: number,
-            ) => {
-              const current = getBranchTargets(setRules, trigger);
-              const nextBranch = current.filter(
-                (_entry, entryIndex) => entryIndex !== index,
-              );
-              onReplaceBranch(trigger, nextBranch);
-            };
-
-            const onUpdateSetPhotoActionType = (actionType: string) => {
-              void persistScreenRouting((current) => {
-                const familyTargets = current.families[setId];
-                if (!familyTargets) {
-                  return current;
-                }
-                if (familyTargets.photoActionType === actionType) {
-                  return current;
-                }
-                return {
-                  ...current,
-                  families: {
-                    ...current.families,
-                    [setId]: {
-                      ...familyTargets,
-                      photoActionType: actionType,
-                    },
-                  },
-                };
-              })
-                .then(() => {
-                  setError(null);
-                })
-                .catch((updateError) => {
-                  setError(
-                    updateError instanceof Error
-                      ? updateError.message
-                      : "Failed to update action type",
-                  );
-                });
-            };
-
-            const onUpdateSetPhotoActionCollectionId = (
-              collectionIdRaw: string | null,
-            ) => {
-              const nextCollectionId =
-                typeof collectionIdRaw === "string" && collectionIdRaw.trim().length > 0
-                  ? collectionIdRaw.trim()
-                  : null;
-              void persistScreenRouting((current) => {
-                const familyTargets = current.families[setId];
-                if (!familyTargets) {
-                  return current;
-                }
-                if (familyTargets.photoActionCollectionId === nextCollectionId) {
-                  return current;
-                }
-                return {
-                  ...current,
-                  families: {
-                    ...current.families,
-                    [setId]: {
-                      ...familyTargets,
-                      photoActionCollectionId: nextCollectionId,
-                    },
-                  },
-                };
-              })
-                .then(() => {
-                  setError(null);
-                })
-                .catch((updateError) => {
-                  setError(
-                    updateError instanceof Error
-                      ? updateError.message
-                      : "Failed to update photo action collection",
-                  );
-                });
-            };
-
-            const onUpdateSetEdgeState = (input: SetEdgeStatePayload) => {
-              void persistScreenRouting((current) => {
-                const familyTargets = current.families[setId];
-                if (!familyTargets) {
-                  return current;
-                }
-                const normalizedNodePositions = normalizeSetNodePositions(
-                  input.nodePositions,
-                );
-                const normalizedEdgeState = normalizeLayoutSetLogicEdgeState({
-                  graph: familyTargets.logicGraph,
-                  edgeOverrides: input.edgeOverrides,
-                  disconnectedEdgeIds: input.disconnectedEdgeIds,
-                });
-
-                const currentSerialized = serializeSetEdgeState({
-                  nodePositions: familyTargets.logicNodePositions ?? {},
-                  edgeOverrides: familyTargets.logicEdgeOverrides,
-                  disconnectedEdgeIds: familyTargets.logicDisconnectedEdgeIds,
-                });
-                const nextSerialized = serializeSetEdgeState({
-                  nodePositions: normalizedNodePositions,
-                  edgeOverrides: normalizedEdgeState.edgeOverrides,
-                  disconnectedEdgeIds: normalizedEdgeState.disconnectedEdgeIds,
-                });
-
-                if (currentSerialized === nextSerialized) {
-                  return current;
-                }
-
-                return {
-                  ...current,
-                  families: {
-                    ...current.families,
-                    [setId]: {
-                      ...familyTargets,
-                      logicNodePositions: normalizedNodePositions,
-                      logicEdgeOverrides: normalizedEdgeState.edgeOverrides,
-                      logicDisconnectedEdgeIds:
-                        normalizedEdgeState.disconnectedEdgeIds,
-                    },
-                  },
-                };
-              }).catch((updateError) => {
-                setError(
-                  updateError instanceof Error
-                    ? updateError.message
-                    : "Failed to update set path connections",
-                );
-              });
-            };
 
             return (
               <article
@@ -1573,81 +1362,14 @@ export const AdminLayoutsPage = () => {
                   </button>
                 </div>
 
-                <section className={`mb-4 rounded border p-3 ${runtimeStatusClass}`}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold">{runtimeStatusLabel}</p>
-                    <button
-                      type="button"
-                      className="h-9 rounded border border-slate-500/70 bg-slate-900/70 px-3 text-xs font-semibold text-slate-100 hover:bg-slate-800/70"
-                      onClick={() =>
-                        setExpandedRuntimeChecks((current) => ({
-                          ...current,
-                          [setId]: !showRuntimeDetails,
-                        }))
-                      }
-                    >
-                      {showRuntimeDetails ? "Hide test paths" : "Show test paths"}
-                    </button>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-200/90">
-                    Checks use the same logic the display runtime will execute.
-                  </p>
-                  {runtimeHealth.issues.length === 0 ? (
-                    <p className="mt-1 text-xs">
-                      No issues found. Runtime path resolves for current set logic.
-                    </p>
-                  ) : (
-                    <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
-                      {runtimeHealth.issues.map((issue) => (
-                        <li key={`${setId}-${issue.severity}-${issue.message}`}>
-                          {issue.message}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {showRuntimeDetails ? (
-                    <div className="mt-3 grid gap-2 md:grid-cols-3">
-                      {runtimeHealth.paths.map((path) => (
-                        <article
-                          key={`${setId}-${path.key}`}
-                          className="rounded border border-slate-600/60 bg-slate-950/70 p-2"
-                        >
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">
-                            {path.label}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-100">{path.summary}</p>
-                        </article>
-                      ))}
-                    </div>
-                  ) : null}
-                </section>
-
-                <LayoutSetLogicCanvas
+                <PhotoRouterBlockEditor
+                  authoring={setConfig.logicBlocks}
                   layoutOptions={layoutOptions}
                   photoCollectionOptions={photoCollectionOptions}
-                  portraitRules={portraitTargets}
-                  landscapeRules={landscapeTargets}
-                  fallbackRules={alwaysTargets}
-                  photoActionType={setConfig.photoActionType}
-                  photoActionCollectionId={setConfig.photoActionCollectionId ?? null}
-                  nodePositions={setConfig.logicNodePositions ?? {}}
-                  edgeOverrides={setConfig.logicEdgeOverrides}
-                  disconnectedEdgeIds={setConfig.logicDisconnectedEdgeIds}
-                  onClearRules={() => {
-                    const confirmed = window.confirm(
-                      `Clear all rules in set "${setConfig.name}"?`,
-                    );
-                    if (!confirmed) {
-                      return;
-                    }
-                    void onUpdateSetRules(setId, []);
+                  runtimeHealth={runtimeHealth}
+                  onChange={(nextAuthoring) => {
+                    void onUpdateSetAuthoring(setId, nextAuthoring);
                   }}
-                  onUpdatePhotoActionType={onUpdateSetPhotoActionType}
-                  onUpdatePhotoActionCollectionId={onUpdateSetPhotoActionCollectionId}
-                  onUpdateEdgeState={onUpdateSetEdgeState}
-                  onAddRule={onAddBranchStep}
-                  onUpdateRule={onUpdateBranchStep}
-                  onRemoveRule={onRemoveBranchStep}
                 />
               </article>
             );

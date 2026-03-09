@@ -14,6 +14,7 @@ export interface RegisteredModuleDefinition<TConfig = unknown>
   source: "sdk";
   version: string;
   description?: string;
+  timeMode?: "device-local" | "site-local" | "source-local";
   categories: string[];
   permissions: string[];
   dataSources: string[];
@@ -54,6 +55,7 @@ export const adaptSdkModule = (
     source: "sdk",
     version: definition.manifest.version,
     description: definition.manifest.description,
+    timeMode: definition.manifest.timeMode,
     categories: definition.manifest.categories ?? [],
     permissions: definition.manifest.permissions ?? [],
     dataSources: definition.manifest.dataSources?.map((source) => source.id) ?? [],

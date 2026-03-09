@@ -33,6 +33,7 @@ export const moduleManifestSchema = z.object({
   id: z.string().min(1),
   displayName: z.string().min(1),
   defaultSize: gridSizeSchema,
+  timeMode: z.enum(["device-local", "site-local", "source-local"]).optional(),
 });
 
 export type ModuleManifest = z.infer<typeof moduleManifestSchema>;

@@ -3,8 +3,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import Database from "better-sqlite3";
 import { createDatabase } from "../src/db";
 import { DeviceRepository } from "../src/repositories/device-repository";
+import { DuplicateDeviceNameError } from "../src/repositories/device-name";
 import { LayoutRepository } from "../src/repositories/layout-repository";
 import { SettingsRepository } from "../src/repositories/settings-repository";
 import { ScreenProfileService } from "../src/services/screen-profile-service";
@@ -163,5 +165,103 @@ test("reportScreenProfile does not persist stale reported targets for a new devi
     assert.equal(storedDevice.targetSelection, null);
   } finally {
     harness.dispose();
+  }
+});
+
+test("default device names stay unique when ids share the same readable prefix", () => {
+  const harness = createHarness();
+
+  try {
+    const first = harness.screenProfileService.reportScreenProfile({
+      screenSessionId: "abcd1234-first",
+      reportedThemeId: "default",
+    });
+    const second = harness.screenProfileService.reportScreenProfile({
+      screenSessionId: "abcd1234-second",
+      reportedThemeId: "default",
+    });
+
+    assert.equal(first.device.name, "Display ABCD-1234");
+    assert.equal(second.device.name, "Display ABCD-1234 (2)");
+  } finally {
+    harness.dispose();
+  }
+});
+
+test("device updates reject duplicate names case-insensitively", () => {
+  const harness = createHarness();
+
+  try {
+    harness.screenProfileService.reportScreenProfile({
+      screenSessionId: "device-name-1",
+      reportedThemeId: "default",
+    });
+    harness.screenProfileService.reportScreenProfile({
+      screenSessionId: "device-name-2",
+      reportedThemeId: "default",
+    });
+
+    harness.deviceRepository.updateDevice("device-name-1", {
+      name: "Kitchen display",
+      themeId: "default",
+      targetSelection: null,
+    });
+
+    assert.throws(
+      () =>
+        harness.deviceRepository.updateDevice("device-name-2", {
+          name: "kitchen DISPLAY",
+          themeId: "default",
+          targetSelection: null,
+        }),
+      DuplicateDeviceNameError,
+    );
+  } finally {
+    harness.dispose();
+  }
+});
+
+test("database startup normalizes existing duplicate device names before adding the unique index", () => {
+  const directory = mkdtempSync(join(tmpdir(), "hearth-device-migration-"));
+  const filePath = join(directory, "hearth.sqlite");
+  const rawDb = new Database(filePath);
+
+  try {
+    rawDb.exec(`
+      CREATE TABLE devices (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        theme_id TEXT NOT NULL DEFAULT 'default',
+        target_selection_json TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    rawDb.exec(`
+      INSERT INTO devices (id, name) VALUES
+        ('device-a', 'Kitchen display'),
+        ('device-b', 'kitchen display'),
+        ('device-c', '');
+    `);
+  } finally {
+    rawDb.close();
+  }
+
+  const migratedDb = createDatabase(filePath);
+  const repository = new DeviceRepository(migratedDb);
+
+  try {
+    const devices = repository
+      .listDevices()
+      .slice()
+      .sort((left, right) => left.id.localeCompare(right.id));
+
+    assert.equal(devices[0]?.name, "Kitchen display");
+    assert.equal(devices[1]?.name, "kitchen display (2)");
+    assert.equal(devices[2]?.name, "Display DEVICEC");
+  } finally {
+    migratedDb.close();
+    rmSync(directory, { recursive: true, force: true });
   }
 });

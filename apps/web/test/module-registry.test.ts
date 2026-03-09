@@ -15,6 +15,7 @@ test("unified module registry lists sdk modules", () => {
       name: "SDK example",
       version: "1.0.0",
       defaultSize: { w: 3, h: 2 },
+      timeMode: "site-local",
     },
     settingsSchema: z.object({ refreshSeconds: z.number().int().default(10) }),
     runtime: {
@@ -28,6 +29,7 @@ test("unified module registry lists sdk modules", () => {
   assert.equal(listed.length, 1);
   assert.equal(listed[0]?.id, "sdk-example");
   assert.equal(registry.getModule("sdk-example")?.source, "sdk");
+  assert.equal(registry.getModule("sdk-example")?.timeMode, "site-local");
 });
 
 test("duplicate sdk module id throws", () => {

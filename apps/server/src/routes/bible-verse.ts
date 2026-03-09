@@ -2,13 +2,13 @@ import {
   bibleVerseModuleConfigSchema,
   bibleVerseModuleParamsSchema,
   bibleVerseModuleResponseSchema,
+  getDayOfYearInTimeZone,
 } from "@hearth/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { config } from "../config.js";
 import type { AppServices } from "../types.js";
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const DAILY_PASSAGE_REFERENCES = [
   "john 3:16",
   "psalm 23:1",
@@ -49,19 +49,16 @@ const ESV_PASSAGE_RESPONSE_SCHEMA = z.object({
   passages: z.array(z.string().min(1)).min(1),
 });
 
-const dayOfYearUtc = (date: Date): number => {
-  const start = Date.UTC(date.getUTCFullYear(), 0, 1);
-  const current = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-  return Math.floor((current - start) / MS_PER_DAY);
-};
-
-const selectDailyPassageReference = (date: Date): string => {
-  const index = dayOfYearUtc(date) % DAILY_PASSAGE_REFERENCES.length;
+export const selectDailyPassageReference = (
+  date: Date,
+  siteTimezone: string,
+): string => {
+  const index = getDayOfYearInTimeZone(date, siteTimezone) % DAILY_PASSAGE_REFERENCES.length;
   return DAILY_PASSAGE_REFERENCES[index] ?? "john 3:16";
 };
 
-const fetchVerseOfDay = async () => {
-  const reference = selectDailyPassageReference(new Date());
+const fetchVerseOfDay = async (siteTimezone: string) => {
+  const reference = selectDailyPassageReference(new Date(), siteTimezone);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 7000);
 
@@ -145,6 +142,8 @@ export const registerBibleVerseRoutes = (
       return reply.code(404).send({ message: "Bible verse module instance not found" });
     }
 
+    const siteTimeConfig = services.settingsRepository.getSiteTimeConfig();
+    reply.header("cache-control", "no-store");
     const generatedAt = new Date().toISOString();
     const basePayload = {
       generatedAt,
@@ -164,7 +163,7 @@ export const registerBibleVerseRoutes = (
     }
 
     try {
-      const verse = await fetchVerseOfDay();
+      const verse = await fetchVerseOfDay(siteTimeConfig.siteTimezone);
       const cleanedText = verse.text.replace(/\s+/g, " ").trim();
       const reference = verse.reference;
 

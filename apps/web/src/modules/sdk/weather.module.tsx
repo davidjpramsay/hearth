@@ -228,6 +228,7 @@ export const moduleDefinition = defineModule({
     description: "Weather module migrated to Hearth Module SDK",
     icon: "cloud",
     defaultSize: { w: 4, h: 3 },
+    timeMode: "source-local",
     categories: ["weather"],
     permissions: ["network"],
     dataSources: [{ id: "weather-api", kind: "rest" }],

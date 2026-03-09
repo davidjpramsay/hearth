@@ -55,6 +55,7 @@ test("validateData validates data schema when provided", () => {
       name: "Status widget",
       version: "1.0.0",
       defaultSize: { w: 3, h: 2 },
+      timeMode: "source-local",
     },
     settingsSchema: z.object({}),
     dataSchema: z.object({
@@ -69,6 +70,7 @@ test("validateData validates data schema when provided", () => {
   const data = validateData(definition, { ok: true, uptimeSeconds: 42 });
   assert.equal(data.ok, true);
   assert.equal(data.uptimeSeconds, 42);
+  assert.equal(definition.manifest.timeMode, "source-local");
 
   assert.throws(() => validateData(definition, { ok: true, uptimeSeconds: -1 }), /greater than or equal to 0/);
 });

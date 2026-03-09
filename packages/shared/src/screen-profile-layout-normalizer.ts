@@ -1,10 +1,13 @@
 import {
   createLayoutSetLogicGraphFromBranches,
   createLayoutSetLogicGraphFromTargets,
+  compileLayoutSetAuthoringToLogicGraph,
+  deriveLayoutSetAuthoringFromLogicGraph,
+  getDefaultLayoutSetAuthoring,
   getLayoutSetLogicBranches,
+  getPrimaryPhotoRouterBlock,
   isDefaultLayoutSetLogicGraph,
-  layoutSetLogicNodePositionsSchema,
-  normalizeLayoutSetLogicEdgeState,
+  normalizeLayoutSetAuthoring,
   normalizeLayoutSetLogicGraph,
   screenProfileLayoutsSchema,
   toAutoLayoutTargetsFromLogicGraph,
@@ -172,18 +175,23 @@ export const normalizeScreenProfileLayoutsConfig = (
         ? createLayoutSetLogicGraphFromTargets(sourceTargets)
         : source.logicGraph;
 
-    const logicGraph = normalizeLayoutSetLogicGraph({
-      graph: initialGraph,
+    const logicBlocks = normalizeLayoutSetAuthoring({
+      authoring:
+        source.logicBlocks.blocks.length > 0
+          ? source.logicBlocks
+          : deriveLayoutSetAuthoringFromLogicGraph({
+              logicGraph: initialGraph,
+              photoActionType: source.photoActionType ?? defaultPhotoActionType,
+              photoActionCollectionId: source.photoActionCollectionId ?? null,
+            }),
       knownLayoutNames,
     });
-    const edgeState = normalizeLayoutSetLogicEdgeState({
-      graph: logicGraph,
-      edgeOverrides: source.logicEdgeOverrides,
-      disconnectedEdgeIds: source.logicDisconnectedEdgeIds,
+    const primaryPhotoRouter = getPrimaryPhotoRouterBlock(logicBlocks);
+
+    const logicGraph = normalizeLayoutSetLogicGraph({
+      graph: compileLayoutSetAuthoringToLogicGraph(logicBlocks),
+      knownLayoutNames,
     });
-    const logicNodePositions = layoutSetLogicNodePositionsSchema.parse(
-      source.logicNodePositions ?? {},
-    );
 
     const autoLayoutTargets = toAutoLayoutTargetsFromLogicGraph(logicGraph);
     const branches = getLayoutSetLogicBranches(logicGraph);
@@ -220,12 +228,13 @@ export const normalizeScreenProfileLayoutsConfig = (
       name: resolvedName,
       staticLayoutName: resolvedStaticLayoutName,
       defaultPhotoCollectionId: source.defaultPhotoCollectionId ?? null,
-      photoActionCollectionId: source.photoActionCollectionId ?? null,
-      photoActionType: source.photoActionType ?? defaultPhotoActionType,
+      photoActionCollectionId: primaryPhotoRouter.photoActionCollectionId ?? null,
+      photoActionType: primaryPhotoRouter.photoActionType ?? defaultPhotoActionType,
+      logicBlocks,
       logicGraph,
-      logicNodePositions,
-      logicEdgeOverrides: edgeState.edgeOverrides,
-      logicDisconnectedEdgeIds: edgeState.disconnectedEdgeIds,
+      logicNodePositions: {},
+      logicEdgeOverrides: {},
+      logicDisconnectedEdgeIds: [],
       autoLayoutTargets,
       portraitPhotoLayoutName: portraitPhotoLayoutNames[0] ?? null,
       landscapePhotoLayoutName: landscapePhotoLayoutNames[0] ?? null,
@@ -235,13 +244,12 @@ export const normalizeScreenProfileLayoutsConfig = (
   }
 
   if (Object.keys(families).length === 0) {
-    const fallbackGraph = createLayoutSetLogicGraphFromBranches({
-      alwaysRules: fallbackStaticLayoutName
-        ? [toRule(fallbackStaticLayoutName, "always")]
-        : [],
-      portraitRules: [],
-      landscapeRules: [],
+    const fallbackAuthoring = getDefaultLayoutSetAuthoring({
+      fallbackLayoutName: fallbackStaticLayoutName,
+      photoActionType: defaultPhotoActionType,
+      photoActionCollectionId: null,
     });
+    const fallbackGraph = compileLayoutSetAuthoringToLogicGraph(fallbackAuthoring);
 
     const fallbackTargets = toAutoLayoutTargetsFromLogicGraph(fallbackGraph);
 
@@ -251,6 +259,7 @@ export const normalizeScreenProfileLayoutsConfig = (
       defaultPhotoCollectionId: null,
       photoActionCollectionId: null,
       photoActionType: defaultPhotoActionType,
+      logicBlocks: fallbackAuthoring,
       logicGraph: fallbackGraph,
       logicNodePositions: {},
       logicEdgeOverrides: {},

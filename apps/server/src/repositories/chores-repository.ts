@@ -5,6 +5,8 @@ import {
   choreScheduleSchema,
   choresBoardResponseSchema,
   choresPayoutConfigSchema,
+  getRuntimeTimeZone,
+  toCalendarDateInTimeZone,
   type ChoreCompletion,
   type ChoreMember,
   type ChoreRecord,
@@ -28,6 +30,7 @@ interface ChoreRow {
   name: string;
   member_id: number;
   schedule_json: string;
+  starts_on: string | null;
   value_amount: number | null;
   active: number;
   created_at: string;
@@ -53,14 +56,7 @@ const addDays = (date: Date, days: number): Date => {
   return next;
 };
 
-const toLocalDateString = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const parseSqliteTimestampToLocalDateString = (timestamp: string): string => {
+const parseSqliteTimestamp = (timestamp: string): Date | null => {
   const normalizedTimestamp = timestamp.includes("T")
     ? timestamp
     : timestamp.replace(" ", "T");
@@ -70,10 +66,10 @@ const parseSqliteTimestampToLocalDateString = (timestamp: string): string => {
   const parsed = new Date(withTimezone);
 
   if (Number.isNaN(parsed.getTime())) {
-    return timestamp.slice(0, 10);
+    return null;
   }
 
-  return toLocalDateString(parsed);
+  return parsed;
 };
 
 const startOfWeek = (dateString: string, paydayDayOfWeek: number): string => {
@@ -109,6 +105,28 @@ const parseSchedule = (scheduleJson: string): ChoreSchedule => {
   }
 };
 
+const resolveChoreStartsOn = (input: {
+  startsOn: string | null;
+  schedule: ChoreSchedule;
+  createdAt: string;
+  siteTimezone: string;
+}): string => {
+  if (input.startsOn && input.startsOn.trim().length > 0) {
+    return input.startsOn;
+  }
+
+  if (input.schedule.type === "one-off") {
+    return input.schedule.date;
+  }
+
+  const createdAt = parseSqliteTimestamp(input.createdAt);
+  if (createdAt) {
+    return toCalendarDateInTimeZone(createdAt, input.siteTimezone);
+  }
+
+  return input.createdAt.slice(0, 10);
+};
+
 const toMember = (row: MemberRow): ChoreMember =>
   choreMemberSchema.parse({
     id: row.id,
@@ -119,12 +137,18 @@ const toMember = (row: MemberRow): ChoreMember =>
     updatedAt: row.updated_at,
   });
 
-const toChore = (row: ChoreRow): ChoreRecord =>
+const toChore = (row: ChoreRow, siteTimezone: string): ChoreRecord =>
   choreRecordSchema.parse({
     id: row.id,
     name: row.name,
     memberId: row.member_id,
     schedule: parseSchedule(row.schedule_json),
+    startsOn: resolveChoreStartsOn({
+      startsOn: row.starts_on,
+      schedule: parseSchedule(row.schedule_json),
+      createdAt: row.created_at,
+      siteTimezone,
+    }),
     valueAmount: row.value_amount,
     active: row.active === 1,
     createdAt: row.created_at,
@@ -230,44 +254,54 @@ export class ChoresRepository {
     return row ? toMember(row) : null;
   }
 
-  listChores(): ChoreRecord[] {
+  listChores(siteTimezone = getRuntimeTimeZone()): ChoreRecord[] {
     const rows = this.db
       .prepare<[], ChoreRow>("SELECT * FROM chores ORDER BY id ASC")
       .all();
-    return rows.map(toChore);
+    return rows.map((row) => toChore(row, siteTimezone));
   }
 
-  getChoreById(id: number): ChoreRecord | null {
+  getChoreById(id: number, siteTimezone = getRuntimeTimeZone()): ChoreRecord | null {
     const row = this.db
       .prepare<{ id: number }, ChoreRow>("SELECT * FROM chores WHERE id = @id")
       .get({ id });
 
-    return row ? toChore(row) : null;
+    return row ? toChore(row, siteTimezone) : null;
   }
 
   createChore(input: {
     name: string;
     memberId: number;
     schedule: ChoreSchedule;
+    startsOn?: string | null;
     valueAmount: number | null;
     active: boolean;
+    siteTimezone?: string;
   }): ChoreRecord {
+    const siteTimezone = input.siteTimezone ?? getRuntimeTimeZone();
+    const startsOn =
+      input.schedule.type === "one-off"
+        ? input.schedule.date
+        : input.startsOn && input.startsOn.trim().length > 0
+          ? input.startsOn
+          : toCalendarDateInTimeZone(new Date(), siteTimezone);
     const result = this.db
       .prepare(
         `
-        INSERT INTO chores (name, member_id, schedule_json, value_amount, active)
-        VALUES (@name, @memberId, @scheduleJson, @valueAmount, @active)
+        INSERT INTO chores (name, member_id, schedule_json, starts_on, value_amount, active)
+        VALUES (@name, @memberId, @scheduleJson, @startsOn, @valueAmount, @active)
         `,
       )
       .run({
         name: input.name.trim(),
         memberId: input.memberId,
         scheduleJson: JSON.stringify(input.schedule),
+        startsOn,
         valueAmount: input.valueAmount,
         active: input.active ? 1 : 0,
       });
 
-    const created = this.getChoreById(Number(result.lastInsertRowid));
+    const created = this.getChoreById(Number(result.lastInsertRowid), siteTimezone);
     if (!created) {
       throw new Error("Failed to create chore");
     }
@@ -281,19 +315,29 @@ export class ChoresRepository {
       name?: string;
       memberId?: number;
       schedule?: ChoreSchedule;
+      startsOn?: string;
       valueAmount?: number | null;
       active?: boolean;
+      siteTimezone?: string;
     },
   ): ChoreRecord | null {
-    const existing = this.getChoreById(id);
+    const siteTimezone = changes.siteTimezone ?? getRuntimeTimeZone();
+    const existing = this.getChoreById(id, siteTimezone);
     if (!existing) {
       return null;
     }
 
+    const nextSchedule = changes.schedule ?? existing.schedule;
     const next = {
       name: changes.name !== undefined ? changes.name.trim() : existing.name,
       memberId: changes.memberId ?? existing.memberId,
-      schedule: changes.schedule ?? existing.schedule,
+      schedule: nextSchedule,
+      startsOn:
+        nextSchedule.type === "one-off"
+          ? nextSchedule.date
+          : changes.startsOn !== undefined
+            ? changes.startsOn
+            : existing.startsOn,
       valueAmount:
         changes.valueAmount !== undefined ? changes.valueAmount : existing.valueAmount,
       active: changes.active ?? existing.active,
@@ -306,6 +350,7 @@ export class ChoresRepository {
         SET name = @name,
             member_id = @memberId,
             schedule_json = @scheduleJson,
+            starts_on = @startsOn,
             value_amount = @valueAmount,
             active = @active,
             updated_at = CURRENT_TIMESTAMP
@@ -317,11 +362,12 @@ export class ChoresRepository {
         name: next.name,
         memberId: next.memberId,
         scheduleJson: JSON.stringify(next.schedule),
+        startsOn: next.startsOn,
         valueAmount: next.valueAmount,
         active: next.active ? 1 : 0,
       });
 
-    return this.getChoreById(id);
+    return this.getChoreById(id, siteTimezone);
   }
 
   deleteChore(id: number): boolean {
@@ -331,7 +377,10 @@ export class ChoresRepository {
     return result.changes > 0;
   }
 
-  setCompletion(input: { choreId: number; date: string; completed: boolean }): void {
+  setCompletion(
+    input: { choreId: number; date: string; completed: boolean },
+    siteTimezone = getRuntimeTimeZone(),
+  ): void {
     if (!input.completed) {
       this.db
         .prepare(
@@ -348,12 +397,12 @@ export class ChoresRepository {
       return;
     }
 
-    const chore = this.getChoreById(input.choreId);
+    const chore = this.getChoreById(input.choreId, siteTimezone);
     if (!chore) {
       throw new Error("Chore not found");
     }
 
-    const choreStartDate = parseSqliteTimestampToLocalDateString(chore.createdAt);
+    const choreStartDate = chore.startsOn;
     if (input.date < choreStartDate) {
       throw new Error("Cannot complete a chore before its start date");
     }
@@ -394,12 +443,14 @@ export class ChoresRepository {
     days: number;
     enableMoneyTracking: boolean;
     payoutConfig: ChoresPayoutConfig;
+    siteTimezone?: string;
   }): ChoresBoardResponse {
     const payoutConfig = choresPayoutConfigSchema.parse(input.payoutConfig);
     const members = this.listMembers();
-    const chores = this.listChores().filter((chore) => chore.active);
+    const siteTimezone = input.siteTimezone ?? payoutConfig.siteTimezone;
+    const chores = this.listChores(siteTimezone).filter((chore) => chore.active);
     const choreStartDateById = new Map(
-      chores.map((chore) => [chore.id, parseSqliteTimestampToLocalDateString(chore.createdAt)]),
+      chores.map((chore) => [chore.id, chore.startsOn]),
     );
     const memberById = new Map(members.map((member) => [member.id, member]));
 

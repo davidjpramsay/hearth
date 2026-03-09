@@ -17,11 +17,13 @@ import { clearAuthToken, getAuthToken } from "../auth/storage";
 import { useNavigate } from "react-router-dom";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
 import { PageShell } from "../components/PageShell";
-import type {
-  ChoreRecord,
-  ChoreSchedule,
-  ChoresBoardResponse,
-  ChoresPayoutConfig,
+import {
+  getRuntimeTimeZone,
+  toCalendarDateInTimeZone,
+  type ChoreRecord,
+  type ChoreSchedule,
+  type ChoresBoardResponse,
+  type ChoresPayoutConfig,
 } from "@hearth/shared";
 
 type ChoreScheduleType = ChoreSchedule["type"];
@@ -40,18 +42,14 @@ interface ChoreFormState {
   scheduleType: ChoreScheduleType;
   weeklyDay: number;
   specificDays: number[];
+  startsOn: string;
   oneOffDate: string;
   valueAmount: string;
   active: boolean;
 }
 
-const todayDate = (): string => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
+const todayDate = (timeZone = getRuntimeTimeZone()): string =>
+  toCalendarDateInTimeZone(new Date(), timeZone);
 
 const dayLabels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -99,30 +97,31 @@ const emptyMemberForm = (): MemberFormState => ({
   weeklyAllowance: "0",
 });
 
-const emptyChoreForm = (): ChoreFormState => ({
+const emptyChoreForm = (referenceDate: string): ChoreFormState => ({
   id: null,
   name: "",
   memberId: "",
   scheduleType: "daily",
   weeklyDay: 1,
   specificDays: [1],
-  oneOffDate: todayDate(),
+  startsOn: referenceDate,
+  oneOffDate: referenceDate,
   valueAmount: "",
   active: true,
 });
 
-const scheduleLabel = (schedule: ChoreSchedule): string => {
-  switch (schedule.type) {
+const scheduleLabel = (chore: ChoreRecord): string => {
+  switch (chore.schedule.type) {
     case "daily":
-      return "Daily";
+      return `Daily from ${formatDateLabel(chore.startsOn)}`;
     case "weekly":
-      return `Weekly (${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][schedule.dayOfWeek]})`;
+      return `Weekly (${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][chore.schedule.dayOfWeek]}) from ${formatDateLabel(chore.startsOn)}`;
     case "specific-days":
-      return `Specific (${schedule.days
+      return `Specific (${chore.schedule.days
         .map((day) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][day])
-        .join(", ")})`;
+        .join(", ")}) from ${formatDateLabel(chore.startsOn)}`;
     case "one-off":
-      return `One-off (${schedule.date})`;
+      return `One-off (${formatDateLabel(chore.schedule.date)})`;
     default:
       return "Unknown";
   }
@@ -144,17 +143,20 @@ const formatWeekButtonDateLabel = (date: string): string =>
 export const AdminChoresPage = () => {
   const token = getAuthToken();
   const navigate = useNavigate();
-  const [selectedDate, setSelectedDate] = useState(todayDate());
+  const [siteToday, setSiteToday] = useState(() => todayDate());
+  const [selectedDate, setSelectedDate] = useState(() => todayDate());
   const [board, setBoard] = useState<ChoresBoardResponse | null>(null);
   const [members, setMembers] = useState<ChoresBoardResponse["members"]>([]);
   const [chores, setChores] = useState<ChoreRecord[]>([]);
   const [memberForm, setMemberForm] = useState<MemberFormState>(emptyMemberForm);
-  const [choreForm, setChoreForm] = useState<ChoreFormState>(emptyChoreForm);
+  const [choreForm, setChoreForm] = useState<ChoreFormState>(() => emptyChoreForm(todayDate()));
   const [payoutConfig, setPayoutConfig] = useState<ChoresPayoutConfig>({
     mode: "all-or-nothing",
     oneOffBonusEnabled: true,
     paydayDayOfWeek: 6,
+    siteTimezone: getRuntimeTimeZone(),
   });
+  const [siteTimezoneDraft, setSiteTimezoneDraft] = useState(() => getRuntimeTimeZone());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -169,19 +171,30 @@ export const AdminChoresPage = () => {
     setError(null);
 
     try {
-      const [nextMembers, nextChores, nextPayoutConfig] = await Promise.all([
+      const [nextMembers, nextChores, nextPayoutConfig, currentDayBoard] = await Promise.all([
         getChoreMembers(token),
         getChoreItems(token),
         getChoresPayoutConfig(token),
+        getChoreBoard(token, { days: 1 }),
       ]);
-      const weekRange = getWeekRangeForPayday(todayDate(), nextPayoutConfig.paydayDayOfWeek);
+      const nextSiteToday = currentDayBoard.startDate;
+      const weekRange = getWeekRangeForPayday(
+        nextSiteToday,
+        nextPayoutConfig.paydayDayOfWeek,
+      );
       const nextBoard = await getChoreBoard(token, { startDate: weekRange.startDate, days: 7 });
+      const nextSelectableRange = {
+        startDate: weekRange.startDate,
+        endDate: weekRange.endDate < nextSiteToday ? weekRange.endDate : nextSiteToday,
+      };
 
       setMembers(nextMembers);
       setChores(nextChores);
       setPayoutConfig(nextPayoutConfig);
+      setSiteTimezoneDraft(nextPayoutConfig.siteTimezone);
+      setSiteToday(nextSiteToday);
       setBoard(nextBoard);
-      setSelectedDate((current) => clampIsoDateToRange(current, weekRange));
+      setSelectedDate((current) => clampIsoDateToRange(current, nextSelectableRange));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load chores");
     } finally {
@@ -221,18 +234,16 @@ export const AdminChoresPage = () => {
     };
   }, [loadData]);
 
-  const today = todayDate();
   const currentWeekRange = useMemo(
-    () => getWeekRangeForPayday(today, payoutConfig.paydayDayOfWeek),
-    [payoutConfig.paydayDayOfWeek, today, board?.generatedAt],
+    () => getWeekRangeForPayday(siteToday, payoutConfig.paydayDayOfWeek),
+    [payoutConfig.paydayDayOfWeek, siteToday],
   );
   const selectableWeekRange = useMemo(
     () => ({
       startDate: currentWeekRange.startDate,
-      endDate:
-        currentWeekRange.endDate < today ? currentWeekRange.endDate : today,
+      endDate: currentWeekRange.endDate < siteToday ? currentWeekRange.endDate : siteToday,
     }),
-    [currentWeekRange.endDate, currentWeekRange.startDate, today],
+    [currentWeekRange.endDate, currentWeekRange.startDate, siteToday],
   );
   const activeSelectedDate = clampIsoDateToRange(selectedDate, selectableWeekRange);
 
@@ -289,17 +300,18 @@ export const AdminChoresPage = () => {
       return { type: "specific-days", days };
     }
 
-    return { type: "one-off", date: choreForm.oneOffDate || todayDate() };
+    return { type: "one-off", date: choreForm.oneOffDate || siteToday };
   };
 
   const loadChoreIntoForm = (chore: ChoreRecord) => {
-    const nextForm = emptyChoreForm();
+    const nextForm = emptyChoreForm(siteToday);
     nextForm.id = chore.id;
     nextForm.name = chore.name;
     nextForm.memberId = String(chore.memberId);
     nextForm.active = chore.active;
     nextForm.valueAmount = chore.valueAmount !== null ? String(chore.valueAmount) : "";
     nextForm.scheduleType = chore.schedule.type;
+    nextForm.startsOn = chore.startsOn;
 
     if (chore.schedule.type === "weekly") {
       nextForm.weeklyDay = chore.schedule.dayOfWeek;
@@ -310,6 +322,30 @@ export const AdminChoresPage = () => {
     }
 
     setChoreForm(nextForm);
+  };
+
+  const savePayoutConfig = async (changes: Partial<ChoresPayoutConfig>) => {
+    if (!token) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await updateChoresPayoutConfig(token, {
+        ...payoutConfig,
+        ...changes,
+      });
+      setPayoutConfig(updated);
+      setSiteTimezoneDraft(updated.siteTimezone);
+      await loadData();
+    } catch (configError) {
+      setError(
+        configError instanceof Error ? configError.message : "Failed to update chores settings",
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onSubmitMember = async (event: FormEvent) => {
@@ -360,10 +396,15 @@ export const AdminChoresPage = () => {
     setError(null);
 
     try {
+      const startsOn =
+        choreForm.scheduleType === "one-off"
+          ? choreForm.oneOffDate || siteToday
+          : choreForm.startsOn || siteToday;
       const payload = {
         name: choreForm.name,
         memberId: Number(choreForm.memberId),
         schedule: buildSchedule(),
+        startsOn,
         valueAmount: choreForm.valueAmount.trim() ? Number(choreForm.valueAmount) : null,
         active: choreForm.active,
       };
@@ -374,7 +415,7 @@ export const AdminChoresPage = () => {
         await updateChoreItem(token, choreForm.id, payload);
       }
 
-      setChoreForm(emptyChoreForm());
+      setChoreForm(emptyChoreForm(siteToday));
       await loadData();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Failed to save chore");
@@ -662,6 +703,23 @@ export const AdminChoresPage = () => {
               </label>
             ) : null}
 
+            {choreForm.scheduleType !== "one-off" ? (
+              <label className="block space-y-1">
+                <span className="text-sm text-slate-300">Starts on</span>
+                <input
+                  type="date"
+                  className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
+                  value={choreForm.startsOn}
+                  onChange={(event) =>
+                    setChoreForm((current) => ({ ...current, startsOn: event.target.value }))
+                  }
+                />
+                <p className="text-xs text-slate-400">
+                  Recurring chores only appear from this household date onward.
+                </p>
+              </label>
+            ) : null}
+
             <label className="block space-y-1">
               <span className="text-sm text-slate-300">Money value (optional)</span>
               <input
@@ -698,7 +756,7 @@ export const AdminChoresPage = () => {
               {choreForm.id !== null ? (
                 <button
                   type="button"
-                  onClick={() => setChoreForm(emptyChoreForm())}
+                  onClick={() => setChoreForm(emptyChoreForm(siteToday))}
                   className="rounded border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-slate-300"
                 >
                   Cancel edit
@@ -722,7 +780,7 @@ export const AdminChoresPage = () => {
                 <p className="text-xs text-slate-300">
                   {members.find((member) => member.id === chore.memberId)?.name ?? "Unknown child"}{" "}
                   |{" "}
-                  {scheduleLabel(chore.schedule)}
+                  {scheduleLabel(chore)}
                   {chore.valueAmount !== null ? ` | $${chore.valueAmount.toFixed(2)}` : ""}
                   {!chore.active ? " | Inactive" : ""}
                 </p>
@@ -745,7 +803,7 @@ export const AdminChoresPage = () => {
                     try {
                       await deleteChoreItem(token, chore.id);
                       if (choreForm.id === chore.id) {
-                        setChoreForm(emptyChoreForm());
+                        setChoreForm(emptyChoreForm(siteToday));
                       }
                       await loadData();
                     } catch (deleteError) {
@@ -866,28 +924,10 @@ export const AdminChoresPage = () => {
               <select
                 className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-100"
                 value={payoutConfig.mode}
-                onChange={async (event) => {
-                  if (!token) {
-                    return;
-                  }
-                  setBusy(true);
-                  setError(null);
-                  try {
-                    const updated = await updateChoresPayoutConfig(token, {
-                      ...payoutConfig,
-                      mode: event.target.value as ChoresPayoutConfig["mode"],
-                    });
-                    setPayoutConfig(updated);
-                    await loadData();
-                  } catch (configError) {
-                    setError(
-                      configError instanceof Error
-                        ? configError.message
-                        : "Failed to update payout rule",
-                    );
-                  } finally {
-                    setBusy(false);
-                  }
+                onChange={(event) => {
+                  void savePayoutConfig({
+                    mode: event.target.value as ChoresPayoutConfig["mode"],
+                  });
                 }}
               >
                 <option value="all-or-nothing">
@@ -903,28 +943,10 @@ export const AdminChoresPage = () => {
               <input
                 type="checkbox"
                 checked={payoutConfig.oneOffBonusEnabled}
-                onChange={async (event) => {
-                  if (!token) {
-                    return;
-                  }
-                  setBusy(true);
-                  setError(null);
-                  try {
-                    const updated = await updateChoresPayoutConfig(token, {
-                      ...payoutConfig,
-                      oneOffBonusEnabled: event.target.checked,
-                    });
-                    setPayoutConfig(updated);
-                    await loadData();
-                  } catch (configError) {
-                    setError(
-                      configError instanceof Error
-                        ? configError.message
-                        : "Failed to update bonus settings",
-                    );
-                  } finally {
-                    setBusy(false);
-                  }
+                onChange={(event) => {
+                  void savePayoutConfig({
+                    oneOffBonusEnabled: event.target.checked,
+                  });
                 }}
               />
             </label>
@@ -933,26 +955,10 @@ export const AdminChoresPage = () => {
               <select
                 className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-100"
                 value={payoutConfig.paydayDayOfWeek}
-                onChange={async (event) => {
-                  if (!token) {
-                    return;
-                  }
-                  setBusy(true);
-                  setError(null);
-                  try {
-                    const updated = await updateChoresPayoutConfig(token, {
-                      ...payoutConfig,
-                      paydayDayOfWeek: Number(event.target.value),
-                    });
-                    setPayoutConfig(updated);
-                    await loadData();
-                  } catch (configError) {
-                    setError(
-                      configError instanceof Error ? configError.message : "Failed to update payday",
-                    );
-                  } finally {
-                    setBusy(false);
-                  }
+                onChange={(event) => {
+                  void savePayoutConfig({
+                    paydayDayOfWeek: Number(event.target.value),
+                  });
                 }}
               >
                 {dayLabels.map((label, index) => (
@@ -962,10 +968,49 @@ export const AdminChoresPage = () => {
                 ))}
               </select>
             </label>
+            <div className="mt-2 space-y-2">
+              <label className="block space-y-1">
+                <span className="text-sm text-slate-300">Household timezone</span>
+                <input
+                  className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-100"
+                  value={siteTimezoneDraft}
+                  onChange={(event) => setSiteTimezoneDraft(event.target.value)}
+                  placeholder="Australia/Perth"
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSiteTimezoneDraft(getRuntimeTimeZone())}
+                  className="rounded border border-slate-500 px-2 py-1 text-xs text-slate-200 hover:border-slate-300"
+                >
+                  Use browser timezone
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    busy ||
+                    siteTimezoneDraft.trim() === payoutConfig.siteTimezone
+                  }
+                  onClick={() => {
+                    void savePayoutConfig({
+                      siteTimezone: siteTimezoneDraft.trim() || getRuntimeTimeZone(),
+                    });
+                  }}
+                  className="rounded bg-cyan-500 px-2 py-1 text-xs font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-60"
+                >
+                  Save timezone
+                </button>
+              </div>
+              <p className="text-xs text-slate-400">
+                Household timezone controls site-local modules. Chores use it for day rollover
+                and week boundaries, and Bible verse uses it for the verse of the day.
+              </p>
+            </div>
             <p className="mt-2 text-xs text-slate-300">
               Current week: {formatDateLabel(currentWeekRange.startDate)} to{" "}
-              {formatDateLabel(currentWeekRange.endDate)}. The completion tracker resets at
-              midnight after payday.
+              {formatDateLabel(currentWeekRange.endDate)} in {payoutConfig.siteTimezone}. The
+              completion tracker resets at midnight after payday.
             </p>
             <p className="mt-2 text-xs text-slate-300">
               Each child has an editable weekly allowance. Recurring chores determine allowance

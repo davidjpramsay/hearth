@@ -44,7 +44,7 @@ Impact: stable dashboard behavior during network hiccups.
 ## Chores Module
 
 - Week stats are computed from a 7-day payday-bounded window.
-- Board generation filters out dates before chore creation (non-retrospective chores).
+- Board generation filters out dates before each chore's effective start date (`startsOn` for recurring chores, scheduled date for one-off chores).
 - Display + admin refresh from SSE and periodic polling to stay correct over day/week boundaries.
 
 Impact: lower unnecessary schedule expansion and predictable week rollover behavior.

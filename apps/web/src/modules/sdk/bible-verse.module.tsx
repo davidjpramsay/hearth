@@ -28,6 +28,7 @@ const loadVerse = async (
     {
       method: "GET",
       signal,
+      cache: "no-store",
     },
   );
 
@@ -51,6 +52,7 @@ export const moduleDefinition = defineModule({
     description: "Bible verse module migrated to Hearth Module SDK",
     icon: "book-open",
     defaultSize: { w: 4, h: 3 },
+    timeMode: "site-local",
     categories: ["faith", "text"],
     permissions: ["network"],
     dataSources: [{ id: "verse-of-the-day", kind: "rest" }],

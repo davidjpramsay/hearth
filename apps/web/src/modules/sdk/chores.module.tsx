@@ -4,18 +4,16 @@ import {
   choresModuleConfigSchema,
   choresModuleSummaryQuerySchema,
   choresPayoutConfigSchema,
+  getRuntimeTimeZone,
+  toCalendarDateInTimeZone,
   type ChoreBoardItem,
   type ChoresBoardResponse,
   type ChoresModuleConfig,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
 
-const localIsoDate = (date: Date = new Date()): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
+const localIsoDate = (date: Date = new Date()): string =>
+  toCalendarDateInTimeZone(date, getRuntimeTimeZone());
 
 const emptyBoard = (): ChoresBoardResponse =>
   choresBoardResponseSchema.parse({
@@ -100,6 +98,7 @@ export const moduleDefinition = defineModule({
     description: "Chores module migrated to Hearth Module SDK",
     icon: "check-square",
     defaultSize: { w: 6, h: 4 },
+    timeMode: "site-local",
     categories: ["family", "tasks"],
     permissions: ["network"],
     dataSources: [{ id: "chores-summary", kind: "rest" }],
@@ -124,9 +123,7 @@ export const moduleDefinition = defineModule({
 
         const load = async () => {
           try {
-            const summary = await fetchSummary(instanceId, {
-              startDate: localIsoDate(),
-            });
+            const summary = await fetchSummary(instanceId);
             if (!active) {
               return;
             }
@@ -239,14 +236,10 @@ export const moduleDefinition = defineModule({
             date: item.date,
             completed,
           });
-          const summary = await fetchSummary(instanceId, {
-            startDate: localIsoDate(),
-          });
+          const summary = await fetchSummary(instanceId);
           setBoard(summary);
         } catch (toggleError) {
-          const summary = await fetchSummary(instanceId, {
-            startDate: localIsoDate(),
-          }).catch(() => null);
+          const summary = await fetchSummary(instanceId).catch(() => null);
           if (summary) {
             setBoard(summary);
           }

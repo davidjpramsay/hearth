@@ -12,6 +12,7 @@ import { isAbsolute, relative, resolve } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { config } from "../config.js";
+import { DuplicateDeviceNameError } from "../repositories/device-name.js";
 import type { AppServices } from "../types.js";
 
 const PHOTO_LIBRARY_ROOT = resolve(config.dataDir, "photos");
@@ -113,13 +114,22 @@ export const registerDisplayRoutes = (
       return reply.code(400).send({ message: validatedTargetSelection.message });
     }
 
-    const updatedDevice = services.deviceRepository.updateDevice(
-      parsedParams.data.id,
-      {
-        ...parsedBody.data,
-        targetSelection: validatedTargetSelection.targetSelection,
-      },
-    );
+    let updatedDevice;
+    try {
+      updatedDevice = services.deviceRepository.updateDevice(
+        parsedParams.data.id,
+        {
+          ...parsedBody.data,
+          targetSelection: validatedTargetSelection.targetSelection,
+        },
+      );
+    } catch (error) {
+      if (error instanceof DuplicateDeviceNameError) {
+        return reply.code(409).send({ message: error.message });
+      }
+
+      throw error;
+    }
 
     services.layoutEventBus.publish({
       type: "display-device-updated",

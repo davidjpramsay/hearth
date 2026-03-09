@@ -52,7 +52,7 @@ React frontend with two routes:
 
 1. Browser loads `/`
 2. Uses a stable device id persisted in browser storage
-3. Reports photo orientation, device id, and legacy local fallback preferences to `/api/display/screen-profile/report`
+3. Reports photo orientation, device id, and current bootstrap state to `/api/display/screen-profile/report`
 4. Server registers or looks up that device, applies server-managed theme/routing, and resolves a layout for that specific display
 5. Browser applies the resolved theme and renders module tiles from registry
 6. Subscribes to `/api/events/layouts` (SSE)
@@ -77,9 +77,8 @@ Current behavior:
   - `targetSelection.kind = "layout"` to pin one layout directly
 - Per-screen theme is also server-managed on that same device record.
 - In set mode:
-  - the server resolves sequence from the set's logic graph
-  - before resolving, runtime applies persisted edge overrides/disconnections from the set designer
-  - set canvas node positions are persisted (`logicNodePositions`) so saved graph arrangement is restored
+  - admin authoring is stored as `logicBlocks` (currently a `photo-router` block graph with layout nodes, connections, and node positions)
+  - the server resolves sequence from the compiled set `logicGraph`
   - photo orientation influences `if-portrait` / `if-landscape` conditions
   - cycle time advances in round-robin order per screen session
   - the selected rule's `cycleSeconds` is treated as the effective slide interval for Photos modules in that active layout
@@ -92,7 +91,7 @@ Current behavior:
   - Photos modules use their own configured slide interval
 - Set mapping is stored in `settings.screen_profile_layouts` and references **unique layout names**.
 - Device overrides are stored in the `devices` table and keyed by stable device id.
-- Admin set designer includes runtime health checks and test-path simulation using the same effective graph (base graph + persisted edge state).
+- Admin set editor includes a compact runtime status check and test-path simulation using the same compiled graph the display runtime executes.
 - `switchMode` is normalized to `auto` for compatibility; manual mode is no longer used.
 - Global `active` layout is still maintained as fallback if a routing target is missing.
 - Display layout swaps are currently immediate (no fade animation pipeline).
@@ -108,11 +107,24 @@ Current behavior:
 - Chores are defined once and scheduled by type (`daily`, `weekly`, `specific-days`, `one-off`).
 - Completion records are stored per `(chore_id, completion_date)`.
 - Recurring chores are **not retrospective**:
-  - they only appear from the chore creation date onward.
+  - they only appear from their explicit `startsOn` date onward.
+- Chores use a configurable household `siteTimezone` for "today", week boundaries, and payout windows.
 - Weekly summaries are computed against a configurable `paydayDayOfWeek` setting:
   - `weekStart = payday + 1`
   - `weekEnd = payday`
   - default payday is Saturday (`6`), so default week is Sunday -> Saturday.
+
+## Module Time Semantics
+
+- `device-local` modules read the display/browser clock directly:
+  - `clock`
+  - `count-down`
+- `site-local` modules use the shared household `siteTimezone` stored in settings:
+  - `chores`
+  - `bible-verse`
+- `source-local` modules follow the upstream data source timezone semantics:
+  - `weather` uses the provider/location timezone
+  - `calendar` preserves feed/all-day date semantics from the source
 
 ## Default Bootstrap State
 
@@ -123,7 +135,10 @@ When no layouts exist, app bootstrap seeds:
 
 And seeds one ready-to-use routing set:
 
-- `set-1` (`16:9 Family Set`) with Start -> Select Photo -> If portrait logic.
+- `set-1` (`16:9 Family Set`) with a `Photo Orientation` action node graph:
+  - select next photo
+  - portrait -> `16:9 Standard Portrait`
+  - fallback -> `16:9 Standard Landscape`
 - Portrait starter layout includes `count-down` and `bible-verse` tiles alongside clock/weather/photos/calendar/chores.
 - Additional sets and logic are created in Admin as needed.
 

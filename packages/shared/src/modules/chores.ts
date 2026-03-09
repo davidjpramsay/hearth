@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ianaTimeZoneSchema } from "../time.js";
 
 export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 export const dayOfWeekSchema = z.number().int().min(0).max(6);
@@ -8,6 +9,7 @@ export const choresPayoutConfigSchema = z.object({
   mode: chorePayoutModeSchema.default("all-or-nothing"),
   oneOffBonusEnabled: z.boolean().default(true),
   paydayDayOfWeek: dayOfWeekSchema.default(6),
+  siteTimezone: ianaTimeZoneSchema.default("UTC"),
 });
 
 export const choreScheduleSchema = z.discriminatedUnion("type", [
@@ -48,6 +50,7 @@ export const choreRecordSchema = z.object({
   name: z.string().min(1),
   memberId: z.number().int().positive(),
   schedule: choreScheduleSchema,
+  startsOn: isoDateSchema,
   valueAmount: z.number().nullable(),
   active: z.boolean(),
   createdAt: z.string(),
@@ -148,6 +151,7 @@ export const createChoreRequestSchema = z.object({
   name: z.string().trim().min(1).max(120),
   memberId: z.number().int().positive(),
   schedule: choreScheduleSchema,
+  startsOn: isoDateSchema.optional(),
   valueAmount: z.number().min(0).nullable().optional(),
   active: z.boolean().optional().default(true),
 });
@@ -157,6 +161,7 @@ export const updateChoreRequestSchema = z
     name: z.string().trim().min(1).max(120).optional(),
     memberId: z.number().int().positive().optional(),
     schedule: choreScheduleSchema.optional(),
+    startsOn: isoDateSchema.optional(),
     valueAmount: z.number().min(0).nullable().optional(),
     active: z.boolean().optional(),
   })
@@ -165,6 +170,7 @@ export const updateChoreRequestSchema = z
       value.name !== undefined ||
       value.memberId !== undefined ||
       value.schedule !== undefined ||
+      value.startsOn !== undefined ||
       value.valueAmount !== undefined ||
       value.active !== undefined,
     {

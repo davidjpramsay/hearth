@@ -11,7 +11,15 @@ import {
   type ModuleManifest,
 } from "@hearth/shared";
 import GridLayout from "react-grid-layout";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+  type Ref,
+} from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getLayouts, updateLayout } from "../api/client";
 import { clearAuthToken, getAuthToken } from "../auth/storage";
@@ -27,6 +35,7 @@ import { moduleRegistry } from "../registry/module-registry";
 
 const PREVIEW_CANVAS_BASE_WIDTH = 1920;
 const GRID_MARGIN_PX = 0;
+const PREVIEW_GRID_MAJOR_STEP = 4;
 
 const toPositiveNumberOr = (value: string, fallback: number): number => {
   const parsed = Number(value);
@@ -94,6 +103,18 @@ const areGridItemsEqual = (left: GridItem[], right: GridItem[]): boolean => {
 
   return true;
 };
+
+const renderResizeHandle = (
+  axis: string,
+  ref: Ref<HTMLElement>,
+): ReactElement => (
+  <span
+    ref={ref}
+    className={`react-resizable-handle react-resizable-handle-${axis} hearth-layout-resize-handle`}
+  >
+    <span className="hearth-layout-resize-handle__grip" />
+  </span>
+);
 
 export const AdminLayoutEditorPage = () => {
   const navigate = useNavigate();
@@ -284,8 +305,18 @@ export const AdminLayoutEditorPage = () => {
 
   const previewGridMetrics = useMemo(
     () =>
-      getAdaptiveGridMetrics(previewCanvasBaseSize.width, previewCanvasBaseSize.height),
-    [previewCanvasBaseSize.height, previewCanvasBaseSize.width],
+      getAdaptiveGridMetrics({
+        canvasWidth: previewCanvasBaseSize.width,
+        canvasHeight: previewCanvasBaseSize.height,
+        aspectWidth: toPositiveNumberOr(customAspectWidth, 16),
+        aspectHeight: toPositiveNumberOr(customAspectHeight, 9),
+      }),
+    [
+      customAspectHeight,
+      customAspectWidth,
+      previewCanvasBaseSize.height,
+      previewCanvasBaseSize.width,
+    ],
   );
 
   const previewGridCanvasSize = useMemo(
@@ -326,6 +357,62 @@ export const AdminLayoutEditorPage = () => {
       height: Math.max(1, Math.round(previewGridCanvasSize.height * previewScale)),
     };
   }, [previewGridCanvasSize.height, previewGridCanvasSize.width, previewScale]);
+
+  const previewGridLines = useMemo(() => {
+    if (
+      previewScale <= 0 ||
+      previewDisplaySize.width < 1 ||
+      previewDisplaySize.height < 1 ||
+      previewGridMetrics.cols < 1 ||
+      previewGridMetrics.rows < 1
+    ) {
+      return {
+        minorVertical: [] as number[],
+        majorVertical: [] as number[],
+        minorHorizontal: [] as number[],
+        majorHorizontal: [] as number[],
+      };
+    }
+
+    const cellWidth = previewDisplaySize.width / previewGridMetrics.cols;
+    const cellHeight = previewDisplaySize.height / previewGridMetrics.rows;
+
+    const minorVertical: number[] = [];
+    const majorVertical: number[] = [];
+    const minorHorizontal: number[] = [];
+    const majorHorizontal: number[] = [];
+
+    for (let column = 1; column < previewGridMetrics.cols; column += 1) {
+      const position = column * cellWidth;
+      if (column % PREVIEW_GRID_MAJOR_STEP === 0) {
+        majorVertical.push(position);
+      } else {
+        minorVertical.push(position);
+      }
+    }
+
+    for (let row = 1; row < previewGridMetrics.rows; row += 1) {
+      const position = row * cellHeight;
+      if (row % PREVIEW_GRID_MAJOR_STEP === 0) {
+        majorHorizontal.push(position);
+      } else {
+        minorHorizontal.push(position);
+      }
+    }
+
+    return {
+      minorVertical,
+      majorVertical,
+      minorHorizontal,
+      majorHorizontal,
+    };
+  }, [
+    previewDisplaySize.height,
+    previewDisplaySize.width,
+    previewGridMetrics.cols,
+    previewGridMetrics.rows,
+    previewScale,
+  ]);
 
   const normalizeLayoutConfigToPreviewGrid = useCallback(
     (
@@ -667,7 +754,7 @@ export const AdminLayoutEditorPage = () => {
               </label>
               <span>
                 Preview ratio: {previewRatioLabel} | Grid{" "}
-                {previewGridMetrics.cols} x {previewGridMetrics.rows} (adaptive)
+                {previewGridMetrics.cols} x {previewGridMetrics.rows} (divisible)
               </span>
             </div>
           </div>
@@ -678,22 +765,68 @@ export const AdminLayoutEditorPage = () => {
           >
             {previewScale > 0 ? (
               <div
-                className="overflow-hidden rounded-lg border border-slate-700/70 bg-slate-950"
+                className="relative overflow-hidden rounded-lg border border-slate-700/70 bg-slate-950"
                 style={{
                   width: `${previewDisplaySize.width}px`,
                   height: `${previewDisplaySize.height}px`,
                 }}
               >
+                <svg
+                  className="pointer-events-none absolute inset-0 z-0"
+                  width={previewDisplaySize.width}
+                  height={previewDisplaySize.height}
+                  viewBox={`0 0 ${previewDisplaySize.width} ${previewDisplaySize.height}`}
+                  aria-hidden="true"
+                >
+                  <g stroke="rgba(148, 163, 184, 0.14)" strokeWidth="1">
+                    {previewGridLines.minorVertical.map((position) => (
+                      <line
+                        key={`minor-v-${position}`}
+                        x1={position}
+                        y1={0}
+                        x2={position}
+                        y2={previewDisplaySize.height}
+                      />
+                    ))}
+                    {previewGridLines.minorHorizontal.map((position) => (
+                      <line
+                        key={`minor-h-${position}`}
+                        x1={0}
+                        y1={position}
+                        x2={previewDisplaySize.width}
+                        y2={position}
+                      />
+                    ))}
+                  </g>
+                  <g stroke="rgba(148, 163, 184, 0.24)" strokeWidth="1">
+                    {previewGridLines.majorVertical.map((position) => (
+                      <line
+                        key={`major-v-${position}`}
+                        x1={position}
+                        y1={0}
+                        x2={position}
+                        y2={previewDisplaySize.height}
+                      />
+                    ))}
+                    {previewGridLines.majorHorizontal.map((position) => (
+                      <line
+                        key={`major-h-${position}`}
+                        x1={0}
+                        y1={position}
+                        x2={previewDisplaySize.width}
+                        y2={position}
+                      />
+                    ))}
+                  </g>
+                </svg>
                 <div
                   style={{
                     width: `${previewGridCanvasSize.width}px`,
                     height: `${previewGridCanvasSize.height}px`,
                     transform: `scale(${previewScale})`,
                     transformOrigin: "top left",
-                    backgroundImage:
-                      "linear-gradient(to right, rgba(148, 163, 184, 0.16) 1px, transparent 1px), linear-gradient(to bottom, rgba(148, 163, 184, 0.16) 1px, transparent 1px)",
-                    backgroundSize: `${previewGridMetrics.rowHeight}px ${previewGridMetrics.rowHeight}px`,
                   }}
+                  className="relative z-10"
                 >
                   <GridLayout
                     width={previewGridCanvasSize.width}
@@ -713,6 +846,7 @@ export const AdminLayoutEditorPage = () => {
                     preventCollision
                     margin={[GRID_MARGIN_PX, GRID_MARGIN_PX]}
                     containerPadding={[0, 0]}
+                    resizeHandle={renderResizeHandle}
                     isDroppable
                     onDropDragOver={() => {
                       const moduleId = draggingModuleId;

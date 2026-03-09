@@ -6,12 +6,16 @@ This is the prioritized feature sequence for upcoming work.
 
 - Chores tile grouped by child with per-child weekly completion and earned-pay indicators.
 - Chores completion tracking is week-scoped with configurable payday (`paydayDayOfWeek`).
-- Chore schedules are non-retrospective (start from creation date).
+- Chore schedules are non-retrospective (start from explicit `startsOn` dates in the household timezone).
+- Explicit module time model:
+  - `device-local` for screen clock modules
+  - `site-local` for household-day modules like chores and bible verse
+  - `source-local` for provider/feed-driven modules like weather and calendar
 - Auto-generated app secrets and rolling SQLite backups.
 - Calendar source URLs encrypted at rest.
 - Server-managed Devices view for per-screen theme and routing assignment.
 - Set-driven layout logic graph with portrait/landscape branching and rule-level cycle timers.
-- Set-designer graph edits persist edge overrides/disconnections and canvas node positions.
+- Visual action-node graph authoring that compiles into the runtime set graph.
 - Built-in Count Down SDK module with date/time countdown modes.
 - PWA installability (manifest + service worker) and iPad Home Screen standalone support.
 
@@ -85,7 +89,7 @@ Goal: deliver explicit set-based logic routing with per-rule timing.
 
 Scope:
 
-- Visual set designer with `Layout`, `If`, and `Action` nodes.
+- Visual set designer with router and layout nodes compiled to the runtime graph.
 - Rule-level `cycleSeconds` control for each resolved layout target.
 - Predictable branch routing from selected photo orientation.
 

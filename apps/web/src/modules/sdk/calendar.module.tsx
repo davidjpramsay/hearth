@@ -197,6 +197,7 @@ export const moduleDefinition = defineModule({
     description: "Calendar module migrated to Hearth Module SDK",
     icon: "calendar",
     defaultSize: { w: 6, h: 4 },
+    timeMode: "source-local",
     categories: ["calendar"],
     permissions: ["network", "calendar"],
     dataSources: [{ id: "calendar-events", kind: "rest" }],

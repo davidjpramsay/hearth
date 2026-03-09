@@ -4,17 +4,10 @@ import {
   choresModuleParamsSchema,
   choresModuleSummaryQuerySchema,
   setChoreCompletionRequestSchema,
+  toCalendarDateInTimeZone,
 } from "@hearth/shared";
 import type { FastifyInstance } from "fastify";
 import type { AppServices } from "../types.js";
-
-const todayDate = (): string => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
 
 export const registerChoresModuleRoutes = (
   app: FastifyInstance,
@@ -31,10 +24,11 @@ export const registerChoresModuleRoutes = (
       return reply.code(400).send({ message: query.error.message });
     }
 
-    const startDate = query.data.startDate ?? todayDate();
-    reply.header("cache-control", "no-store");
-
     const payoutConfig = services.settingsRepository.getChoresPayoutConfig();
+    const startDate =
+      query.data.startDate ??
+      toCalendarDateInTimeZone(new Date(), payoutConfig.siteTimezone);
+    reply.header("cache-control", "no-store");
     const moduleInstance = services.layoutRepository.findModuleInstance(
       params.data.instanceId,
       "chores",
@@ -68,6 +62,7 @@ export const registerChoresModuleRoutes = (
       days,
       enableMoneyTracking: config.enableMoneyTracking,
       payoutConfig,
+      siteTimezone: payoutConfig.siteTimezone,
     });
 
     return reply.send(choresBoardResponseSchema.parse(board));
@@ -92,13 +87,17 @@ export const registerChoresModuleRoutes = (
       return reply.code(404).send({ message: "Chores module instance not found" });
     }
 
-    const chore = services.choresRepository.getChoreById(body.data.choreId);
+    const payoutConfig = services.settingsRepository.getChoresPayoutConfig();
+    const chore = services.choresRepository.getChoreById(
+      body.data.choreId,
+      payoutConfig.siteTimezone,
+    );
     if (!chore) {
       return reply.code(404).send({ message: "Chore not found" });
     }
 
     try {
-      services.choresRepository.setCompletion(body.data);
+      services.choresRepository.setCompletion(body.data, payoutConfig.siteTimezone);
     } catch (error) {
       return reply.code(400).send({
         message: error instanceof Error ? error.message : "Failed to update completion",

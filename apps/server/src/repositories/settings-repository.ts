@@ -2,10 +2,13 @@ import type Database from "better-sqlite3";
 import {
   choresPayoutConfigSchema,
   createLayoutSetLogicGraphFromBranches,
+  deriveLayoutSetAuthoringFromLogicGraph,
+  getRuntimeTimeZone,
   getLayoutSetLogicBranches,
   normalizeScreenProfileLayoutsConfig,
   photoCollectionsConfigSchema,
   screenProfileLayoutsSchema,
+  siteTimeConfigSchema,
   toAutoLayoutTargetsFromLogicGraph,
   DEFAULT_LANDSCAPE_LAYOUT_LOGIC_CONDITION_TYPE,
   DEFAULT_LAYOUT_LOGIC_ACTION_TYPE,
@@ -14,12 +17,14 @@ import {
   type AutoLayoutTarget,
   type ChoresPayoutConfig,
   type PhotoCollectionsConfig,
+  type SiteTimeConfig,
   type ScreenProfileLayouts,
 } from "@hearth/shared";
 import { z } from "zod";
 
 const ADMIN_PASSWORD_KEY = "admin_password_hash";
 const CHORES_PAYOUT_CONFIG_KEY = "chores_payout_config";
+const SITE_TIME_CONFIG_KEY = "site_time_config";
 const SCREEN_PROFILE_LAYOUTS_KEY = "screen_profile_layouts";
 const PHOTO_COLLECTIONS_KEY = "photo_collections";
 const DEFAULT_TARGET_CYCLE_SECONDS = 20;
@@ -182,6 +187,11 @@ export class SettingsRepository {
       });
       const autoLayoutTargets = toAutoLayoutTargetsFromLogicGraph(logicGraph);
       const branches = getLayoutSetLogicBranches(logicGraph);
+      const logicBlocks = deriveLayoutSetAuthoringFromLogicGraph({
+        logicGraph,
+        photoActionType: DEFAULT_PHOTO_ACTION_TYPE,
+        photoActionCollectionId: null,
+      });
 
       return {
         name: `Layout set ${setIndex}`,
@@ -189,6 +199,7 @@ export class SettingsRepository {
         defaultPhotoCollectionId: null,
         photoActionCollectionId: null,
         photoActionType: DEFAULT_PHOTO_ACTION_TYPE,
+        logicBlocks,
         logicGraph,
         logicNodePositions: {},
         logicEdgeOverrides: {},
@@ -292,6 +303,23 @@ export class SettingsRepository {
       .run({ key, value });
   }
 
+  private getLegacySiteTimezoneFromChoresConfig(): string | null {
+    const rawValue = this.getValue(CHORES_PAYOUT_CONFIG_KEY);
+    if (!rawValue) {
+      return null;
+    }
+
+    try {
+      const parsedValue = JSON.parse(rawValue);
+      const parsedTimezone = siteTimeConfigSchema.shape.siteTimezone.safeParse(
+        parsedValue?.siteTimezone,
+      );
+      return parsedTimezone.success ? parsedTimezone.data : null;
+    } catch {
+      return null;
+    }
+  }
+
   getAdminPasswordHash(): string | null {
     return this.getValue(ADMIN_PASSWORD_KEY);
   }
@@ -300,23 +328,81 @@ export class SettingsRepository {
     this.setValue(ADMIN_PASSWORD_KEY, hash);
   }
 
-  getChoresPayoutConfig(): ChoresPayoutConfig {
-    const rawValue = this.getValue(CHORES_PAYOUT_CONFIG_KEY);
+  getSiteTimeConfig(): SiteTimeConfig {
+    const fallbackTimezone =
+      this.getLegacySiteTimezoneFromChoresConfig() ?? getRuntimeTimeZone();
+    const rawValue = this.getValue(SITE_TIME_CONFIG_KEY);
     if (!rawValue) {
-      return choresPayoutConfigSchema.parse({});
+      return siteTimeConfigSchema.parse({
+        siteTimezone: fallbackTimezone,
+      });
     }
 
     try {
-      return choresPayoutConfigSchema.parse(JSON.parse(rawValue));
+      const parsedValue = JSON.parse(rawValue);
+      return siteTimeConfigSchema.parse({
+        ...parsedValue,
+        siteTimezone:
+          typeof parsedValue?.siteTimezone === "string"
+            ? parsedValue.siteTimezone
+            : fallbackTimezone,
+      });
     } catch {
-      return choresPayoutConfigSchema.parse({});
+      return siteTimeConfigSchema.parse({
+        siteTimezone: fallbackTimezone,
+      });
+    }
+  }
+
+  setSiteTimeConfig(config: SiteTimeConfig): void {
+    this.setValue(
+      SITE_TIME_CONFIG_KEY,
+      JSON.stringify(
+        siteTimeConfigSchema.parse({
+          ...config,
+          siteTimezone: config.siteTimezone || getRuntimeTimeZone(),
+        }),
+      ),
+    );
+  }
+
+  getChoresPayoutConfig(): ChoresPayoutConfig {
+    const defaultTimeZone = this.getSiteTimeConfig().siteTimezone;
+    const rawValue = this.getValue(CHORES_PAYOUT_CONFIG_KEY);
+    if (!rawValue) {
+      return choresPayoutConfigSchema.parse({
+        siteTimezone: defaultTimeZone,
+      });
+    }
+
+    try {
+      const parsedValue = JSON.parse(rawValue);
+      return choresPayoutConfigSchema.parse({
+        ...parsedValue,
+        siteTimezone: defaultTimeZone,
+      });
+    } catch {
+      return choresPayoutConfigSchema.parse({
+        siteTimezone: defaultTimeZone,
+      });
     }
   }
 
   setChoresPayoutConfig(config: ChoresPayoutConfig): void {
+    const siteTimezone = siteTimeConfigSchema.shape.siteTimezone.parse(
+      config.siteTimezone || getRuntimeTimeZone(),
+    );
+    this.setSiteTimeConfig({
+      siteTimezone,
+    });
     this.setValue(
       CHORES_PAYOUT_CONFIG_KEY,
-      JSON.stringify(choresPayoutConfigSchema.parse(config)),
+      JSON.stringify(
+        choresPayoutConfigSchema.parse({
+          ...config,
+          siteTimezone,
+        }),
+      ),
     );
   }
 

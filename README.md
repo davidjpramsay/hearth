@@ -67,10 +67,10 @@ pnpm --filter @hearth/module-sdk test
 
 ## Recent Changelog
 
+- March 9, 2026: Layout Sets now use a visual action-node graph with draggable layout nodes and `Photo Orientation` nodes, backed by persisted `logicBlocks` that compile into the runtime `logicGraph`; the old primitive free-form canvas path is removed.
 - March 8, 2026: photo image responses now send long-lived immutable cache headers, allowing cache-capable kiosk browsers to reuse already-loaded images on repeat views instead of refetching them each time.
 - March 6, 2026: added SDK `count-down` module with date/time countdown modes, completion pulse effect, and resilient empty-event fallback rendering.
 - March 6, 2026: Bible Verse module now centers short verses and uses one-way looped slow-scroll for long verses with fixed heading/footer.
-- March 6, 2026: set-designer edge reconnect/disconnect state and canvas node positions are now persisted and applied in display runtime resolution; Layout Sets include runtime health + test-path simulation that uses the same effective logic.
 - March 5, 2026: set-driven display now publishes effective cycle context so Photos modules follow set rule timers in `Layout Set` mode and use module slide interval in `Single Layout` mode.
 - March 5, 2026: calendar module event cards now use stronger full-color fills in list/week/month views, with updated header labeling (`Upcoming` for list/week, current month name for month view).
 - March 2, 2026: Bible Verse module switched to `api.esv.org` (ESV provider) with server-side API key support.
@@ -195,8 +195,7 @@ Notes:
 - The display surface no longer exposes a local settings cog for routing/theme changes.
 - Set mode behavior:
   - each set runs its configured logic/cycle rules
-  - manual path edits in the set designer (edge reconnect/disconnect) are persisted and applied at runtime
-  - set canvas node positions are persisted (`logicNodePositions`) so saved graph arrangement is retained
+  - action-node graph connections and node positions are persisted in `logicBlocks`, so the saved graph arrangement is retained
   - photo orientation can influence rule branches, but does not force set selection
   - the active set rule timer (`cycleSeconds`) controls layout dwell time and overrides Photos module slide interval while that layout is active
   - photo collection selection in set mode resolves as:
@@ -206,7 +205,7 @@ Notes:
 - Single-layout mode behavior:
   - set logic is bypassed
   - Photos module slide rotation uses the module's own `Slide interval (seconds)` setting
-- In Admin > Layouts, each set includes a runtime health panel and portrait/landscape/unknown test-path simulation based on the same logic used by display runtime.
+- In Admin > Layouts, each set includes a compact runtime status indicator and test-path simulation based on the same logic used by display runtime.
 - Photo collections:
   - managed in Admin > Layouts > Photo Collections
   - each collection can include multiple folders
@@ -226,11 +225,10 @@ On a brand-new database, Hearth seeds two starter layouts:
 
 Default layout-set routing starts with one ready-to-use set:
 
-  - `set-1` (`16:9 Family Set`) uses top-down logic:
-  - Start -> Select next photo -> If portrait
-  - Yes -> `16:9 Standard Portrait` for 20s
-  - No -> `16:9 Standard Landscape` for 20s
-  - Return -> Start
+- `set-1` (`16:9 Family Set`) uses one `Photo Orientation` action node graph:
+  - select next photo from `/photos`
+  - if portrait -> `16:9 Standard Portrait` for 20s
+  - otherwise -> `16:9 Standard Landscape` for 20s
 - Additional sets and logic can be created in Admin.
 
 Note: this seed is only used when the database has no layouts yet (fresh install/reset).
@@ -242,10 +240,21 @@ Privacy default:
 
 ## Chores Week Model
 
-- Chore schedules are not retrospective: a chore starts on/after its creation date.
+- Chore schedules are not retrospective: recurring chores start on/after their explicit `startsOn` date, and one-off chores only appear on their scheduled date.
 - Weekly payout/completion windows use a configurable `paydayDayOfWeek` setting.
+- Chores day/week boundaries use a configurable household `siteTimezone`, so hosted servers do not change what counts as "today".
 - Default payday is Saturday (`6`), so the default week runs Sunday -> Saturday.
 - Completion tracker is week-scoped and resets to a new week after payday midnight.
+
+## Module Time Model
+
+- `device-local`: modules that should follow the current screen/browser clock, such as `clock` and `count-down`.
+- `site-local`: modules that should follow the household calendar day, currently `chores` and `bible-verse`, using the shared `siteTimezone` setting.
+- `source-local`: modules that should follow the upstream data source timezone, such as `weather` and `calendar`.
+
+Current admin control:
+
+- The household timezone is currently edited from Admin -> Chores, but it applies to all site-local modules, not just chores.
 
 ## Environment Variables
 

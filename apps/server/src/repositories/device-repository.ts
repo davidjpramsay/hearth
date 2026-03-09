@@ -9,6 +9,12 @@ import {
   type ReportScreenTargetSelection,
   type UpdateDisplayDeviceRequest,
 } from "@hearth/shared";
+import {
+  DuplicateDeviceNameError,
+  buildDefaultDeviceName,
+  normalizeDeviceName,
+  toUniqueDeviceName,
+} from "./device-name.js";
 
 interface DeviceRow {
   id: string;
@@ -21,11 +27,6 @@ interface DeviceRow {
 }
 
 const DEFAULT_THEME_ID = displayThemeIdSchema.parse("default");
-
-const buildDefaultDeviceName = (deviceId: string): string => {
-  const suffix = deviceId.trim().slice(0, 8);
-  return `Display ${suffix.length > 0 ? suffix : "device"}`.slice(0, 80);
-};
 
 const parseTargetSelection = (
   rawValue: string | null,
@@ -45,6 +46,52 @@ const parseTargetSelection = (
 
 export class DeviceRepository {
   constructor(private readonly db: Database.Database) {}
+
+  private listUsedDeviceNames(excludeDeviceId?: string): Set<string> {
+    const rows = excludeDeviceId
+      ? this.db
+          .prepare<{ excludeDeviceId: string }, { name: string }>(
+            `
+            SELECT name
+            FROM devices
+            WHERE id != @excludeDeviceId
+            `,
+          )
+          .all({ excludeDeviceId })
+      : this.db
+          .prepare<[], { name: string }>(
+            `
+            SELECT name
+            FROM devices
+            `,
+          )
+          .all();
+
+    return new Set(
+      rows
+        .map((row) => normalizeDeviceName(row.name))
+        .filter((name) => name.length > 0),
+    );
+  }
+
+  private ensureUniqueCustomName(name: string, excludeDeviceId?: string): string {
+    const nextName = name.trim().slice(0, 80);
+    const normalizedName = normalizeDeviceName(nextName);
+    const usedNames = this.listUsedDeviceNames(excludeDeviceId);
+
+    if (usedNames.has(normalizedName)) {
+      throw new DuplicateDeviceNameError();
+    }
+
+    return nextName;
+  }
+
+  private buildUniqueDefaultName(deviceId: string): string {
+    return toUniqueDeviceName(
+      buildDefaultDeviceName(deviceId),
+      this.listUsedDeviceNames(),
+    );
+  }
 
   private mapRow(row: DeviceRow): DisplayDevice {
     const parsedTheme = displayThemeIdSchema.safeParse(row.theme_id);
@@ -131,7 +178,7 @@ export class DeviceRepository {
         )
         .run({
           id: normalizedDeviceId,
-          name: buildDefaultDeviceName(normalizedDeviceId),
+          name: this.buildUniqueDefaultName(normalizedDeviceId),
           themeId: themeId.success ? themeId.data : DEFAULT_THEME_ID,
           targetSelectionJson: targetSelection ? JSON.stringify(targetSelection) : null,
         });
@@ -155,6 +202,7 @@ export class DeviceRepository {
   updateDevice(deviceId: string, input: UpdateDisplayDeviceRequest): DisplayDevice {
     const normalizedDeviceId = displayDeviceIdSchema.parse(deviceId);
     const parsedUpdate = updateDisplayDeviceRequestSchema.parse(input);
+    const nextName = this.ensureUniqueCustomName(parsedUpdate.name, normalizedDeviceId);
 
     this.db
       .prepare(
@@ -169,7 +217,7 @@ export class DeviceRepository {
       )
       .run({
         id: normalizedDeviceId,
-        name: parsedUpdate.name,
+        name: nextName,
         themeId: parsedUpdate.themeId,
         targetSelectionJson: parsedUpdate.targetSelection
           ? JSON.stringify(parsedUpdate.targetSelection)

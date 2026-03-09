@@ -8,6 +8,7 @@ import {
   createChoreMemberRequestSchema,
   createChoreRequestSchema,
   setChoreCompletionRequestSchema,
+  toCalendarDateInTimeZone,
   updateChoresPayoutConfigRequestSchema,
   updateChoreMemberRequestSchema,
   updateChoreRequestSchema,
@@ -18,14 +19,6 @@ import type { AppServices } from "../types.js";
 const idParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
-
-const todayDate = (): string => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
 
 const publishChoreEvent = (
   services: AppServices,
@@ -49,13 +42,16 @@ export const registerChoresRoutes = (
       return reply.code(400).send({ message: query.error.message });
     }
 
-    const startDate = query.data.startDate ?? todayDate();
     const payoutConfig = services.settingsRepository.getChoresPayoutConfig();
+    const startDate =
+      query.data.startDate ??
+      toCalendarDateInTimeZone(new Date(), payoutConfig.siteTimezone);
     const board = services.choresRepository.getBoard({
       startDate,
       days: query.data.days,
       enableMoneyTracking: true,
       payoutConfig,
+      siteTimezone: payoutConfig.siteTimezone,
     });
 
     return reply.send(choresBoardResponseSchema.parse(board));
@@ -198,7 +194,8 @@ export const registerChoresRoutes = (
       return;
     }
 
-    const chores = services.choresRepository.listChores();
+    const payoutConfig = services.settingsRepository.getChoresPayoutConfig();
+    const chores = services.choresRepository.listChores(payoutConfig.siteTimezone);
     return reply.send(z.array(choreRecordSchema).parse(chores));
   });
 
@@ -222,8 +219,10 @@ export const registerChoresRoutes = (
       name: body.data.name,
       memberId: body.data.memberId,
       schedule: body.data.schedule,
+      startsOn: body.data.startsOn,
       valueAmount: body.data.valueAmount ?? null,
       active: body.data.active,
+      siteTimezone: services.settingsRepository.getChoresPayoutConfig().siteTimezone,
     });
 
     publishChoreEvent(services, {
@@ -263,8 +262,10 @@ export const registerChoresRoutes = (
       name: body.data.name,
       memberId: body.data.memberId,
       schedule: body.data.schedule,
+      startsOn: body.data.startsOn,
       valueAmount: body.data.valueAmount,
       active: body.data.active,
+      siteTimezone: services.settingsRepository.getChoresPayoutConfig().siteTimezone,
     });
 
     if (!updated) {
@@ -318,13 +319,17 @@ export const registerChoresRoutes = (
       return reply.code(400).send({ message: body.error.message });
     }
 
-    const chore = services.choresRepository.getChoreById(body.data.choreId);
+    const payoutConfig = services.settingsRepository.getChoresPayoutConfig();
+    const chore = services.choresRepository.getChoreById(
+      body.data.choreId,
+      payoutConfig.siteTimezone,
+    );
     if (!chore) {
       return reply.code(404).send({ message: "Chore not found" });
     }
 
     try {
-      services.choresRepository.setCompletion(body.data);
+      services.choresRepository.setCompletion(body.data, payoutConfig.siteTimezone);
     } catch (error) {
       return reply.code(400).send({
         message: error instanceof Error ? error.message : "Failed to update completion",

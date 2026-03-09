@@ -105,6 +105,7 @@ export const moduleDefinition = defineModule({
     description: "Clock migrated to Hearth Module SDK",
     icon: "clock",
     defaultSize: { w: 3, h: 2 },
+    timeMode: "device-local",
     categories: ["time"],
     permissions: [],
     dataSources: [{ id: "local-time", kind: "local" }],
