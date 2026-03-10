@@ -11,6 +11,10 @@ import {
   type ChoresModuleConfig,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import {
+  ModulePresentationControls,
+  scaleRoleRem,
+} from "../ui/ModulePresentationControls";
 
 const localIsoDate = (date: Date = new Date()): string =>
   toCalendarDateInTimeZone(date, getRuntimeTimeZone());
@@ -111,6 +115,10 @@ export const moduleDefinition = defineModule({
       const [loading, setLoading] = useState(true);
       const [error, setError] = useState<string | null>(null);
       const [savingKeys, setSavingKeys] = useState<string[]>([]);
+      const headingSize = scaleRoleRem(0.875, settings.presentation.headingScale);
+      const primarySize = scaleRoleRem(0.75, settings.presentation.primaryScale);
+      const supportingSize = scaleRoleRem(0.75, settings.presentation.supportingScale);
+      const compactSupportingSize = scaleRoleRem(0.6875, settings.presentation.supportingScale);
 
       useEffect(() => {
         if (isEditing) {
@@ -163,11 +171,13 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="text-sm font-semibold text-slate-100">Chores preview</p>
-            <p className="mt-2 text-xs text-slate-300">
+            <p className="font-semibold text-slate-100" style={{ fontSize: headingSize }}>
+              Chores preview
+            </p>
+            <p className="mt-2 text-slate-300" style={{ fontSize: supportingSize }}>
               Preview days: {settings.previewDays}
             </p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-slate-400" style={{ fontSize: supportingSize }}>
               Stats: {settings.showStats ? "On" : "Off"} | Money:{" "}
               {settings.enableMoneyTracking ? "On" : "Off"}
             </p>
@@ -254,15 +264,27 @@ export const moduleDefinition = defineModule({
       return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 p-2 text-slate-100">
           <header className="mb-2 flex items-center justify-between rounded border border-slate-700 bg-slate-900/80 px-3 py-2">
-            <p className="text-sm font-semibold tracking-wide">Today&apos;s Chores</p>
-            <p className="text-xs text-slate-300">
+            <p
+              className="font-semibold tracking-wide"
+              style={{ fontSize: headingSize }}
+            >
+              Today&apos;s Chores
+            </p>
+            <p className="text-slate-300" style={{ fontSize: supportingSize }}>
               {`${totalTodayCompleted}/${todayItems.length}`}
             </p>
           </header>
 
-          {loading ? <p className="text-sm text-slate-300">Loading chores...</p> : null}
+          {loading ? (
+            <p className="text-slate-300" style={{ fontSize: supportingSize }}>
+              Loading chores...
+            </p>
+          ) : null}
           {!loading && error ? (
-            <p className="rounded border border-rose-500/60 bg-rose-500/10 px-2 py-1 text-xs text-rose-200">
+            <p
+              className="rounded border border-rose-500/60 bg-rose-500/10 px-2 py-1 text-rose-200"
+              style={{ fontSize: supportingSize }}
+            >
               {error}
             </p>
           ) : null}
@@ -280,18 +302,35 @@ export const moduleDefinition = defineModule({
                     className="rounded border border-slate-700 bg-slate-900/70"
                   >
                     <header className="flex items-center justify-between border-b border-slate-700 px-2 py-1.5">
-                      <p className="text-sm font-semibold text-slate-100">{member.memberName}</p>
-                      <div className="flex items-center gap-2 text-[11px] text-slate-300">
-                        <span className="rounded border border-cyan-500/40 bg-cyan-500/10 px-1.5 py-0.5 text-cyan-200">
+                      <p
+                        className="font-semibold text-slate-100"
+                        style={{ fontSize: headingSize }}
+                      >
+                        {member.memberName}
+                      </p>
+                      <div
+                        className="flex items-center gap-2 text-slate-300"
+                        style={{ fontSize: compactSupportingSize }}
+                      >
+                        <span
+                          className="rounded border border-cyan-500/40 bg-cyan-500/10 px-1.5 py-0.5 text-cyan-200"
+                          style={{ fontSize: compactSupportingSize }}
+                        >
                           Week {completionPercent}%
                         </span>
                         {settings.enableMoneyTracking ? (
-                          <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
+                          <span
+                            className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200"
+                            style={{ fontSize: compactSupportingSize }}
+                          >
                             Pay ${basePayEarned.toFixed(2)} / ${member.baseAllowance.toFixed(2)}
                           </span>
                         ) : null}
                         {settings.enableMoneyTracking && member.bonusPayout > 0 ? (
-                          <span className="rounded border border-emerald-500/30 bg-emerald-500/5 px-1.5 py-0.5 text-emerald-100">
+                          <span
+                            className="rounded border border-emerald-500/30 bg-emerald-500/5 px-1.5 py-0.5 text-emerald-100"
+                            style={{ fontSize: compactSupportingSize }}
+                          >
                             +${member.bonusPayout.toFixed(2)} bonus
                           </span>
                         ) : null}
@@ -318,18 +357,27 @@ export const moduleDefinition = defineModule({
                               }
                               className="h-4 w-4 accent-cyan-500"
                             />
-                            <span className="min-w-0 flex-1 text-xs font-medium text-slate-100">
+                            <span
+                              className="min-w-0 flex-1 font-medium text-slate-100"
+                              style={{ fontSize: primarySize }}
+                            >
                               {item.choreName}
                             </span>
                             {settings.enableMoneyTracking && item.valueAmount !== null ? (
-                              <span className="text-[11px] text-emerald-200">
+                              <span
+                                className="text-emerald-200"
+                                style={{ fontSize: compactSupportingSize }}
+                              >
                                 ${item.valueAmount.toFixed(2)}
                               </span>
                             ) : null}
                           </label>
                         ))
                       ) : (
-                        <p className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-[11px] text-slate-300">
+                        <p
+                          className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-slate-300"
+                          style={{ fontSize: compactSupportingSize }}
+                        >
                           No chores today.
                         </p>
                       )}
@@ -338,7 +386,10 @@ export const moduleDefinition = defineModule({
                 );
               })}
               {memberRows.length === 0 ? (
-                <p className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-300">
+                <p
+                  className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-slate-300"
+                  style={{ fontSize: supportingSize }}
+                >
                   No children configured yet.
                 </p>
               ) : null}
@@ -394,6 +445,10 @@ export const moduleDefinition = defineModule({
               }
             />
           </label>
+          <ModulePresentationControls
+            value={settings.presentation}
+            onChange={(presentation) => applyPatch({ presentation })}
+          />
         </div>
       );
     },

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { withModulePresentation } from "./presentation.js";
 
 export const photosOrientationSchema = z.enum(["portrait", "landscape", "square"]);
 export const photosLayoutOrientationSchema = z.enum(["landscape", "portrait"]);
@@ -39,13 +40,15 @@ export const photoCollectionsConfigSchema = z
     }
   });
 
-export const photosModuleConfigSchema = z.object({
-  folderPath: z.string().trim().min(1).max(2048).default("/photos"),
-  collectionId: photoCollectionIdSchema.nullable().default(null),
-  intervalSeconds: z.number().int().min(3).max(3600).default(20),
-  shuffle: z.boolean().default(true),
-  layoutOrientation: photosLayoutOrientationSchema.default("landscape"),
-});
+export const photosModuleConfigSchema = withModulePresentation(
+  z.object({
+    folderPath: z.string().trim().min(1).max(2048).default("/photos"),
+    collectionId: photoCollectionIdSchema.nullable().default(null),
+    intervalSeconds: z.number().int().min(3).max(3600).default(20),
+    shuffle: z.boolean().default(true),
+    layoutOrientation: photosLayoutOrientationSchema.default("landscape"),
+  }),
+);
 
 export const photosModuleFrameSchema = z.object({
   imageId: z.string().min(1),

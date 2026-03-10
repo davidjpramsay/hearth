@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { withModulePresentation } from "./presentation.js";
 
 export const calendarViewModeSchema = z.enum(["list", "week", "month"]);
 const calendarColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -31,15 +32,17 @@ export const parseCalendarEventBoundary = (
   return allDay ? toLocalCalendarDay(parsed) : parsed;
 };
 
-export const calendarModuleConfigSchema = z.object({
-  viewMode: calendarViewModeSchema.default("list"),
-  calendars: z.array(z.string().trim().max(2048)).max(24).default([]),
-  calendarLabels: z.array(z.string().trim().max(120)).max(24).default([]),
-  calendarColors: z.array(calendarColorSchema).max(24).default([]),
-  daysToShow: z.number().int().min(1).max(90).default(14),
-  use24Hour: z.boolean().default(true),
-  refreshIntervalSeconds: z.number().int().min(30).max(86_400).default(300),
-});
+export const calendarModuleConfigSchema = withModulePresentation(
+  z.object({
+    viewMode: calendarViewModeSchema.default("list"),
+    calendars: z.array(z.string().trim().max(2048)).max(24).default([]),
+    calendarLabels: z.array(z.string().trim().max(120)).max(24).default([]),
+    calendarColors: z.array(calendarColorSchema).max(24).default([]),
+    daysToShow: z.number().int().min(1).max(90).default(14),
+    use24Hour: z.boolean().default(true),
+    refreshIntervalSeconds: z.number().int().min(30).max(86_400).default(300),
+  }),
+);
 
 export const calendarModuleEventSchema = z.object({
   id: z.string().min(1),

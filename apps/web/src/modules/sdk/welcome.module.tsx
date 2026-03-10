@@ -1,9 +1,16 @@
 import { z } from "zod";
+import { withModulePresentation } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import {
+  ModulePresentationControls,
+  scaleRoleRem,
+} from "../ui/ModulePresentationControls";
 
-const settingsSchema = z.object({
-  message: z.string().max(240).default("Welcome to Hearth"),
-});
+const settingsSchema = withModulePresentation(
+  z.object({
+    message: z.string().max(240).default("Welcome to Hearth"),
+  }),
+);
 
 type WelcomeConfig = z.infer<typeof settingsSchema>;
 
@@ -22,14 +29,17 @@ export const moduleDefinition = defineModule({
   settingsSchema,
   runtime: {
     Component: ({ settings }) => (
-      <div className="flex h-full w-full items-center justify-center rounded-xl bg-slate-800 px-4 text-center text-xl font-medium text-slate-100">
+      <div
+        className="flex h-full w-full items-center justify-center rounded-xl bg-slate-800 px-4 text-center font-medium text-slate-100"
+        style={{ fontSize: scaleRoleRem(1.25, settings.presentation.primaryScale) }}
+      >
         {settings.message}
       </div>
     ),
   },
   admin: {
     SettingsPanel: ({ settings, onChange }: { settings: WelcomeConfig; onChange: (next: WelcomeConfig) => void }) => (
-      <div className="space-y-3 rounded-lg border border-slate-700 bg-slate-900 p-4 text-sm text-slate-200">
+      <div className="space-y-4 rounded-lg border border-slate-700 bg-slate-900 p-4 text-sm text-slate-200">
         <h3 className="text-base font-semibold">Welcome settings</h3>
         <label className="block space-y-2">
           <span>Message</span>
@@ -40,6 +50,10 @@ export const moduleDefinition = defineModule({
             onChange={(event) => onChange({ ...settings, message: event.target.value })}
           />
         </label>
+        <ModulePresentationControls
+          value={settings.presentation}
+          onChange={(presentation) => onChange({ ...settings, presentation })}
+        />
       </div>
     ),
   },

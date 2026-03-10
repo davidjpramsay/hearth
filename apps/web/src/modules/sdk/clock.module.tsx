@@ -1,14 +1,54 @@
 import { useEffect, useState } from "react";
 import { z } from "zod";
+import {
+  clampModulePresentationScale,
+  withModulePresentation,
+} from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import {
+  ModulePresentationControls,
+  scaleRoleRem,
+} from "../ui/ModulePresentationControls";
 
-const settingsSchema = z.object({
-  use24Hour: z.boolean().default(true),
-  showSeconds: z.boolean().default(true),
-  showDate: z.boolean().default(false),
-  timeFontSizeRem: z.number().min(1.5).max(8).default(2.25),
-  dateFontSizeRem: z.number().min(0.75).max(4).default(1),
-});
+const baseSettingsSchema = withModulePresentation(
+  z.object({
+    use24Hour: z.boolean().default(true),
+    showSeconds: z.boolean().default(true),
+    showDate: z.boolean().default(false),
+  }),
+);
+
+const migrateLegacyClockFontSizes = (input: unknown): unknown => {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return input;
+  }
+
+  const rawInput = input as Record<string, unknown>;
+  const nextInput: Record<string, unknown> = { ...rawInput };
+  const rawPresentation =
+    rawInput.presentation && typeof rawInput.presentation === "object"
+      ? (rawInput.presentation as Record<string, unknown>)
+      : {};
+  const nextPresentation: Record<string, unknown> = { ...rawPresentation };
+  const timeFontSizeRem =
+    typeof rawInput.timeFontSizeRem === "number" ? rawInput.timeFontSizeRem : null;
+  const dateFontSizeRem =
+    typeof rawInput.dateFontSizeRem === "number" ? rawInput.dateFontSizeRem : null;
+
+  if (timeFontSizeRem !== null && typeof nextPresentation.primaryScale !== "number") {
+    nextPresentation.primaryScale = clampModulePresentationScale(timeFontSizeRem / 2.25);
+  }
+  if (dateFontSizeRem !== null && typeof nextPresentation.supportingScale !== "number") {
+    nextPresentation.supportingScale = clampModulePresentationScale(dateFontSizeRem / 1);
+  }
+  if (Object.keys(nextPresentation).length > 0) {
+    nextInput.presentation = nextPresentation;
+  }
+
+  return nextInput;
+};
+
+const settingsSchema = z.preprocess(migrateLegacyClockFontSizes, baseSettingsSchema);
 
 type Settings = z.infer<typeof settingsSchema>;
 
@@ -60,40 +100,15 @@ const SettingsPanel = ({
         }
       />
     </label>
-    <label className="block space-y-2">
-      <span>Time font size (rem)</span>
-      <input
-        className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
-        type="number"
-        min={1.5}
-        max={8}
-        step={0.25}
-        value={settings.timeFontSizeRem}
-        onChange={(event) =>
-          onChange({
-            ...settings,
-            timeFontSizeRem: Number(event.target.value) || settings.timeFontSizeRem,
-          })
-        }
-      />
-    </label>
-    <label className="block space-y-2">
-      <span>Date font size (rem)</span>
-      <input
-        className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
-        type="number"
-        min={0.75}
-        max={4}
-        step={0.125}
-        value={settings.dateFontSizeRem}
-        onChange={(event) =>
-          onChange({
-            ...settings,
-            dateFontSizeRem: Number(event.target.value) || settings.dateFontSizeRem,
-          })
-        }
-      />
-    </label>
+    <ModulePresentationControls
+      value={settings.presentation}
+      onChange={(presentation) =>
+        onChange({
+          ...settings,
+          presentation,
+        })
+      }
+    />
   </div>
 );
 
@@ -144,12 +159,15 @@ export const moduleDefinition = defineModule({
           {settings.showDate ? (
             <p
               className="mb-2 font-medium text-cyan-200"
-              style={{ fontSize: `${settings.dateFontSizeRem}rem` }}
+              style={{ fontSize: scaleRoleRem(1, settings.presentation.supportingScale) }}
             >
               {dateFormatter.format(now)}
             </p>
           ) : null}
-          <p className="font-semibold" style={{ fontSize: `${settings.timeFontSizeRem}rem` }}>
+          <p
+            className="font-semibold"
+            style={{ fontSize: scaleRoleRem(2.25, settings.presentation.primaryScale) }}
+          >
             {timeFormatter.format(now)}
           </p>
         </div>

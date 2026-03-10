@@ -67,6 +67,7 @@ pnpm --filter @hearth/module-sdk test
 
 ## Recent Changelog
 
+- March 10, 2026: all active SDK modules now share a minimal `presentation` settings block (`heading`, `primary`, `supporting`) for clean per-module sizing, and the old clock-specific time/date font-size controls were removed.
 - March 9, 2026: Layout Sets now use a visual action-node graph with draggable layout nodes and `Photo Orientation` nodes, backed by persisted `logicBlocks` that compile into the runtime `logicGraph`; the old primitive free-form canvas path is removed.
 - March 8, 2026: photo image responses now send long-lived immutable cache headers, allowing cache-capable kiosk browsers to reuse already-loaded images on repeat views instead of refetching them each time.
 - March 6, 2026: added SDK `count-down` module with date/time countdown modes, completion pulse effect, and resilient empty-event fallback rendering.

@@ -8,6 +8,10 @@ import {
   type WeatherModuleCurrentResponse,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import {
+  ModulePresentationControls,
+  scaleRoleRem,
+} from "../ui/ModulePresentationControls";
 import { type TileDensity, useTileDensity } from "../ui/useTileDensity";
 
 const emptyPayload = (): WeatherModuleCurrentResponse =>
@@ -260,10 +264,17 @@ export const moduleDefinition = defineModule({
       const showTopMeta = density !== "xs";
       const showForecastWind = density === "lg";
       const showForecastPrecipitation = density !== "xs";
-      const temperatureClass =
-        density === "xs" ? "text-3xl" : density === "sm" ? "text-4xl" : "text-5xl";
       const locationLabel = formatLocationLabel(payload.locationLabel, density);
-      const locationLabelClass = density === "xs" ? "text-[10px]" : "text-xs";
+      const locationLabelSizeRem = density === "xs" ? 0.625 : 0.75;
+      const temperatureSizeRem = density === "xs" ? 1.875 : density === "sm" ? 2.25 : 3;
+      const conditionSizeRem = 0.875;
+      const supportingSizeRem = 0.75;
+      const forecastHeadingSizeRem = 0.6875;
+      const forecastDaySizeRem = 0.625;
+      const forecastTemperatureSizeRem = 0.6875;
+      const statusTextSizeRem = 0.875;
+      const heroIconSizeRem = 1.5;
+      const forecastIconSizeRem = 1.125;
 
       useEffect(() => {
         if (isEditing) {
@@ -318,11 +329,22 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="text-sm font-semibold text-slate-100">Weather preview</p>
-            <p className="mt-2 text-xs text-slate-300">
+            <p
+              className="font-semibold text-slate-100"
+              style={{ fontSize: scaleRoleRem(0.875, settings.presentation.headingScale) }}
+            >
+              Weather preview
+            </p>
+            <p
+              className="mt-2 text-slate-300"
+              style={{ fontSize: scaleRoleRem(0.75, settings.presentation.supportingScale) }}
+            >
               Location: {settings.locationQuery}
             </p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p
+              className="mt-1 text-slate-400"
+              style={{ fontSize: scaleRoleRem(0.75, settings.presentation.supportingScale) }}
+            >
               Every {settings.refreshIntervalSeconds}s | Unit: {" "}
               {settings.temperatureUnit === "fahrenheit" ? "Fahrenheit" : "Celsius"}
             </p>
@@ -336,13 +358,29 @@ export const moduleDefinition = defineModule({
           className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-700 bg-gradient-to-b from-slate-900 to-slate-950 p-3 text-slate-100"
         >
           {loading ? (
-            <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-300">
+            <div
+              className="flex min-h-0 flex-1 items-center justify-center text-slate-300"
+              style={{
+                fontSize: scaleRoleRem(
+                  statusTextSizeRem,
+                  settings.presentation.supportingScale,
+                ),
+              }}
+            >
               Loading weather...
             </div>
           ) : null}
 
           {!loading && error ? (
-            <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-rose-500/60 bg-rose-500/10 px-3 text-center text-xs text-rose-200">
+            <div
+              className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-rose-500/60 bg-rose-500/10 px-3 text-center text-rose-200"
+              style={{
+                fontSize: scaleRoleRem(
+                  supportingSizeRem,
+                  settings.presentation.supportingScale,
+                ),
+              }}
+            >
               {error}
             </div>
           ) : null}
@@ -350,26 +388,66 @@ export const moduleDefinition = defineModule({
           {!loading && !error ? (
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
               <p
-                className={`truncate pr-1 font-semibold uppercase tracking-wide text-cyan-200 ${locationLabelClass}`}
+                className="truncate pr-1 font-semibold uppercase tracking-wide text-cyan-200"
+                style={{
+                  fontSize: scaleRoleRem(
+                    locationLabelSizeRem,
+                    settings.presentation.headingScale,
+                  ),
+                }}
                 title={payload.locationLabel}
               >
                 {locationLabel}
               </p>
               <div className="mt-2 flex items-end justify-between">
                 <div>
-                  <p className={`${temperatureClass} font-semibold text-cyan-300`}>
+                  <p
+                    className="font-semibold text-cyan-300"
+                    style={{
+                      fontSize: scaleRoleRem(
+                        temperatureSizeRem,
+                        settings.presentation.primaryScale,
+                      ),
+                    }}
+                  >
                     {formatTemperature(payload.temperature, settings.temperatureUnit)}
                   </p>
                   {showTopCondition ? (
-                    <p className="mt-1 text-sm text-slate-200">{payload.conditionLabel}</p>
+                    <p
+                      className="mt-1 text-slate-200"
+                      style={{
+                        fontSize: scaleRoleRem(
+                          conditionSizeRem,
+                          settings.presentation.supportingScale,
+                        ),
+                      }}
+                    >
+                      {payload.conditionLabel}
+                    </p>
                   ) : null}
                 </div>
                 <div className="flex flex-col items-end">
-                  <p className="text-2xl" aria-hidden>
+                  <p
+                    aria-hidden
+                    style={{
+                      fontSize: scaleRoleRem(
+                        heroIconSizeRem,
+                        settings.presentation.primaryScale,
+                      ),
+                    }}
+                  >
                     {weatherSymbolForCode(payload.conditionCode, payload.isDay)}
                   </p>
                   {showDayNight ? (
-                    <p className="text-xs uppercase tracking-wide text-slate-300">
+                    <p
+                      className="uppercase tracking-wide text-slate-300"
+                      style={{
+                        fontSize: scaleRoleRem(
+                          supportingSizeRem,
+                          settings.presentation.supportingScale,
+                        ),
+                      }}
+                    >
                       {payload.isDay === null ? "" : payload.isDay ? "Day" : "Night"}
                     </p>
                   ) : null}
@@ -377,7 +455,15 @@ export const moduleDefinition = defineModule({
               </div>
 
               {showTopMeta ? (
-                <div className="mt-3 space-y-1 text-xs text-slate-300">
+                <div
+                  className="mt-3 space-y-1 text-slate-300"
+                  style={{
+                    fontSize: scaleRoleRem(
+                      supportingSizeRem,
+                      settings.presentation.supportingScale,
+                    ),
+                  }}
+                >
                   {settings.showWind ? (
                     <p>
                       Wind: {formatWind(payload.windSpeed, settings.windSpeedUnit)}
@@ -394,7 +480,15 @@ export const moduleDefinition = defineModule({
 
               {showForecast ? (
                 <section className="mt-auto pt-3">
-                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+                  <p
+                    className="mb-1 font-semibold uppercase tracking-wide text-slate-300"
+                    style={{
+                      fontSize: scaleRoleRem(
+                        forecastHeadingSizeRem,
+                        settings.presentation.headingScale,
+                      ),
+                    }}
+                  >
                     Week forecast
                   </p>
                   <div
@@ -410,13 +504,38 @@ export const moduleDefinition = defineModule({
                           compactForecastCards ? "min-w-0 px-1.5 py-1" : "min-w-0 px-2 py-1"
                         }`}
                       >
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">
+                        <p
+                          className="font-semibold uppercase tracking-wide text-cyan-200"
+                          style={{
+                            fontSize: scaleRoleRem(
+                              forecastDaySizeRem,
+                              settings.presentation.headingScale,
+                            ),
+                          }}
+                        >
                           {formatForecastDayLabel(day.date, index)}
                         </p>
-                        <p className="mt-0.5 text-lg" aria-hidden>
+                        <p
+                          className="mt-0.5"
+                          aria-hidden
+                          style={{
+                            fontSize: scaleRoleRem(
+                              forecastIconSizeRem,
+                              settings.presentation.primaryScale,
+                            ),
+                          }}
+                        >
                           {weatherSymbolForCode(day.conditionCode, true)}
                         </p>
-                        <p className="mt-0.5 text-[11px] font-semibold text-slate-100">
+                        <p
+                          className="mt-0.5 font-semibold text-slate-100"
+                          style={{
+                            fontSize: scaleRoleRem(
+                              forecastTemperatureSizeRem,
+                              settings.presentation.primaryScale,
+                            ),
+                          }}
+                        >
                           {day.tempMax === null ? "--" : `${Math.round(day.tempMax)}°`}
                           <span className="text-slate-400"> / </span>
                           <span className="text-slate-300">
@@ -424,12 +543,28 @@ export const moduleDefinition = defineModule({
                           </span>
                         </p>
                         {showForecastWind ? (
-                          <p className="mt-0.5 text-[10px] text-slate-300">
+                          <p
+                            className="mt-0.5 text-slate-300"
+                            style={{
+                              fontSize: scaleRoleRem(
+                                forecastDaySizeRem,
+                                settings.presentation.supportingScale,
+                              ),
+                            }}
+                          >
                             💨 {day.windMax === null ? "--" : Math.round(day.windMax)}
                           </p>
                         ) : null}
                         {showForecastPrecipitation ? (
-                          <p className="text-[10px] text-slate-300">
+                          <p
+                            className="text-slate-300"
+                            style={{
+                              fontSize: scaleRoleRem(
+                                forecastDaySizeRem,
+                                settings.presentation.supportingScale,
+                              ),
+                            }}
+                          >
                             🌧️ {" "}
                             {day.precipitationChancePercent === null
                               ? "--"
@@ -443,7 +578,15 @@ export const moduleDefinition = defineModule({
               ) : null}
 
               {payload.warning ? (
-                <p className="mt-2 rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200">
+                <p
+                  className="mt-2 rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-amber-200"
+                  style={{
+                    fontSize: scaleRoleRem(
+                      forecastHeadingSizeRem,
+                      settings.presentation.supportingScale,
+                    ),
+                  }}
+                >
                   {payload.warning}
                 </p>
               ) : null}
@@ -725,6 +868,11 @@ export const moduleDefinition = defineModule({
               onChange={(event) => applyPatch({ showHumidity: event.target.checked })}
             />
           </label>
+
+          <ModulePresentationControls
+            value={settings.presentation}
+            onChange={(presentation) => applyPatch({ presentation })}
+          />
         </div>
       );
     },

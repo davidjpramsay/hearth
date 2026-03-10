@@ -6,6 +6,10 @@ import {
   type BibleVerseModuleResponse,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import {
+  ModulePresentationControls,
+  scaleRoleRem,
+} from "../ui/ModulePresentationControls";
 
 const emptyPayload = (): BibleVerseModuleResponse =>
   bibleVerseModuleResponseSchema.parse({
@@ -68,6 +72,11 @@ export const moduleDefinition = defineModule({
       const verseContentRef = useRef<HTMLDivElement | null>(null);
       const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
       const [maxScrollOffset, setMaxScrollOffset] = useState(0);
+      const headingSize = scaleRoleRem(0.75, settings.presentation.headingScale);
+      const primarySize = scaleRoleRem(0.875, settings.presentation.primaryScale);
+      const supportingSize = scaleRoleRem(0.75, settings.presentation.supportingScale);
+      const compactSupportingSize = scaleRoleRem(0.6875, settings.presentation.supportingScale);
+      const sourceSize = scaleRoleRem(0.625, settings.presentation.supportingScale);
 
       useEffect(() => {
         if (isEditing) {
@@ -228,11 +237,13 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="text-sm font-semibold text-slate-100">Bible verse preview</p>
-            <p className="mt-2 text-xs text-slate-300">
+            <p className="font-semibold text-slate-100" style={{ fontSize: headingSize }}>
+              Bible verse preview
+            </p>
+            <p className="mt-2 text-slate-300" style={{ fontSize: supportingSize }}>
               Refresh every {settings.refreshIntervalSeconds}s
             </p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-slate-400" style={{ fontSize: supportingSize }}>
               Reference: {settings.showReference ? "Shown" : "Hidden"}
             </p>
           </div>
@@ -241,18 +252,27 @@ export const moduleDefinition = defineModule({
 
       return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-700 bg-gradient-to-b from-slate-900 to-slate-950 p-3 text-slate-100">
-          <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">
+          <p
+            className="font-semibold uppercase tracking-wide text-cyan-200"
+            style={{ fontSize: headingSize }}
+          >
             Verse of the day
           </p>
 
           {loading ? (
-            <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-300">
+            <div
+              className="flex min-h-0 flex-1 items-center justify-center text-slate-300"
+              style={{ fontSize: supportingSize }}
+            >
               Loading verse...
             </div>
           ) : null}
 
           {!loading && error ? (
-            <div className="mt-2 flex min-h-0 flex-1 items-center justify-center rounded-md border border-rose-500/60 bg-rose-500/10 px-3 text-center text-xs text-rose-200">
+            <div
+              className="mt-2 flex min-h-0 flex-1 items-center justify-center rounded-md border border-rose-500/60 bg-rose-500/10 px-3 text-center text-rose-200"
+              style={{ fontSize: supportingSize }}
+            >
               {error}
             </div>
           ) : null}
@@ -265,38 +285,50 @@ export const moduleDefinition = defineModule({
                   shouldAutoScroll ? "overflow-hidden" : "flex items-center justify-center"
                 }`}
               >
-              <div ref={verseContentRef} className="w-full">
+                <div ref={verseContentRef} className="w-full">
                   {payload.verse ? (
-                    <p className="text-center text-sm leading-relaxed text-slate-100">
+                    <p
+                      className="text-center leading-relaxed text-slate-100"
+                      style={{ fontSize: primarySize }}
+                    >
                       {payload.verse}
                     </p>
                   ) : (
-                    <p className="text-center text-sm text-slate-300">No verse available.</p>
+                    <p
+                      className="text-center text-slate-300"
+                      style={{ fontSize: supportingSize }}
+                    >
+                      No verse available.
+                    </p>
                   )}
-                  {shouldAutoScroll ? (
-                    <div
-                      aria-hidden
-                      style={{ height: `${AUTO_SCROLL_GAP_PX}px` }}
-                    />
-                  ) : null}
+                  {shouldAutoScroll ? <div aria-hidden style={{ height: `${AUTO_SCROLL_GAP_PX}px` }} /> : null}
                 </div>
               </div>
 
               <div className="mt-2 space-y-1 border-t border-slate-800/80 pt-2 text-center">
                 {settings.showReference && payload.reference ? (
-                  <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">
+                  <p
+                    className="font-semibold uppercase tracking-wide text-cyan-200"
+                    style={{ fontSize: supportingSize }}
+                  >
                     {payload.reference}
                   </p>
                 ) : null}
 
                 {payload.warning ? (
-                  <p className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200">
+                  <p
+                    className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-amber-200"
+                    style={{ fontSize: compactSupportingSize }}
+                  >
                     {payload.warning}
                   </p>
                 ) : null}
 
                 {settings.showSource ? (
-                  <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                  <p
+                    className="uppercase tracking-wide text-slate-400"
+                    style={{ fontSize: sourceSize }}
+                  >
                     Source: {payload.sourceLabel}
                   </p>
                 ) : null}
@@ -356,7 +388,10 @@ export const moduleDefinition = defineModule({
               onChange={(event) => applyPatch({ showSource: event.target.checked })}
             />
           </label>
-
+          <ModulePresentationControls
+            value={settings.presentation}
+            onChange={(presentation) => applyPatch({ presentation })}
+          />
         </div>
       );
     },

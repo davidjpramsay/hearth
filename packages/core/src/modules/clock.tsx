@@ -1,14 +1,77 @@
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import type { ModuleDefinition } from "@hearth/shared";
+import {
+  MODULE_PRESENTATION_SCALE_MAX,
+  MODULE_PRESENTATION_SCALE_MIN,
+  MODULE_PRESENTATION_SCALE_STEP,
+  clampModulePresentationScale,
+  withModulePresentation,
+  type ModulePresentationSettings,
+} from "@hearth/shared";
 
-const clockConfigSchema = z.object({
-  use24Hour: z.boolean().default(true),
-  showSeconds: z.boolean().default(true),
-  showDate: z.boolean().default(false),
-  timeFontSizeRem: z.number().min(1.5).max(8).default(2.25),
-  dateFontSizeRem: z.number().min(0.75).max(4).default(1),
-});
+const scaleFieldMeta = [
+  {
+    key: "headingScale",
+    label: "Heading size",
+  },
+  {
+    key: "primaryScale",
+    label: "Primary size",
+  },
+  {
+    key: "supportingScale",
+    label: "Supporting size",
+  },
+] as const satisfies ReadonlyArray<{
+  key: keyof ModulePresentationSettings;
+  label: string;
+}>;
+
+const formatScaleLabel = (value: number): string => `${Math.round(value * 100)}%`;
+
+const scaleRoleRem = (baseRem: number, scale: number): string =>
+  `${(baseRem * clampModulePresentationScale(scale, 1)).toFixed(3).replace(/\.?0+$/, "")}rem`;
+
+const baseClockConfigSchema = withModulePresentation(
+  z.object({
+    use24Hour: z.boolean().default(true),
+    showSeconds: z.boolean().default(true),
+    showDate: z.boolean().default(false),
+  }),
+);
+
+const migrateLegacyClockFontSizes = (config: unknown): unknown => {
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    return config;
+  }
+
+  const rawConfig = config as Record<string, unknown>;
+  const nextConfig: Record<string, unknown> = { ...rawConfig };
+  const rawPresentation =
+    rawConfig.presentation && typeof rawConfig.presentation === "object"
+      ? (rawConfig.presentation as Record<string, unknown>)
+      : {};
+  const nextPresentation: Record<string, unknown> = { ...rawPresentation };
+  const timeFontSizeRem =
+    typeof rawConfig.timeFontSizeRem === "number" ? rawConfig.timeFontSizeRem : null;
+  const dateFontSizeRem =
+    typeof rawConfig.dateFontSizeRem === "number" ? rawConfig.dateFontSizeRem : null;
+
+  if (timeFontSizeRem !== null && typeof nextPresentation.primaryScale !== "number") {
+    nextPresentation.primaryScale = clampModulePresentationScale(timeFontSizeRem / 2.25);
+  }
+  if (dateFontSizeRem !== null && typeof nextPresentation.supportingScale !== "number") {
+    nextPresentation.supportingScale = clampModulePresentationScale(dateFontSizeRem / 1);
+  }
+  if (Object.keys(nextPresentation).length > 0) {
+    nextConfig.presentation = nextPresentation;
+  }
+
+  return nextConfig;
+};
+
+const clockConfigSchema = z.preprocess(migrateLegacyClockFontSizes, baseClockConfigSchema);
 
 type ClockConfig = z.infer<typeof clockConfigSchema>;
 const DEFAULT_CONFIG = clockConfigSchema.parse({});
@@ -53,12 +116,15 @@ export const clockModule: ModuleDefinition<ClockConfig> = {
         {normalizedConfig.showDate ? (
           <p
             className="mb-2 font-medium text-cyan-200"
-            style={{ fontSize: `${normalizedConfig.dateFontSizeRem}rem` }}
+            style={{ fontSize: scaleRoleRem(1, normalizedConfig.presentation.supportingScale) }}
           >
             {dateFormatter.format(now)}
           </p>
         ) : null}
-        <p className="font-semibold" style={{ fontSize: `${normalizedConfig.timeFontSizeRem}rem` }}>
+        <p
+          className="font-semibold"
+          style={{ fontSize: scaleRoleRem(2.25, normalizedConfig.presentation.primaryScale) }}
+        >
           {timeFormatter.format(now)}
         </p>
       </div>
@@ -109,46 +175,47 @@ export const clockModule: ModuleDefinition<ClockConfig> = {
             }
           />
         </label>
-        <label className="block space-y-2">
-          <span>Time font size (rem)</span>
-          <input
-            className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
-            type="number"
-            min={1.5}
-            max={8}
-            step={0.25}
-            value={normalizedConfig.timeFontSizeRem}
-            onChange={(event) =>
-              onChange({
-                ...normalizedConfig,
-                timeFontSizeRem: Math.max(
-                  1.5,
-                  Math.min(8, Number(event.target.value) || 1.5),
-                ),
-              })
-            }
-          />
-        </label>
-        <label className="block space-y-2">
-          <span>Date font size (rem)</span>
-          <input
-            className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
-            type="number"
-            min={0.75}
-            max={4}
-            step={0.125}
-            value={normalizedConfig.dateFontSizeRem}
-            onChange={(event) =>
-              onChange({
-                ...normalizedConfig,
-                dateFontSizeRem: Math.max(
-                  0.75,
-                  Math.min(4, Number(event.target.value) || 0.75),
-                ),
-              })
-            }
-          />
-        </label>
+        <div className="space-y-3 rounded border border-slate-700/80 bg-slate-950/40 p-3">
+          <div>
+            <p className="font-medium text-slate-100">Role sizing</p>
+            <p className="text-xs text-slate-400">
+              100% keeps the current default sizing for text, icons, emoji, and small visuals.
+            </p>
+          </div>
+          {scaleFieldMeta.map((field) => (
+            <label key={field.key} className="block space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <span>{field.label}</span>
+                <span className="text-xs text-slate-400">
+                  {formatScaleLabel(normalizedConfig.presentation[field.key])}
+                </span>
+              </div>
+              <input
+                className="w-full accent-cyan-400"
+                type="range"
+                min={MODULE_PRESENTATION_SCALE_MIN}
+                max={MODULE_PRESENTATION_SCALE_MAX}
+                step={MODULE_PRESENTATION_SCALE_STEP}
+                value={normalizedConfig.presentation[field.key]}
+                onChange={(event) =>
+                  onChange({
+                    ...normalizedConfig,
+                    presentation: {
+                      ...normalizedConfig.presentation,
+                      [field.key]: clampModulePresentationScale(
+                        Number.parseFloat(event.target.value),
+                        normalizedConfig.presentation[field.key],
+                      ),
+                    },
+                  })
+                }
+              />
+            </label>
+          ))}
+          <p className="text-xs text-slate-500">
+            Roles stay the same across modules, but each module only maps the elements it uses.
+          </p>
+        </div>
       </div>
     );
   },

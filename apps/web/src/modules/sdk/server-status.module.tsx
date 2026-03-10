@@ -1,12 +1,19 @@
 import { z } from "zod";
+import { withModulePresentation } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
 import { useModuleQuery } from "../data/useModuleQuery";
 import { ModuleFrame } from "../ui/ModuleFrame";
+import {
+  ModulePresentationControls,
+  scaleRoleRem,
+} from "../ui/ModulePresentationControls";
 
-const settingsSchema = z.object({
-  pollSeconds: z.number().int().min(5).max(300).default(30),
-  showMemory: z.boolean().default(true),
-});
+const settingsSchema = withModulePresentation(
+  z.object({
+    pollSeconds: z.number().int().min(5).max(300).default(30),
+    showMemory: z.boolean().default(true),
+  }),
+);
 
 const statusSchema = z.object({
   ok: z.boolean(),
@@ -76,6 +83,15 @@ const SettingsPanel = ({
         }
       />
     </label>
+    <ModulePresentationControls
+      value={settings.presentation}
+      onChange={(presentation) =>
+        onChange({
+          ...settings,
+          presentation,
+        })
+      }
+    />
   </div>
 );
 
@@ -124,12 +140,23 @@ export const moduleDefinition = defineModule({
         >
           {status.data ? (
             <div className="space-y-3 rounded-lg border border-slate-700 bg-slate-950/60 p-3 text-slate-100">
-              <div className="text-sm text-slate-300">Service: {status.data.service}</div>
-              <div className="text-sm text-slate-300">
+              <div
+                className="text-slate-300"
+                style={{ fontSize: scaleRoleRem(0.875, settings.presentation.primaryScale) }}
+              >
+                Service: {status.data.service}
+              </div>
+              <div
+                className="text-slate-300"
+                style={{ fontSize: scaleRoleRem(0.875, settings.presentation.primaryScale) }}
+              >
                 Uptime: {Math.floor(status.data.uptimeSeconds)}s
               </div>
               {settings.showMemory && status.data.memory ? (
-                <div className="text-xs text-slate-400">
+                <div
+                  className="text-slate-400"
+                  style={{ fontSize: scaleRoleRem(0.75, settings.presentation.supportingScale) }}
+                >
                   <p>RSS: {formatBytes(status.data.memory.rss)}</p>
                   <p>Heap used: {formatBytes(status.data.memory.heapUsed)}</p>
                   <p>Heap total: {formatBytes(status.data.memory.heapTotal)}</p>

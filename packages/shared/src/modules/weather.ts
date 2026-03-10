@@ -1,19 +1,22 @@
 import { z } from "zod";
+import { withModulePresentation } from "./presentation.js";
 
 export const weatherTemperatureUnitSchema = z.enum(["celsius", "fahrenheit"]);
 export const weatherWindSpeedUnitSchema = z.enum(["kmh", "mph", "knots"]);
 
-export const weatherModuleConfigSchema = z.object({
-  locationQuery: z.string().trim().max(120).default("Perth, AU"),
-  latitude: z.number().min(-90).max(90).nullable().default(null),
-  longitude: z.number().min(-180).max(180).nullable().default(null),
-  temperatureUnit: weatherTemperatureUnitSchema.default("celsius"),
-  windSpeedUnit: weatherWindSpeedUnitSchema.default("kmh"),
-  refreshIntervalSeconds: z.number().int().min(60).max(3600).default(600),
-  showForecast: z.boolean().default(true),
-  showHumidity: z.boolean().default(true),
-  showWind: z.boolean().default(true),
-});
+export const weatherModuleConfigSchema = withModulePresentation(
+  z.object({
+    locationQuery: z.string().trim().max(120).default("Perth, AU"),
+    latitude: z.number().min(-90).max(90).nullable().default(null),
+    longitude: z.number().min(-180).max(180).nullable().default(null),
+    temperatureUnit: weatherTemperatureUnitSchema.default("celsius"),
+    windSpeedUnit: weatherWindSpeedUnitSchema.default("kmh"),
+    refreshIntervalSeconds: z.number().int().min(60).max(3600).default(600),
+    showForecast: z.boolean().default(true),
+    showHumidity: z.boolean().default(true),
+    showWind: z.boolean().default(true),
+  }),
+);
 
 export const weatherModuleCurrentResponseSchema = z.object({
   generatedAt: z.string().datetime({ offset: true }),

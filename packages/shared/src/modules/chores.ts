@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ianaTimeZoneSchema } from "../time.js";
+import { withModulePresentation } from "./presentation.js";
 
 export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 export const dayOfWeekSchema = z.number().int().min(0).max(6);
@@ -30,11 +31,13 @@ export const choreScheduleSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
-export const choresModuleConfigSchema = z.object({
-  enableMoneyTracking: z.boolean().default(true),
-  showStats: z.boolean().default(true),
-  previewDays: z.number().int().min(0).max(14).default(7),
-});
+export const choresModuleConfigSchema = withModulePresentation(
+  z.object({
+    enableMoneyTracking: z.boolean().default(true),
+    showStats: z.boolean().default(true),
+    previewDays: z.number().int().min(0).max(14).default(7),
+  }),
+);
 
 export const choreMemberSchema = z.object({
   id: z.number().int().positive(),

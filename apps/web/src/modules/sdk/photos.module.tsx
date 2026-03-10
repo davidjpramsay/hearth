@@ -11,6 +11,10 @@ import {
 import { defineModule } from "@hearth/module-sdk";
 import { getAuthToken } from "../../auth/storage";
 import { getDeviceId } from "../../device/device-id";
+import {
+  ModulePresentationControls,
+  scaleRoleRem,
+} from "../ui/ModulePresentationControls";
 
 const LAYOUT_CROSSFADE_DATA_ATTRIBUTE = "data-hearth-layout-crossfade";
 const DISPLAY_SOURCE_KIND_STORAGE_KEY = "hearth:display-source-kind";
@@ -408,18 +412,22 @@ export const moduleDefinition = defineModule({
         settings.collectionId && settings.collectionId.trim().length > 0
           ? `Collection: ${settings.collectionId.trim()}`
           : "/photos";
+      const headingSize = scaleRoleRem(0.875, settings.presentation.headingScale);
+      const supportingSize = scaleRoleRem(0.75, settings.presentation.supportingScale);
 
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="text-sm font-semibold text-slate-100">Photo slideshow preview</p>
-            <p className="mt-2 text-xs text-slate-300">
+            <p className="font-semibold text-slate-100" style={{ fontSize: headingSize }}>
+              Photo slideshow preview
+            </p>
+            <p className="mt-2 text-slate-300" style={{ fontSize: supportingSize }}>
               Photo source: {previewSourceLabel}
             </p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-slate-400" style={{ fontSize: supportingSize }}>
               Every {effectiveIntervalSeconds}s | {settings.shuffle ? "Shuffle" : "In order"}
             </p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-slate-400" style={{ fontSize: supportingSize }}>
               Layout lock: {getLayoutRatioLabel(settings.layoutOrientation)}
             </p>
           </div>
@@ -429,13 +437,19 @@ export const moduleDefinition = defineModule({
       return (
         <div className="relative h-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950">
           {loading ? (
-            <div className="flex h-full items-center justify-center text-sm text-slate-300">
+            <div
+              className="flex h-full items-center justify-center text-slate-300"
+              style={{ fontSize: supportingSize }}
+            >
               Loading photos...
             </div>
           ) : null}
 
           {!loading && error ? (
-            <div className="flex h-full items-center justify-center px-3 text-center text-sm text-rose-200">
+            <div
+              className="flex h-full items-center justify-center px-3 text-center text-rose-200"
+              style={{ fontSize: supportingSize }}
+            >
               {error}
             </div>
           ) : null}
@@ -455,7 +469,10 @@ export const moduleDefinition = defineModule({
           ) : null}
 
           {!loading && !error && !displayFrame && frameData.warning ? (
-            <div className="flex h-full items-center justify-center px-3 text-center text-sm text-slate-300">
+            <div
+              className="flex h-full items-center justify-center px-3 text-center text-slate-300"
+              style={{ fontSize: supportingSize }}
+            >
               {frameData.warning}
             </div>
           ) : null}
@@ -588,6 +605,10 @@ export const moduleDefinition = defineModule({
               <option value="portrait">Portrait (3:4)</option>
             </select>
           </label>
+          <ModulePresentationControls
+            value={settings.presentation}
+            onChange={(presentation) => applyPatch({ presentation })}
+          />
         </div>
       );
     },

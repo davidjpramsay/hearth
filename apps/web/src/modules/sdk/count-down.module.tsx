@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import { withModulePresentation } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import {
+  ModulePresentationControls,
+  scaleRoleRem,
+} from "../ui/ModulePresentationControls";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
@@ -21,15 +26,17 @@ const defaultTargetDate = (): string => {
   return toDateInputValue(nextDay);
 };
 
-const settingsSchema = z.object({
-  eventName: z.string().trim().max(80).default("Upcoming Event"),
-  mode: z.enum(["date", "time"]).default("date"),
-  targetDate: z.string().regex(DATE_INPUT_REGEX).default(defaultTargetDate()),
-  days: z.number().int().min(0).max(3650).default(0),
-  hours: z.number().int().min(0).max(23).default(1),
-  minutes: z.number().int().min(0).max(59).default(0),
-  seconds: z.number().int().min(0).max(59).default(0),
-});
+const settingsSchema = withModulePresentation(
+  z.object({
+    eventName: z.string().trim().max(80).default("Upcoming Event"),
+    mode: z.enum(["date", "time"]).default("date"),
+    targetDate: z.string().regex(DATE_INPUT_REGEX).default(defaultTargetDate()),
+    days: z.number().int().min(0).max(3650).default(0),
+    hours: z.number().int().min(0).max(23).default(1),
+    minutes: z.number().int().min(0).max(59).default(0),
+    seconds: z.number().int().min(0).max(59).default(0),
+  }),
+);
 
 type Settings = z.infer<typeof settingsSchema>;
 
@@ -237,6 +244,16 @@ const SettingsPanel = ({
         </div>
       </div>
     )}
+
+    <ModulePresentationControls
+      value={settings.presentation}
+      onChange={(presentation) =>
+        onChange({
+          ...settings,
+          presentation,
+        })
+      }
+    />
   </div>
 );
 
@@ -306,6 +323,10 @@ export const moduleDefinition = defineModule({
       const countdown = useMemo(() => splitDuration(remainingMs), [remainingMs]);
       const complete = remainingMs <= 0;
       const displayEventName = settings.eventName.trim() || "Upcoming Event";
+      const eventLabelSize = scaleRoleRem(0.75, settings.presentation.headingScale);
+      const eventNameSize = scaleRoleRem(1, settings.presentation.headingScale);
+      const segmentValueSize = scaleRoleRem(1.5, settings.presentation.primaryScale);
+      const segmentLabelSize = scaleRoleRem(0.6875, settings.presentation.supportingScale);
       const timeSegments = [
         { label: "Days", value: String(countdown.days) },
         { label: "Hours", value: String(countdown.hours).padStart(2, "0") },
@@ -328,11 +349,17 @@ export const moduleDefinition = defineModule({
           ) : null}
 
           <div>
-            <p className="truncate text-xs uppercase tracking-wide text-cyan-200/80">Event</p>
             <p
-              className={`truncate text-base font-semibold ${
+              className="truncate uppercase tracking-wide text-cyan-200/80"
+              style={{ fontSize: eventLabelSize }}
+            >
+              Event
+            </p>
+            <p
+              className={`truncate font-semibold ${
                 complete ? "animate-pulse text-emerald-200 drop-shadow-[0_0_10px_rgba(52,211,153,0.7)]" : ""
               }`}
+              style={{ fontSize: eventNameSize }}
               title={displayEventName}
             >
               {displayEventName}
@@ -350,8 +377,16 @@ export const moduleDefinition = defineModule({
                       : "border-slate-700 bg-slate-900/70"
                   }`}
                 >
-                  <p className="text-2xl font-semibold leading-none text-cyan-200">{segment.value}</p>
-                  <p className="mt-2 text-[11px] uppercase tracking-wide text-slate-300">
+                  <p
+                    className="font-semibold leading-none text-cyan-200"
+                    style={{ fontSize: segmentValueSize }}
+                  >
+                    {segment.value}
+                  </p>
+                  <p
+                    className="mt-2 uppercase tracking-wide text-slate-300"
+                    style={{ fontSize: segmentLabelSize }}
+                  >
                     {segment.label}
                   </p>
                 </div>

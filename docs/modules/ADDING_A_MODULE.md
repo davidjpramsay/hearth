@@ -34,14 +34,17 @@ No manual registry edits needed for web modules.
 ## Manual path
 
 1. Create SDK module file under `apps/web/src/modules/sdk`.
-2. Export default `defineModule({...})`.
-3. Add `admin.SettingsPanel` if configurable.
-4. If server-backed, add adapter in `apps/server/src/modules/adapters`.
-5. Register adapter in `apps/server/src/modules/adapters/index.ts`.
-6. Run `pnpm -r build`.
+2. Wrap settings in `withModulePresentation(...)` so the module gets the shared `presentation` block.
+3. Export default `defineModule({...})`.
+4. Add `admin.SettingsPanel` if configurable. Reuse `apps/web/src/modules/ui/ModulePresentationControls.tsx` when the module should expose role sizing.
+5. Map visible module elements to `heading`, `primary`, or `supporting` instead of adding one-off font-size fields.
+6. If server-backed, add adapter in `apps/server/src/modules/adapters`.
+7. Register adapter in `apps/server/src/modules/adapters/index.ts`.
+8. Run `pnpm -r build`.
 
 ## Verify
 
 - `pnpm --filter @hearth/web build`
 - `pnpm --filter @hearth/server build`
+- `pnpm --filter @hearth/web test`
 - open `/admin` and confirm module appears in palette

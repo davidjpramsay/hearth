@@ -7,6 +7,10 @@ import {
   type CalendarModuleEvent,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import {
+  ModulePresentationControls,
+  scaleRoleRem,
+} from "../ui/ModulePresentationControls";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CALENDAR_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
@@ -348,10 +352,20 @@ export const moduleDefinition = defineModule({
         return Array.from({ length: 7 }, (_value, index) => addDays(firstDay, index));
       }, [now]);
 
-      const monthCells = useMemo(() => {
+      const monthGrid = useMemo(() => {
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const gridStart = addDays(startOfDay(monthStart), -monthStart.getDay());
-        return Array.from({ length: 42 }, (_value, index) => addDays(gridStart, index));
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const gridEnd = addDays(startOfDay(monthEnd), 6 - monthEnd.getDay());
+        const dayCount = Math.round((gridEnd.getTime() - gridStart.getTime()) / DAY_MS) + 1;
+        const weekCount = Math.max(4, Math.ceil(dayCount / 7));
+
+        return {
+          weekCount,
+          cells: Array.from({ length: weekCount * 7 }, (_value, index) =>
+            addDays(gridStart, index),
+          ),
+        };
       }, [now]);
 
       const calendarLegendEntries = useMemo(() => {
@@ -395,11 +409,22 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="text-sm font-semibold text-slate-100">Calendar preview</p>
-            <p className="mt-2 text-xs text-slate-300">
+            <p
+              className="font-semibold text-slate-100"
+              style={{ fontSize: scaleRoleRem(0.875, settings.presentation.headingScale) }}
+            >
+              Calendar preview
+            </p>
+            <p
+              className="mt-2 text-slate-300"
+              style={{ fontSize: scaleRoleRem(0.75, settings.presentation.supportingScale) }}
+            >
               Events load from the active layout on the dashboard.
             </p>
-            <p className="mt-3 text-xs text-slate-400">
+            <p
+              className="mt-3 text-slate-400"
+              style={{ fontSize: scaleRoleRem(0.75, settings.presentation.supportingScale) }}
+            >
               View: {settings.viewMode} | Sources: {settings.calendars.length}
             </p>
           </div>
@@ -409,22 +434,34 @@ export const moduleDefinition = defineModule({
       return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-700 bg-gradient-to-b from-slate-900 to-slate-950 p-2 text-slate-100">
           <header className="mb-2 flex items-center justify-between rounded-md border border-slate-700/80 bg-slate-900/80 px-3 py-2">
-            <p className="text-lg font-semibold tracking-wide text-slate-100">
+            <p
+              className="font-semibold tracking-wide text-slate-100"
+              style={{ fontSize: scaleRoleRem(1.125, settings.presentation.headingScale) }}
+            >
               {headerTitle}
             </p>
-            <p className="text-[11px] tracking-wide text-slate-400">
+            <p
+              className="tracking-wide text-slate-400"
+              style={{ fontSize: scaleRoleRem(0.6875, settings.presentation.supportingScale) }}
+            >
               {headerViewLabel}
             </p>
           </header>
 
           {loading ? (
-            <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-300">
+            <div
+              className="flex min-h-0 flex-1 items-center justify-center text-slate-300"
+              style={{ fontSize: scaleRoleRem(0.875, settings.presentation.supportingScale) }}
+            >
               Loading calendar...
             </div>
           ) : null}
 
           {!loading && error ? (
-            <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-rose-500/60 bg-rose-500/10 px-3 text-center text-xs text-rose-200">
+            <div
+              className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-rose-500/60 bg-rose-500/10 px-3 text-center text-rose-200"
+              style={{ fontSize: scaleRoleRem(0.75, settings.presentation.supportingScale) }}
+            >
               {error}
             </div>
           ) : null}
@@ -443,24 +480,51 @@ export const moduleDefinition = defineModule({
 
                   return (
                     <section key={day.toISOString()} className="rounded-md border border-slate-700/80 bg-slate-900/70 p-2">
-                      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-200">
+                      <h4
+                        className="mb-2 font-semibold uppercase tracking-wide text-cyan-200"
+                        style={{ fontSize: scaleRoleRem(0.75, settings.presentation.headingScale) }}
+                      >
                         {dayFormatter.format(day)}
                       </h4>
                       <div className="space-y-2">
                         {dayEvents.map((event) => (
                           <article
                             key={event.id}
-                            className="rounded border border-slate-700/70 bg-slate-950/70 pl-4 pr-2 py-1.5"
+                            className="rounded border border-slate-700/70 bg-slate-950/70 px-2.5 py-1.5 text-left"
                             style={eventStyleForView(event, now)}
                           >
-                            <p className="line-clamp-2 text-[13px] font-semibold text-slate-100">
+                            <p
+                              className="line-clamp-2 text-left font-semibold text-slate-100"
+                              style={{
+                                fontSize: scaleRoleRem(
+                                  0.8125,
+                                  settings.presentation.primaryScale,
+                                ),
+                              }}
+                            >
                               {event.title}
                             </p>
-                            <p className="mt-0.5 text-[11px] text-cyan-200">
+                            <p
+                              className="mt-0.5 text-cyan-200"
+                              style={{
+                                fontSize: scaleRoleRem(
+                                  0.6875,
+                                  settings.presentation.supportingScale,
+                                ),
+                              }}
+                            >
                               {formatEventTime(event, timeFormatter)}
                             </p>
                             {event.location ? (
-                              <p className="mt-0.5 line-clamp-1 text-[11px] text-slate-300">
+                              <p
+                                className="mt-0.5 line-clamp-1 text-slate-300"
+                                style={{
+                                  fontSize: scaleRoleRem(
+                                    0.6875,
+                                    settings.presentation.supportingScale,
+                                  ),
+                                }}
+                              >
                                 {event.location}
                               </p>
                             ) : null}
@@ -471,7 +535,10 @@ export const moduleDefinition = defineModule({
                   );
                 })}
                 {!hasListEvents ? (
-                  <p className="rounded-md border border-slate-700 bg-slate-900/60 px-3 py-2 text-xs text-slate-300">
+                  <p
+                    className="rounded-md border border-slate-700 bg-slate-900/60 px-3 py-2 text-slate-300"
+                    style={{ fontSize: scaleRoleRem(0.75, settings.presentation.supportingScale) }}
+                  >
                     No upcoming events for the configured calendars.
                   </p>
                 ) : null}
@@ -487,11 +554,16 @@ export const moduleDefinition = defineModule({
                     <span
                       key={entry.source}
                       title={entry.label}
-                      className="inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-[10px] text-slate-200"
+                      className="inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-slate-200"
+                      style={{ fontSize: scaleRoleRem(0.625, settings.presentation.supportingScale) }}
                     >
                       <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: entry.color }}
+                        className="rounded-full"
+                        style={{
+                          backgroundColor: entry.color,
+                          width: scaleRoleRem(0.5, settings.presentation.supportingScale),
+                          height: scaleRoleRem(0.5, settings.presentation.supportingScale),
+                        }}
                       />
                       <span className="max-w-[120px] truncate">{entry.label}</span>
                     </span>
@@ -509,26 +581,55 @@ export const moduleDefinition = defineModule({
                       key={day.toISOString()}
                       className="rounded-md border border-slate-700/80 bg-slate-900/70 p-2"
                     >
-                      <h4 className="mb-2 text-center text-[11px] font-semibold uppercase tracking-wide text-cyan-200">
+                      <h4
+                        className="mb-2 text-center font-semibold uppercase tracking-wide text-cyan-200"
+                        style={{ fontSize: scaleRoleRem(0.6875, settings.presentation.headingScale) }}
+                      >
                         {dayFormatter.format(day)}
                       </h4>
                       <div className="space-y-1.5">
                         {dayEvents.map((event) => (
                           <article
                             key={event.id}
-                            className="rounded border border-slate-700/70 bg-slate-950/80 pl-4 pr-2 py-1"
+                            className="rounded border border-slate-700/70 bg-slate-950/80 px-2.5 py-1 text-left"
                             style={eventStyleForView(event, now)}
                           >
-                            <p className="line-clamp-2 text-[11px] font-medium text-slate-100">
+                            <p
+                              className="line-clamp-2 text-left font-medium text-slate-100"
+                              style={{
+                                fontSize: scaleRoleRem(
+                                  0.6875,
+                                  settings.presentation.primaryScale,
+                                ),
+                              }}
+                            >
                               {event.title}
                             </p>
-                            <p className="mt-0.5 text-[10px] text-cyan-200">
+                            <p
+                              className="mt-0.5 text-cyan-200"
+                              style={{
+                                fontSize: scaleRoleRem(
+                                  0.625,
+                                  settings.presentation.supportingScale,
+                                ),
+                              }}
+                            >
                               {formatEventTime(event, timeFormatter)}
                             </p>
                           </article>
                         ))}
                         {dayEvents.length === 0 ? (
-                          <p className="text-center text-[10px] text-slate-400">No events</p>
+                          <p
+                            className="text-center text-slate-400"
+                            style={{
+                              fontSize: scaleRoleRem(
+                                0.625,
+                                settings.presentation.supportingScale,
+                              ),
+                            }}
+                          >
+                            No events
+                          </p>
                         ) : null}
                       </div>
                     </section>
@@ -546,11 +647,16 @@ export const moduleDefinition = defineModule({
                     <span
                       key={entry.source}
                       title={entry.label}
-                      className="inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-[10px] text-slate-200"
+                      className="inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-slate-200"
+                      style={{ fontSize: scaleRoleRem(0.625, settings.presentation.supportingScale) }}
                     >
                       <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: entry.color }}
+                        className="rounded-full"
+                        style={{
+                          backgroundColor: entry.color,
+                          width: scaleRoleRem(0.5, settings.presentation.supportingScale),
+                          height: scaleRoleRem(0.5, settings.presentation.supportingScale),
+                        }}
                       />
                       <span className="max-w-[120px] truncate">{entry.label}</span>
                     </span>
@@ -558,17 +664,23 @@ export const moduleDefinition = defineModule({
                 </div>
               ) : null}
               <div className="min-h-0 flex-1 overflow-auto pr-1">
-                <div className="grid min-h-full min-w-[680px] grid-cols-7 grid-rows-[auto_repeat(6,minmax(0,1fr))] gap-1 text-[11px]">
+                <div
+                  className="grid min-h-full min-w-[680px] grid-cols-7 gap-1"
+                  style={{
+                    gridTemplateRows: `auto repeat(${monthGrid.weekCount}, minmax(0, 1fr))`,
+                  }}
+                >
                   {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayLabel) => (
                     <p
                       key={dayLabel}
-                      className="pb-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400"
+                      className="pb-1 text-center font-semibold uppercase tracking-wide text-slate-400"
+                      style={{ fontSize: scaleRoleRem(0.625, settings.presentation.headingScale) }}
                     >
                       {dayLabel}
                     </p>
                   ))}
 
-                  {monthCells.map((day) => {
+                  {monthGrid.cells.map((day) => {
                     const inMonth = day.getMonth() === now.getMonth();
                     const isToday = day.getTime() === todayDayStartMs;
                     const dayEvents = parsedEvents
@@ -589,22 +701,34 @@ export const moduleDefinition = defineModule({
                         }`}
                       >
                         <p
-                          className={`shrink-0 text-right text-[10px] ${
+                          className={`shrink-0 text-right ${
                             inMonth ? "text-slate-200" : "text-slate-500"
                           }`}
+                          style={{
+                            fontSize: scaleRoleRem(
+                              0.625,
+                              settings.presentation.supportingScale,
+                            ),
+                          }}
                         >
                           {monthDayFormatter.format(day)}
                         </p>
                         <div className="mt-1 min-h-0 space-y-1 overflow-hidden">
-                        {dayEvents.map((event) => (
-                          <p
-                            key={event.id}
-                            className="line-clamp-2 rounded border border-slate-700/60 bg-slate-950/80 pl-3 pr-1 py-0.5 text-[10px] text-slate-100"
-                            style={eventStyleForView(event, now)}
-                          >
-                            {event.title}
-                          </p>
-                        ))}
+                          {dayEvents.map((event) => (
+                            <p
+                              key={event.id}
+                              className="line-clamp-2 rounded border border-slate-700/60 bg-slate-950/80 pl-1.5 pr-1 py-0.5 text-left leading-tight text-slate-100"
+                              style={{
+                                ...eventStyleForView(event, now),
+                                fontSize: scaleRoleRem(
+                                  0.625,
+                                  settings.presentation.primaryScale,
+                                ),
+                              }}
+                            >
+                              {event.title}
+                            </p>
+                          ))}
                         </div>
                       </section>
                     );
@@ -615,7 +739,10 @@ export const moduleDefinition = defineModule({
           ) : null}
 
           {!loading && !error && payload.warnings.length > 0 ? (
-            <div className="mt-2 rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-100">
+            <div
+              className="mt-2 rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-amber-100"
+              style={{ fontSize: scaleRoleRem(0.6875, settings.presentation.supportingScale) }}
+            >
               {payload.warnings[0]}
             </div>
           ) : null}
@@ -803,6 +930,11 @@ export const moduleDefinition = defineModule({
               }
             />
           </label>
+
+          <ModulePresentationControls
+            value={settings.presentation}
+            onChange={(presentation) => applyPatch({ presentation })}
+          />
         </div>
       );
     },

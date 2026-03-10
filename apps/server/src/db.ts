@@ -360,8 +360,10 @@ const DEFAULT_LAYOUT_SEEDS: DefaultLayoutSeed[] = [
             use24Hour: true,
             showSeconds: true,
             showDate: true,
-            timeFontSizeRem: 2.5,
-            dateFontSizeRem: 1.25,
+            presentation: {
+              primaryScale: 1.1,
+              supportingScale: 1.25,
+            },
           },
         },
         {

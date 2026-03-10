@@ -6,6 +6,7 @@ The SDK contract is defined in `packages/module-sdk`.
 
 ```tsx
 import { z } from "zod";
+import { withModulePresentation } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
 
 export default defineModule({
@@ -15,9 +16,11 @@ export default defineModule({
     version: "1.0.0",
     defaultSize: { w: 4, h: 3 },
   },
-  settingsSchema: z.object({
-    title: z.string().default("Example"),
-  }),
+  settingsSchema: withModulePresentation(
+    z.object({
+      title: z.string().default("Example"),
+    }),
+  ),
   runtime: {
     Component: ({ settings }) => <div>{settings.title}</div>,
   },
@@ -55,6 +58,16 @@ Optional hooks in `runtime`:
 
 These ensure settings/data are schema-safe at runtime.
 
+## Presentation block
+
+Active modules should include the shared `presentation` block in `settingsSchema`:
+
+- `presentation.headingScale`
+- `presentation.primaryScale`
+- `presentation.supportingScale`
+
+Use `withModulePresentation(...)` from `@hearth/shared` to add it. The intent is semantic sizing, not a free-form control for every text node. Map each visible text/icon/emoji/small visual to one of those roles and keep the mapping stable inside the module.
+
 ## Layout Logic SDK
 
 `@hearth/module-sdk` also exports `createLayoutLogicRegistry(...)` for custom
@@ -76,8 +89,14 @@ server runtime behavior stay aligned.
 
 SDK modules can provide admin settings UI through `admin.SettingsPanel`.
 
+For modules that expose role sizing, use the shared editor control in:
+
+- `apps/web/src/modules/ui/ModulePresentationControls.tsx`
+
 Real examples:
 
 - `apps/web/src/modules/sdk/welcome.module.tsx`
 - `apps/web/src/modules/sdk/clock.module.tsx`
 - `apps/web/src/modules/sdk/server-status.module.tsx`
+- `apps/web/src/modules/sdk/weather.module.tsx`
+- `apps/web/src/modules/sdk/calendar.module.tsx`
