@@ -24,9 +24,11 @@ interface DeviceRow {
   created_at: string;
   updated_at: string;
   last_seen_at: string;
+  last_seen_ip: string | null;
 }
 
 const DEFAULT_THEME_ID = displayThemeIdSchema.parse("default");
+const MAX_DEVICE_IP_LENGTH = 255;
 
 const parseTargetSelection = (
   rawValue: string | null,
@@ -46,6 +48,15 @@ const parseTargetSelection = (
 
 export class DeviceRepository {
   constructor(private readonly db: Database.Database) {}
+
+  private normalizeLastSeenIp(value: string | null | undefined): string | null {
+    if (typeof value !== "string") {
+      return null;
+    }
+
+    const nextValue = value.trim().slice(0, MAX_DEVICE_IP_LENGTH);
+    return nextValue.length > 0 ? nextValue : null;
+  }
 
   private listUsedDeviceNames(excludeDeviceId?: string): Set<string> {
     const rows = excludeDeviceId
@@ -107,6 +118,7 @@ export class DeviceRepository {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       lastSeenAt: row.last_seen_at,
+      lastSeenIp: this.normalizeLastSeenIp(row.last_seen_ip),
     });
   }
 
@@ -115,7 +127,15 @@ export class DeviceRepository {
     const row = this.db
       .prepare<{ id: string }, DeviceRow>(
         `
-        SELECT id, name, theme_id, target_selection_json, created_at, updated_at, last_seen_at
+        SELECT
+          id,
+          name,
+          theme_id,
+          target_selection_json,
+          created_at,
+          updated_at,
+          last_seen_at,
+          last_seen_ip
         FROM devices
         WHERE id = @id
         `,
@@ -129,7 +149,15 @@ export class DeviceRepository {
     const rows = this.db
       .prepare<[], DeviceRow>(
         `
-        SELECT id, name, theme_id, target_selection_json, created_at, updated_at, last_seen_at
+        SELECT
+          id,
+          name,
+          theme_id,
+          target_selection_json,
+          created_at,
+          updated_at,
+          last_seen_at,
+          last_seen_ip
         FROM devices
         ORDER BY last_seen_at DESC, created_at DESC, id ASC
         `,
@@ -143,9 +171,11 @@ export class DeviceRepository {
     deviceId: string;
     reportedTargetSelection: ReportScreenTargetSelection | null;
     reportedThemeId: string | null | undefined;
+    lastSeenIp?: string | null;
   }): DisplayDevice {
     const normalizedDeviceId = displayDeviceIdSchema.parse(input.deviceId);
     const existing = this.getDevice(normalizedDeviceId);
+    const nextLastSeenIp = this.normalizeLastSeenIp(input.lastSeenIp);
 
     if (!existing) {
       const themeId = displayThemeIdSchema.safeParse(input.reportedThemeId);
@@ -163,7 +193,8 @@ export class DeviceRepository {
             target_selection_json,
             created_at,
             updated_at,
-            last_seen_at
+            last_seen_at,
+            last_seen_ip
           )
           VALUES (
             @id,
@@ -172,7 +203,8 @@ export class DeviceRepository {
             @targetSelectionJson,
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP,
-            CURRENT_TIMESTAMP
+            CURRENT_TIMESTAMP,
+            @lastSeenIp
           )
           `,
         )
@@ -181,20 +213,34 @@ export class DeviceRepository {
           name: this.buildUniqueDefaultName(normalizedDeviceId),
           themeId: themeId.success ? themeId.data : DEFAULT_THEME_ID,
           targetSelectionJson: targetSelection ? JSON.stringify(targetSelection) : null,
+          lastSeenIp: nextLastSeenIp,
         });
 
       return this.getDevice(normalizedDeviceId) as DisplayDevice;
     }
 
-    this.db
-      .prepare(
-        `
-        UPDATE devices
-        SET last_seen_at = CURRENT_TIMESTAMP
-        WHERE id = @id
-        `,
-      )
-      .run({ id: normalizedDeviceId });
+    if (nextLastSeenIp === null) {
+      this.db
+        .prepare(
+          `
+          UPDATE devices
+          SET last_seen_at = CURRENT_TIMESTAMP
+          WHERE id = @id
+          `,
+        )
+        .run({ id: normalizedDeviceId });
+    } else {
+      this.db
+        .prepare(
+          `
+          UPDATE devices
+          SET last_seen_at = CURRENT_TIMESTAMP,
+              last_seen_ip = @lastSeenIp
+          WHERE id = @id
+          `,
+        )
+        .run({ id: normalizedDeviceId, lastSeenIp: nextLastSeenIp });
+    }
 
     return this.getDevice(normalizedDeviceId) as DisplayDevice;
   }
@@ -225,5 +271,19 @@ export class DeviceRepository {
       });
 
     return this.getDevice(normalizedDeviceId) as DisplayDevice;
+  }
+
+  deleteDevice(deviceId: string): boolean {
+    const normalizedDeviceId = displayDeviceIdSchema.parse(deviceId);
+    const result = this.db
+      .prepare<{ id: string }>(
+        `
+        DELETE FROM devices
+        WHERE id = @id
+        `,
+      )
+      .run({ id: normalizedDeviceId });
+
+    return result.changes > 0;
   }
 }

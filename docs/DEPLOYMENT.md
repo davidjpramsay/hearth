@@ -64,8 +64,9 @@ Basic flow:
 1. Copy `.env.example` to `.env`.
 2. Set a real `ADMIN_PASSWORD`.
 3. Review the `./data:/app/data` volume in `docker-compose.yml`.
-4. Run `docker compose pull`.
-5. Run `docker compose up -d`.
+4. If you want Kobo Reader, also set `KOBO_READER_*` in `.env` and add the two optional read-only mounts in `docker-compose.yml`.
+5. Run `docker compose pull`.
+6. Run `docker compose up -d`.
 
 If you want to pin a release instead of using `latest`, set:
 
@@ -87,7 +88,8 @@ Basic flow:
 1. Copy `.env.example` to `.env`.
 2. Set a real `ADMIN_PASSWORD`.
 3. Review the `./data:/app/data` volume in `docker-compose.build.yml`.
-4. Run `docker compose -f docker-compose.build.yml up --build -d`.
+4. If you want Kobo Reader, also set `KOBO_READER_*` in `.env` and add the two optional read-only mounts in `docker-compose.build.yml`.
+5. Run `docker compose -f docker-compose.build.yml up --build -d`.
 
 This is mainly for advanced users, local container debugging, or custom forks.
 

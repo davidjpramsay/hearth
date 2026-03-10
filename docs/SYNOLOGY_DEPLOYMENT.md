@@ -61,6 +61,16 @@ HEARTH_IMAGE=ghcr.io/davidjpramsay/hearth:v0.1.0
 
 Leave `HEARTH_IMAGE` on `latest` if you want the newest published mainline image.
 
+Optional Kobo Reader support:
+
+```env
+KOBO_READER_APP_DB_PATH=/external/calibreweb/app.db
+KOBO_READER_LIBRARY_DB_PATH=/external/books/metadata.db
+KOBO_READER_LIBRARY_ROOT=/external/books
+```
+
+These values only matter if you want the `Kobo Reader` module.
+
 ## Container Manager Steps
 
 ### 1. Create folders on the NAS
@@ -82,6 +92,11 @@ Copy these files into:
 
 - `docker-compose.synology.yml`
 - `.env`
+
+If you want the `Kobo Reader` module, make sure these folders already exist on the NAS:
+
+- `/volume1/docker/calibreweb`
+- `/volume1/media/Books`
 
 ### 3. Install Container Manager
 
@@ -146,6 +161,24 @@ For local photos, place them under:
 ```text
 /volume1/docker/hearth/data/photos
 ```
+
+## Optional Kobo Reader Mounts
+
+The Synology compose file now includes active read-only mounts for Kobo Reader:
+
+```text
+/volume1/docker/calibreweb -> /external/calibreweb
+/volume1/media/Books -> /external/books
+```
+
+These are used to read:
+
+- Calibre-Web Kobo sync state from `app.db`
+- Calibre library metadata from `metadata.db`
+- book covers from the Calibre library folders
+
+If you do not use Calibre-Web / Kobo sync, you can remove those mounts and the
+`KOBO_READER_*` env vars from your Synology deployment.
 
 ## Updating A Synology Install
 

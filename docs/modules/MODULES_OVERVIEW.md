@@ -80,4 +80,5 @@ Hearth runtime is SDK-first:
 - SDK-first runtime with typed manifests/schemas
 - Legacy module code remains available as reference during migration work
 - Clear server/client boundary for integrations and secrets
+- Shared, theme-driven module surfaces keep the dashboard visually coherent across themes and module types
 - AI-friendly scaffolding and strongly typed contracts

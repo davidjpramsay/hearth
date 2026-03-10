@@ -519,3 +519,121 @@ test("multi-action graph paths can chain into another action node", () => {
   );
   assert.equal(landscapeSequence[0]?.actionParams.photoCollectionId, "family");
 });
+
+test("photo-router action nodes can match landscape photos without an enabled toggle", () => {
+  const authoring = setPrimaryPhotoRouterBlock({
+    authoring: {
+      version: 1,
+      blocks: [],
+    },
+    block: {
+      id: "photo-router",
+      type: "photo-router",
+      nodes: [
+        {
+          id: "action-a",
+          nodeType: "photo-orientation",
+          title: "Photo Orientation",
+          photoActionType: "photo.select-next",
+          photoActionCollectionId: null,
+          portrait: {
+            enabled: false,
+            conditionType: "photo.orientation.landscape",
+            conditionParams: {},
+          },
+          landscape: {
+            enabled: false,
+            conditionType: "photo.orientation.landscape",
+            conditionParams: {},
+          },
+        },
+        {
+          id: "layout-match",
+          nodeType: "layout",
+          layoutName: "Landscape layout",
+          cycleSeconds: 12,
+          actionType: "layout.display",
+          actionParams: {},
+        },
+        {
+          id: "layout-fallback",
+          nodeType: "layout",
+          layoutName: "Fallback layout",
+          cycleSeconds: 18,
+          actionType: "layout.display",
+          actionParams: {},
+        },
+      ],
+      layoutNodes: [],
+      title: "Photo Orientation",
+      photoActionType: "photo.select-next",
+      photoActionCollectionId: null,
+      connections: [
+        {
+          id: "__start__::default::action-a",
+          source: "__start__",
+          target: "action-a",
+        },
+        {
+          id: "action-a::portrait::layout-match",
+          source: "action-a",
+          sourceHandle: "portrait",
+          target: "layout-match",
+        },
+        {
+          id: "action-a::fallback::layout-fallback",
+          source: "action-a",
+          sourceHandle: "fallback",
+          target: "layout-fallback",
+        },
+        {
+          id: "layout-match::next::__end__",
+          source: "layout-match",
+          sourceHandle: "next",
+          target: "__end__",
+        },
+        {
+          id: "layout-fallback::next::__end__",
+          source: "layout-fallback",
+          sourceHandle: "next",
+          target: "__end__",
+        },
+      ],
+      nodePositions: {},
+      fallback: {
+        steps: [],
+      },
+      portrait: {
+        enabled: false,
+        conditionType: "photo.orientation.landscape",
+        conditionParams: {},
+        steps: [],
+      },
+      landscape: {
+        enabled: false,
+        conditionType: "photo.orientation.landscape",
+        conditionParams: {},
+        steps: [],
+      },
+    },
+  });
+
+  const logicGraph = compileLayoutSetAuthoringToLogicGraph(authoring);
+  const portraitSequence = resolveDisplaySequenceFromLogicGraph({
+    graph: logicGraph,
+    orientation: "portrait",
+  });
+  const landscapeSequence = resolveDisplaySequenceFromLogicGraph({
+    graph: logicGraph,
+    orientation: "landscape",
+  });
+
+  assert.deepEqual(
+    portraitSequence.map((target) => target.layoutName),
+    ["Fallback layout"],
+  );
+  assert.deepEqual(
+    landscapeSequence.map((target) => target.layoutName),
+    ["Landscape layout"],
+  );
+});

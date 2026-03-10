@@ -39,14 +39,17 @@ test("reportScreenProfile seeds a new device from reported local settings", () =
   const harness = createHarness();
 
   try {
-    const response = harness.screenProfileService.reportScreenProfile({
-      screenSessionId: "device-seed-1",
-      targetSelection: {
-        kind: "layout",
-        layoutName: "16:9 Standard Portrait",
+    const response = harness.screenProfileService.reportScreenProfile(
+      {
+        screenSessionId: "device-seed-1",
+        targetSelection: {
+          kind: "layout",
+          layoutName: "16:9 Standard Portrait",
+        },
+        reportedThemeId: "monokai",
       },
-      reportedThemeId: "monokai",
-    });
+      { lastSeenIp: "192.168.1.40" },
+    );
 
     assert.equal(response.device.id, "device-seed-1");
     assert.equal(response.device.themeId, "monokai");
@@ -59,6 +62,35 @@ test("reportScreenProfile seeds a new device from reported local settings", () =
     assert.ok(storedDevice);
     assert.equal(storedDevice.themeId, "monokai");
     assert.equal(storedDevice.targetSelection?.kind, "layout");
+    assert.equal(storedDevice.lastSeenIp, "192.168.1.40");
+  } finally {
+    harness.dispose();
+  }
+});
+
+test("reportScreenProfile refreshes the last seen ip when the screen checks in again", () => {
+  const harness = createHarness();
+
+  try {
+    harness.screenProfileService.reportScreenProfile(
+      {
+        screenSessionId: "device-ip-1",
+        reportedThemeId: "default",
+      },
+      { lastSeenIp: "192.168.1.40" },
+    );
+
+    harness.screenProfileService.reportScreenProfile(
+      {
+        screenSessionId: "device-ip-1",
+        reportedThemeId: "default",
+      },
+      { lastSeenIp: "192.168.1.41" },
+    );
+
+    const storedDevice = harness.deviceRepository.getDevice("device-ip-1");
+    assert.ok(storedDevice);
+    assert.equal(storedDevice.lastSeenIp, "192.168.1.41");
   } finally {
     harness.dispose();
   }
@@ -133,7 +165,7 @@ test("managed device updates reject unknown target assignments", () => {
     assert.equal(emptySetSelection.ok, false);
     assert.equal(
       emptySetSelection.message,
-      "Choose a set or switch routing to Inherit default.",
+      "Choose a set.",
     );
   } finally {
     harness.dispose();
@@ -258,8 +290,11 @@ test("database startup normalizes existing duplicate device names before adding 
       .sort((left, right) => left.id.localeCompare(right.id));
 
     assert.equal(devices[0]?.name, "Kitchen display");
+    assert.equal(devices[0]?.lastSeenIp, null);
     assert.equal(devices[1]?.name, "kitchen display (2)");
+    assert.equal(devices[1]?.lastSeenIp, null);
     assert.equal(devices[2]?.name, "Display DEVICEC");
+    assert.equal(devices[2]?.lastSeenIp, null);
   } finally {
     migratedDb.close();
     rmSync(directory, { recursive: true, force: true });

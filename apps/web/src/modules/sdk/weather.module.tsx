@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   weatherLocationSearchResponseSchema,
   weatherModuleConfigSchema,
@@ -224,6 +224,120 @@ const formatForecastDayLabel = (isoDate: string, index: number): string => {
   }).format(parsed);
 };
 
+interface WeatherTone {
+  accentRgbVar: string;
+  summaryLabel: string;
+}
+
+const WEATHER_TONE_MAP: Record<string, WeatherTone> = {
+  clearDay: {
+    accentRgbVar: "var(--color-status-loading-rgb)",
+    summaryLabel: "Bright sky",
+  },
+  clearNight: {
+    accentRgbVar: "var(--color-text-accent-rgb)",
+    summaryLabel: "Night sky",
+  },
+  cloudy: {
+    accentRgbVar: "var(--tone-slate-300-rgb)",
+    summaryLabel: "Overcast",
+  },
+  rain: {
+    accentRgbVar: "var(--color-text-accent-rgb)",
+    summaryLabel: "Wet weather",
+  },
+  storm: {
+    accentRgbVar: "var(--color-status-error-rgb)",
+    summaryLabel: "Storm front",
+  },
+  snow: {
+    accentRgbVar: "var(--tone-slate-100-rgb)",
+    summaryLabel: "Cold air",
+  },
+};
+
+const resolveWeatherTone = (
+  conditionCode: number | null,
+  isDay: boolean | null,
+): WeatherTone => {
+  if (conditionCode !== null && conditionCode >= 95) {
+    return WEATHER_TONE_MAP.storm;
+  }
+
+  if (
+    conditionCode !== null &&
+    ((conditionCode >= 51 && conditionCode <= 67) || (conditionCode >= 80 && conditionCode <= 82))
+  ) {
+    return WEATHER_TONE_MAP.rain;
+  }
+
+  if (conditionCode !== null && conditionCode >= 71 && conditionCode <= 86) {
+    return WEATHER_TONE_MAP.snow;
+  }
+
+  if (conditionCode === 0 || conditionCode === 1) {
+    return isDay === false ? WEATHER_TONE_MAP.clearNight : WEATHER_TONE_MAP.clearDay;
+  }
+
+  return WEATHER_TONE_MAP.cloudy;
+};
+
+const buildModuleAccentStyle = (accentRgbVar: string): CSSProperties =>
+  ({
+    ["--module-accent-rgb" as string]: accentRgbVar,
+  }) as CSSProperties;
+
+const WEATHER_ORB_STYLE: CSSProperties = {
+  background:
+    "radial-gradient(circle at 32% 28%, rgb(var(--module-accent-rgb, var(--color-text-accent-rgb)) / 0.3), rgb(var(--tone-slate-950-rgb) / 0.08) 58%, rgb(var(--tone-slate-950-rgb) / 0.22) 100%)",
+  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+};
+
+const formatDayNightLabel = (isDay: boolean | null): string => {
+  if (isDay === null) {
+    return "Now";
+  }
+
+  return isDay ? "Day" : "Night";
+};
+
+const WeatherStatCard = ({
+  label,
+  value,
+  icon,
+  settings,
+}: {
+  label: string;
+  value: string;
+  icon: string;
+  settings: WeatherModuleConfig;
+}) => (
+  <div className="module-panel-card rounded-2xl px-3 py-2">
+    <div className="flex items-center gap-2">
+      <span
+        aria-hidden
+        style={{ fontSize: scaleRoleRem(0.95, settings.presentation.primaryScale) }}
+      >
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p
+          className="module-panel-label"
+          style={{ fontSize: scaleRoleRem(0.55, settings.presentation.supportingScale) }}
+        >
+          {label}
+        </p>
+        <p
+          className="truncate font-medium text-[color:var(--color-text-primary)]"
+          style={{ fontSize: scaleRoleRem(0.82, settings.presentation.primaryScale) }}
+        >
+          {value}
+        </p>
+      </div>
+    </div>
+  </div>
+);
+
 export const moduleDefinition = defineModule({
   manifest: {
     id: "weather",
@@ -259,9 +373,7 @@ export const moduleDefinition = defineModule({
       );
       const compactForecastCards = density === "sm";
       const showForecast = forecastDays.length > 0;
-      const showDayNight = density !== "xs";
       const showTopCondition = density !== "xs";
-      const showTopMeta = density !== "xs";
       const showForecastWind = density === "lg";
       const showForecastPrecipitation = density !== "xs";
       const locationLabel = formatLocationLabel(payload.locationLabel, density);
@@ -273,8 +385,13 @@ export const moduleDefinition = defineModule({
       const forecastDaySizeRem = 0.625;
       const forecastTemperatureSizeRem = 0.6875;
       const statusTextSizeRem = 0.875;
-      const heroIconSizeRem = 1.5;
-      const forecastIconSizeRem = 1.125;
+      const heroIconSizeRem = density === "xs" ? 1.75 : 2.2;
+      const forecastIconSizeRem = density === "xs" ? 1 : 1.2;
+      const heroCompact = density === "xs" || tileMetrics.width < 380;
+      const tone = resolveWeatherTone(payload.conditionCode, payload.isDay);
+      const moduleAccentStyle = buildModuleAccentStyle(tone.accentRgbVar);
+      const showStats = density !== "xs";
+      const showForecastSectionTitle = density !== "xs";
 
       useEffect(() => {
         if (isEditing) {
@@ -328,24 +445,34 @@ export const moduleDefinition = defineModule({
 
       if (isEditing) {
         return (
-          <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
+          <div
+            className="module-panel-shell flex h-full flex-col justify-between px-4 py-4 text-[color:var(--color-text-primary)]"
+            style={moduleAccentStyle}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p
+                  className="module-panel-label"
+                  style={{ fontSize: scaleRoleRem(0.62, settings.presentation.headingScale) }}
+                >
+                  Weather preview
+                </p>
+                <p
+                  className="mt-2 font-semibold text-[color:var(--color-text-primary)]"
+                  style={{ fontSize: scaleRoleRem(1.05, settings.presentation.primaryScale) }}
+                >
+                  {settings.locationQuery}
+                </p>
+              </div>
+              <div className="module-panel-chip rounded-full px-3 py-1 text-xs uppercase tracking-[0.22em]">
+                Preview
+              </div>
+            </div>
             <p
-              className="font-semibold text-slate-100"
-              style={{ fontSize: scaleRoleRem(0.875, settings.presentation.headingScale) }}
+              className="text-[color:var(--color-text-secondary)]"
+              style={{ fontSize: scaleRoleRem(0.76, settings.presentation.supportingScale) }}
             >
-              Weather preview
-            </p>
-            <p
-              className="mt-2 text-slate-300"
-              style={{ fontSize: scaleRoleRem(0.75, settings.presentation.supportingScale) }}
-            >
-              Location: {settings.locationQuery}
-            </p>
-            <p
-              className="mt-1 text-slate-400"
-              style={{ fontSize: scaleRoleRem(0.75, settings.presentation.supportingScale) }}
-            >
-              Every {settings.refreshIntervalSeconds}s | Unit: {" "}
+              Refreshes every {settings.refreshIntervalSeconds}s in {" "}
               {settings.temperatureUnit === "fahrenheit" ? "Fahrenheit" : "Celsius"}
             </p>
           </div>
@@ -355,11 +482,12 @@ export const moduleDefinition = defineModule({
       return (
         <div
           ref={tileRef}
-          className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-700 bg-gradient-to-b from-slate-900 to-slate-950 p-3 text-slate-100"
+          className="module-panel-shell relative isolate flex h-full min-h-0 flex-col p-3 text-[color:var(--color-text-primary)]"
+          style={moduleAccentStyle}
         >
           {loading ? (
             <div
-              className="flex min-h-0 flex-1 items-center justify-center text-slate-300"
+              className="relative z-10 flex min-h-0 flex-1 items-center justify-center text-[color:var(--color-text-secondary)]"
               style={{
                 fontSize: scaleRoleRem(
                   statusTextSizeRem,
@@ -373,7 +501,7 @@ export const moduleDefinition = defineModule({
 
           {!loading && error ? (
             <div
-              className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-rose-500/60 bg-rose-500/10 px-3 text-center text-rose-200"
+              className="relative z-10 flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-rose-300/40 bg-rose-300/10 px-4 text-center text-rose-50"
               style={{
                 fontSize: scaleRoleRem(
                   supportingSizeRem,
@@ -386,38 +514,110 @@ export const moduleDefinition = defineModule({
           ) : null}
 
           {!loading && !error ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
-              <p
-                className="truncate pr-1 font-semibold uppercase tracking-wide text-cyan-200"
-                style={{
-                  fontSize: scaleRoleRem(
-                    locationLabelSizeRem,
-                    settings.presentation.headingScale,
-                  ),
-                }}
-                title={payload.locationLabel}
+            <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
+              <div
+                className={`flex ${heroCompact ? "flex-col gap-3" : "items-start justify-between gap-4"}`}
               >
-                {locationLabel}
-              </p>
-              <div className="mt-2 flex items-end justify-between">
-                <div>
-                  <p
-                    className="font-semibold text-cyan-300"
-                    style={{
-                      fontSize: scaleRoleRem(
-                        temperatureSizeRem,
-                        settings.presentation.primaryScale,
-                      ),
-                    }}
-                  >
-                    {formatTemperature(payload.temperature, settings.temperatureUnit)}
-                  </p>
-                  {showTopCondition ? (
-                    <p
-                      className="mt-1 text-slate-200"
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className="module-panel-chip max-w-full truncate rounded-full px-3 py-1 uppercase tracking-[0.22em]"
                       style={{
                         fontSize: scaleRoleRem(
-                          conditionSizeRem,
+                          locationLabelSizeRem,
+                          settings.presentation.headingScale,
+                        ),
+                      }}
+                      title={payload.locationLabel}
+                    >
+                      {locationLabel}
+                    </span>
+                    <span
+                      className="module-panel-chip module-panel-chip--neutral rounded-full px-3 py-1 uppercase tracking-[0.22em]"
+                      style={{
+                        fontSize: scaleRoleRem(
+                          forecastHeadingSizeRem,
+                          settings.presentation.supportingScale,
+                        ),
+                      }}
+                    >
+                      {formatDayNightLabel(payload.isDay)}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-end gap-3">
+                    <p
+                      className="font-semibold leading-none tracking-[-0.07em]"
+                      style={{
+                        color: "rgb(var(--module-accent-rgb, var(--color-text-accent-rgb)))",
+                        fontSize: scaleRoleRem(
+                          temperatureSizeRem,
+                          settings.presentation.primaryScale,
+                        ),
+                      }}
+                    >
+                      {formatTemperature(payload.temperature, settings.temperatureUnit)}
+                    </p>
+
+                    {showTopCondition ? (
+                      <div className="pb-2">
+                        <p
+                          className="font-medium text-[color:var(--color-text-primary)]"
+                          style={{
+                            fontSize: scaleRoleRem(
+                              conditionSizeRem,
+                              settings.presentation.primaryScale,
+                            ),
+                          }}
+                        >
+                          {payload.conditionLabel}
+                        </p>
+                        {!heroCompact ? (
+                          <p
+                            className="text-[color:var(--color-text-secondary)]"
+                            style={{
+                              fontSize: scaleRoleRem(
+                                supportingSizeRem,
+                                settings.presentation.supportingScale,
+                              ),
+                            }}
+                          >
+                            {tone.summaryLabel}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div
+                  className={`flex shrink-0 items-center gap-3 ${
+                    heroCompact ? "justify-between" : "flex-col text-center"
+                  }`}
+                >
+                  <div
+                    className="module-panel-card flex h-20 w-20 items-center justify-center rounded-full border"
+                    style={WEATHER_ORB_STYLE}
+                  >
+                    <span
+                      aria-hidden
+                      style={{
+                        color: "rgb(var(--module-accent-rgb, var(--color-text-accent-rgb)))",
+                        fontSize: scaleRoleRem(
+                          heroIconSizeRem,
+                          settings.presentation.primaryScale,
+                        ),
+                      }}
+                    >
+                      {weatherSymbolForCode(payload.conditionCode, payload.isDay)}
+                    </span>
+                  </div>
+                  {!heroCompact ? (
+                    <p
+                      className="module-panel-label"
+                      style={{
+                        fontSize: scaleRoleRem(
+                          supportingSizeRem,
                           settings.presentation.supportingScale,
                         ),
                       }}
@@ -426,73 +626,63 @@ export const moduleDefinition = defineModule({
                     </p>
                   ) : null}
                 </div>
-                <div className="flex flex-col items-end">
-                  <p
-                    aria-hidden
-                    style={{
-                      fontSize: scaleRoleRem(
-                        heroIconSizeRem,
-                        settings.presentation.primaryScale,
-                      ),
-                    }}
-                  >
-                    {weatherSymbolForCode(payload.conditionCode, payload.isDay)}
-                  </p>
-                  {showDayNight ? (
-                    <p
-                      className="uppercase tracking-wide text-slate-300"
-                      style={{
-                        fontSize: scaleRoleRem(
-                          supportingSizeRem,
-                          settings.presentation.supportingScale,
-                        ),
-                      }}
-                    >
-                      {payload.isDay === null ? "" : payload.isDay ? "Day" : "Night"}
-                    </p>
-                  ) : null}
-                </div>
               </div>
 
-              {showTopMeta ? (
-                <div
-                  className="mt-3 space-y-1 text-slate-300"
-                  style={{
-                    fontSize: scaleRoleRem(
-                      supportingSizeRem,
-                      settings.presentation.supportingScale,
-                    ),
-                  }}
-                >
+              {showStats ? (
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
                   {settings.showWind ? (
-                    <p>
-                      Wind: {formatWind(payload.windSpeed, settings.windSpeedUnit)}
-                    </p>
+                    <WeatherStatCard
+                      label="Wind"
+                      value={formatWind(payload.windSpeed, settings.windSpeedUnit)}
+                      icon="💨"
+                      settings={settings}
+                    />
                   ) : null}
                   {settings.showHumidity ? (
-                    <p>
-                      Humidity:{" "}
-                      {payload.humidityPercent === null ? "--" : `${payload.humidityPercent}%`}
-                    </p>
+                    <WeatherStatCard
+                      label="Humidity"
+                      value={
+                        payload.humidityPercent === null ? "--" : `${payload.humidityPercent}%`
+                      }
+                      icon="💧"
+                      settings={settings}
+                    />
                   ) : null}
                 </div>
               ) : null}
 
               {showForecast ? (
-                <section className="mt-auto pt-3">
-                  <p
-                    className="mb-1 font-semibold uppercase tracking-wide text-slate-300"
-                    style={{
-                      fontSize: scaleRoleRem(
-                        forecastHeadingSizeRem,
-                        settings.presentation.headingScale,
-                      ),
-                    }}
-                  >
-                    Week forecast
-                  </p>
+                <section
+                  className="module-panel-card mt-auto rounded-[24px] p-3"
+                >
+                  {showForecastSectionTitle ? (
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <p
+                        className="module-panel-label font-semibold"
+                        style={{
+                          fontSize: scaleRoleRem(
+                            forecastHeadingSizeRem,
+                            settings.presentation.headingScale,
+                          ),
+                        }}
+                      >
+                        Week ahead
+                      </p>
+                      <p
+                        className="text-[color:var(--color-text-muted)]"
+                        style={{
+                          fontSize: scaleRoleRem(
+                            supportingSizeRem,
+                            settings.presentation.supportingScale,
+                          ),
+                        }}
+                      >
+                        {payload.conditionLabel}
+                      </p>
+                    </div>
+                  ) : null}
                   <div
-                    className="grid gap-1"
+                    className="grid gap-2"
                     style={{
                       gridTemplateColumns: `repeat(${Math.max(1, forecastDays.length)}, minmax(0, 1fr))`,
                     }}
@@ -500,76 +690,86 @@ export const moduleDefinition = defineModule({
                     {forecastDays.map((day, index) => (
                       <div
                         key={day.date}
-                        className={`rounded border border-slate-700 bg-slate-900/70 text-center ${
-                          compactForecastCards ? "min-w-0 px-1.5 py-1" : "min-w-0 px-2 py-1"
-                        }`}
+                        className="module-panel-card rounded-2xl p-2.5 text-left"
                       >
+                        <div className="flex items-start justify-between gap-2">
+                          <p
+                            className="module-panel-label font-semibold text-[color:var(--color-text-secondary)]"
+                            style={{
+                              fontSize: scaleRoleRem(
+                                forecastDaySizeRem,
+                                settings.presentation.headingScale,
+                              ),
+                            }}
+                          >
+                            {formatForecastDayLabel(day.date, index)}
+                          </p>
+                          <span
+                            aria-hidden
+                            className="shrink-0"
+                            style={{
+                              fontSize: scaleRoleRem(
+                                forecastIconSizeRem,
+                                settings.presentation.primaryScale,
+                              ),
+                            }}
+                          >
+                            {weatherSymbolForCode(day.conditionCode, true)}
+                          </span>
+                        </div>
                         <p
-                          className="font-semibold uppercase tracking-wide text-cyan-200"
+                          className="mt-3 font-semibold text-[color:var(--color-text-primary)]"
                           style={{
                             fontSize: scaleRoleRem(
-                              forecastDaySizeRem,
-                              settings.presentation.headingScale,
-                            ),
-                          }}
-                        >
-                          {formatForecastDayLabel(day.date, index)}
-                        </p>
-                        <p
-                          className="mt-0.5"
-                          aria-hidden
-                          style={{
-                            fontSize: scaleRoleRem(
-                              forecastIconSizeRem,
-                              settings.presentation.primaryScale,
-                            ),
-                          }}
-                        >
-                          {weatherSymbolForCode(day.conditionCode, true)}
-                        </p>
-                        <p
-                          className="mt-0.5 font-semibold text-slate-100"
-                          style={{
-                            fontSize: scaleRoleRem(
-                              forecastTemperatureSizeRem,
+                              compactForecastCards ? 0.92 : forecastTemperatureSizeRem,
                               settings.presentation.primaryScale,
                             ),
                           }}
                         >
                           {day.tempMax === null ? "--" : `${Math.round(day.tempMax)}°`}
-                          <span className="text-slate-400"> / </span>
-                          <span className="text-slate-300">
+                          <span
+                            style={{
+                              color: "rgb(var(--tone-slate-300-rgb) / 0.5)",
+                            }}
+                          >
+                            {" "}
+                            /{" "}
+                          </span>
+                          <span className="text-[color:var(--color-text-secondary)]">
                             {day.tempMin === null ? "--" : `${Math.round(day.tempMin)}°`}
                           </span>
                         </p>
-                        {showForecastWind ? (
-                          <p
-                            className="mt-0.5 text-slate-300"
-                            style={{
-                              fontSize: scaleRoleRem(
-                                forecastDaySizeRem,
-                                settings.presentation.supportingScale,
-                              ),
-                            }}
-                          >
-                            💨 {day.windMax === null ? "--" : Math.round(day.windMax)}
-                          </p>
-                        ) : null}
                         {showForecastPrecipitation ? (
-                          <p
-                            className="text-slate-300"
-                            style={{
-                              fontSize: scaleRoleRem(
-                                forecastDaySizeRem,
-                                settings.presentation.supportingScale,
-                              ),
-                            }}
-                          >
-                            🌧️ {" "}
-                            {day.precipitationChancePercent === null
-                              ? "--"
-                              : `${day.precipitationChancePercent}%`}
-                          </p>
+                          <div className="mt-2 flex items-center gap-1.5 text-[color:var(--color-text-secondary)]">
+                            <span aria-hidden>🌧️</span>
+                            <span
+                              style={{
+                                fontSize: scaleRoleRem(
+                                  forecastDaySizeRem,
+                                  settings.presentation.supportingScale,
+                                ),
+                              }}
+                            >
+                              {day.precipitationChancePercent === null
+                                ? "--"
+                                : `${day.precipitationChancePercent}%`}
+                            </span>
+                          </div>
+                        ) : null}
+                        {showForecastWind ? (
+                          <div className="mt-1 flex items-center gap-1.5 text-[color:var(--color-text-muted)]">
+                            <span aria-hidden>💨</span>
+                            <span
+                              style={{
+                                fontSize: scaleRoleRem(
+                                  forecastDaySizeRem,
+                                  settings.presentation.supportingScale,
+                                ),
+                              }}
+                            >
+                              {day.windMax === null ? "--" : Math.round(day.windMax)}
+                            </span>
+                          </div>
                         ) : null}
                       </div>
                     ))}
@@ -579,7 +779,7 @@ export const moduleDefinition = defineModule({
 
               {payload.warning ? (
                 <p
-                  className="mt-2 rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-amber-200"
+                  className="module-panel-card mt-3 rounded-2xl px-3 py-2 text-[color:var(--color-text-secondary)]"
                   style={{
                     fontSize: scaleRoleRem(
                       forecastHeadingSizeRem,

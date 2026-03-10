@@ -26,12 +26,16 @@ Optional:
 ```env
 HEARTH_IMAGE=ghcr.io/davidjpramsay/hearth:latest
 ESV_API_KEY=your_api_key_here
+KOBO_READER_APP_DB_PATH=/external/calibreweb/app.db
+KOBO_READER_LIBRARY_DB_PATH=/external/books/metadata.db
+KOBO_READER_LIBRARY_ROOT=/external/books
 ```
 
 Notes:
 
 - `HEARTH_IMAGE` can be pinned to a release tag if you do not want `latest`.
 - `ESV_API_KEY` is only needed if you want the Bible Verse module to load live data.
+- `KOBO_READER_*` is only needed if you want the Kobo Reader module.
 - After the first successful startup, you can remove `ADMIN_PASSWORD` if you do not want it stored in the runtime env.
 
 ## Required Mount
@@ -60,6 +64,13 @@ If you want local photos, place them under:
 
 ```text
 /volume1/docker/hearth/data/photos
+```
+
+Optional Kobo Reader mounts:
+
+```text
+/volume1/docker/calibreweb -> /external/calibreweb:ro
+/volume1/media/Books -> /external/books:ro
 ```
 
 ## Network

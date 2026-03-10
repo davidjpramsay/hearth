@@ -8,6 +8,7 @@ import {
 import { createEmptyLayoutConfig } from "@hearth/core";
 import { z } from "zod";
 import type { FastifyInstance } from "fastify";
+import { sanitizeLayoutRecordForPublicDisplay } from "../services/public-layout.js";
 import type { AppServices } from "../types.js";
 
 const idParamsSchema = z.object({
@@ -179,7 +180,13 @@ export const registerLayoutRoutes = (
     }
 
     const layouts = services.layoutRepository.listLayouts(query.data.activeOnly);
-    return reply.send(layoutsResponseSchema.parse(layouts));
+    return reply.send(
+      layoutsResponseSchema.parse(
+        query.data.activeOnly
+          ? layouts.map((layout) => sanitizeLayoutRecordForPublicDisplay(layout) ?? layout)
+          : layouts,
+      ),
+    );
   });
 
   app.post("/layouts", async (request, reply) => {

@@ -210,6 +210,20 @@ export const updateDisplayDevice = async (
     (body) => displayDeviceSchema.parse(body),
   );
 
+export const deleteDisplayDevice = async (
+  token: string,
+  deviceId: string,
+): Promise<void> => {
+  await request(
+    `/display/devices/${encodeURIComponent(deviceId)}`,
+    {
+      method: "DELETE",
+      headers: withAuth(token),
+    },
+    () => undefined,
+  );
+};
+
 export const getPhotoCollections = async (
   token: string,
 ): Promise<PhotoCollectionsResponse> =>

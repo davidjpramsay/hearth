@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 interface ModuleFrameProps {
   title: string;
   subtitle?: string;
+  hideHeader?: boolean;
   loading?: boolean;
   error?: string | null;
   empty?: boolean;
@@ -31,6 +32,7 @@ const formatLastUpdated = (timestampMs: number | null | undefined): string | nul
 export const ModuleFrame = ({
   title,
   subtitle,
+  hideHeader = false,
   loading = false,
   error = null,
   empty = false,
@@ -56,45 +58,48 @@ export const ModuleFrame = ({
       onTouchStartCapture={() => onSelect?.()}
       className="module-frame"
     >
-      <div className="module-drag-handle module-frame__header">
-        <div className="min-w-0">
-          <span className="module-frame__title">{title}</span>
-          {subtitle ? <p className="module-frame__subtitle">{subtitle}</p> : null}
+      {hideHeader ? <div className="module-drag-handle module-frame__drag-strip" /> : null}
+      {!hideHeader ? (
+        <div className="module-drag-handle module-frame__header">
+          <div className="min-w-0">
+            {title ? <span className="module-frame__title">{title}</span> : null}
+            {subtitle ? <p className="module-frame__subtitle">{subtitle}</p> : null}
+          </div>
+          <div className="flex items-center gap-2">
+            {showStatusMeta ? (
+              <div className="module-frame__meta">
+                {statusLabel ? <span className="text-accent">{statusLabel}</span> : null}
+                {formattedLastUpdated ? (
+                  <span className="text-muted">Updated {formattedLastUpdated}</span>
+                ) : null}
+                <span className={statusClassName} aria-hidden="true" />
+              </div>
+            ) : null}
+            {onRemove ? (
+              <button
+                type="button"
+                onTouchStart={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onMouseDown={(event) => {
+                  // Prevent grid drag from swallowing the click.
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onRemove();
+                }}
+                className="module-frame__remove module-no-drag"
+              >
+                Remove
+              </button>
+            ) : null}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {showStatusMeta ? (
-            <div className="module-frame__meta">
-              {statusLabel ? <span className="text-accent">{statusLabel}</span> : null}
-              {formattedLastUpdated ? (
-                <span className="text-muted">Updated {formattedLastUpdated}</span>
-              ) : null}
-              <span className={statusClassName} aria-hidden="true" />
-            </div>
-          ) : null}
-          {onRemove ? (
-            <button
-              type="button"
-              onTouchStart={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-              }}
-              onMouseDown={(event) => {
-                // Prevent grid drag from swallowing the click.
-                event.preventDefault();
-                event.stopPropagation();
-              }}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onRemove();
-              }}
-              className="module-frame__remove module-no-drag"
-            >
-              Remove
-            </button>
-          ) : null}
-        </div>
-      </div>
+      ) : null}
 
       <div className="module-frame__body module-no-drag">
         {error ? (

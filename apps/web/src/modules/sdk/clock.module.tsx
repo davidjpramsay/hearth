@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import {
   clampModulePresentationScale,
@@ -9,6 +9,7 @@ import {
   ModulePresentationControls,
   scaleRoleRem,
 } from "../ui/ModulePresentationControls";
+import { useTileDensity } from "../ui/useTileDensity";
 
 const baseSettingsSchema = withModulePresentation(
   z.object({
@@ -51,6 +52,33 @@ const migrateLegacyClockFontSizes = (input: unknown): unknown => {
 const settingsSchema = z.preprocess(migrateLegacyClockFontSizes, baseSettingsSchema);
 
 type Settings = z.infer<typeof settingsSchema>;
+
+const buildClockParts = (date: Date, use24Hour: boolean) => {
+  const parts = new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: !use24Hour,
+  }).formatToParts(date);
+
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "--";
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "--";
+  const second = parts.find((part) => part.type === "second")?.value ?? "--";
+  const dayPeriod = parts.find((part) => part.type === "dayPeriod")?.value ?? null;
+  const separator =
+    parts.find(
+      (part, index) =>
+        part.type === "literal" &&
+        parts[index - 1]?.type === "hour" &&
+        parts[index + 1]?.type === "minute",
+    )?.value ?? ":";
+
+  return {
+    primary: `${hour}${separator}${minute}`,
+    second,
+    dayPeriod,
+  };
+};
 
 const SettingsPanel = ({
   settings,
@@ -128,6 +156,7 @@ export const moduleDefinition = defineModule({
   settingsSchema,
   runtime: {
     Component: ({ settings }) => {
+      const { ref, metrics } = useTileDensity<HTMLDivElement>();
       const [now, setNow] = useState(() => new Date());
 
       useEffect(() => {
@@ -140,36 +169,121 @@ export const moduleDefinition = defineModule({
         };
       }, []);
 
-      const timeFormatter = new Intl.DateTimeFormat(undefined, {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: settings.showSeconds ? "2-digit" : undefined,
-        hour12: !settings.use24Hour,
-      });
-
       const dateFormatter = new Intl.DateTimeFormat(undefined, {
         weekday: "short",
         month: "short",
         day: "numeric",
         year: "numeric",
       });
+      const dayFormatter = new Intl.DateTimeFormat(undefined, {
+        weekday: "long",
+      });
+      const timeParts = useMemo(
+        () => buildClockParts(now, settings.use24Hour),
+        [now, settings.use24Hour],
+      );
+      const compact = metrics.width < 320 || metrics.height < 150;
 
       return (
-        <div className="flex h-full w-full flex-col items-center justify-center rounded-xl bg-slate-800 text-cyan-300">
-          {settings.showDate ? (
-            <p
-              className="mb-2 font-medium text-cyan-200"
-              style={{ fontSize: scaleRoleRem(1, settings.presentation.supportingScale) }}
-            >
-              {dateFormatter.format(now)}
-            </p>
-          ) : null}
-          <p
-            className="font-semibold"
-            style={{ fontSize: scaleRoleRem(2.25, settings.presentation.primaryScale) }}
+        <div
+          ref={ref}
+          className="module-panel-shell relative isolate flex h-full w-full text-[color:var(--color-text-primary)]"
+        >
+          <div
+            className={`relative z-10 flex h-full w-full flex-col ${
+              compact
+                ? "justify-between gap-3 px-4 py-4"
+                : "items-center justify-center gap-4 px-5 py-5"
+            }`}
           >
-            {timeFormatter.format(now)}
-          </p>
+            <div
+              className={`flex w-full ${compact ? "items-start justify-between gap-3" : "flex-col items-center gap-3"}`}
+            >
+              {settings.showDate ? (
+                <div className="module-panel-chip rounded-full px-3 py-1.5 text-center">
+                  <p
+                    className="font-medium text-[color:var(--color-text-secondary)]"
+                    style={{
+                      fontSize: scaleRoleRem(
+                        compact ? 0.82 : 0.98,
+                        settings.presentation.supportingScale,
+                      ),
+                    }}
+                  >
+                    {dateFormatter.format(now)}
+                  </p>
+                </div>
+              ) : (
+                <p
+                  className="module-panel-label"
+                  style={{
+                    fontSize: scaleRoleRem(0.6, settings.presentation.supportingScale),
+                  }}
+                >
+                  {dayFormatter.format(now)}
+                </p>
+              )}
+            </div>
+
+            <div
+              className={`flex w-full items-end ${
+                compact ? "justify-between gap-3" : "justify-center gap-4"
+              }`}
+            >
+              <p
+                className="font-semibold leading-none tracking-[-0.06em] text-[color:var(--color-text-accent)]"
+                style={{
+                  fontSize: scaleRoleRem(
+                    compact ? 2.2 : 2.9,
+                    settings.presentation.primaryScale,
+                  ),
+                }}
+              >
+                {timeParts.primary}
+              </p>
+
+              {settings.showSeconds ? (
+                <div className="module-panel-card mb-[0.2em] rounded-2xl px-3 py-2 text-right">
+                  <p
+                    className="font-semibold leading-none text-[color:var(--color-text-primary)]"
+                    style={{
+                      fontSize: scaleRoleRem(
+                        compact ? 0.95 : 1.15,
+                        settings.presentation.headingScale,
+                      ),
+                    }}
+                  >
+                    {timeParts.second}
+                  </p>
+                  {!settings.use24Hour && timeParts.dayPeriod ? (
+                    <p
+                      className="mt-1 text-[color:var(--color-text-muted)]"
+                      style={{
+                        fontSize: scaleRoleRem(0.5, settings.presentation.supportingScale),
+                        letterSpacing: "0.22em",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {timeParts.dayPeriod}
+                    </p>
+                  ) : null}
+                </div>
+              ) : !settings.use24Hour && timeParts.dayPeriod ? (
+                <div className="module-panel-card mb-[0.2em] rounded-full px-3 py-1.5">
+                  <p
+                    className="text-[color:var(--color-text-muted)]"
+                    style={{
+                      fontSize: scaleRoleRem(0.62, settings.presentation.supportingScale),
+                      letterSpacing: "0.24em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {timeParts.dayPeriod}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
       );
     },

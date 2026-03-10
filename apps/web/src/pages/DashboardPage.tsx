@@ -1,6 +1,7 @@
 import GridLayout from "react-grid-layout";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  type DisplayDeviceRuntime,
   type GridItem,
   type LayoutRecord,
   type ModuleInstance,
@@ -112,6 +113,25 @@ interface DisplayDeviceUpdatedEventDetail {
   deviceId: string;
 }
 
+const DeviceIdentityCard = (props: {
+  device: DisplayDeviceRuntime | null;
+  fallbackDeviceId: string;
+  message: string;
+}) => (
+  <div className="w-full max-w-xl rounded-2xl border border-slate-700/80 bg-slate-950/70 px-4 py-3 text-left shadow-2xl shadow-slate-950/30">
+    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-300/90">
+      This display
+    </p>
+    <p className="mt-2 text-lg font-semibold text-slate-100">
+      {props.device?.name ?? "Registering display..."}
+    </p>
+    <p className="mt-1 break-all text-sm text-slate-400">
+      ID: {props.device?.id ?? props.fallbackDeviceId}
+    </p>
+    <p className="mt-3 text-sm text-slate-300">{props.message}</p>
+  </div>
+);
+
 const parseEventSourcePayload = <T,>(event: Event): T | null => {
   const data = (event as MessageEvent<unknown>).data;
   if (typeof data !== "string") {
@@ -142,6 +162,7 @@ const areSameLayoutSnapshot = (
 
 export const DashboardPage = () => {
   const [activeLayout, setActiveLayout] = useState<LayoutRecord | null>(null);
+  const [deviceIdentity, setDeviceIdentity] = useState<DisplayDeviceRuntime | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [viewportSize, setViewportSize] = useState(getViewportSize);
   const [photoOrientationHint, setPhotoOrientationHint] =
@@ -192,6 +213,7 @@ export const DashboardPage = () => {
         }
         deviceBootstrapRef.current =
           getDashboardDeviceBootstrapStateFromResolution(resolution);
+        setDeviceIdentity(resolution.device);
         applyTheme(resolution.device.themeId);
         setNextCycleAtMs(resolution.nextCycleAtMs);
         publishDisplayCycleContext({
@@ -497,6 +519,11 @@ export const DashboardPage = () => {
               No display layout is configured for this screen. Use Admin &gt; Devices to assign a
               set or pinned layout for this display.
             </p>
+            <DeviceIdentityCard
+              device={deviceIdentity}
+              fallbackDeviceId={deviceIdRef.current}
+              message="Use Admin > Devices to match this screen, rename it, and assign its layout."
+            />
           </div>
         ) : !activeHasPlacedModules ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-6 text-center text-amber-100">
@@ -505,6 +532,11 @@ export const DashboardPage = () => {
               The active layout has no placed modules. Open Admin &gt; Layouts to add modules to
               this layout or choose a different device assignment.
             </p>
+            <DeviceIdentityCard
+              device={deviceIdentity}
+              fallbackDeviceId={deviceIdRef.current}
+              message="If you are still setting screens up, use Admin > Devices to rename this display so it is easy to identify later."
+            />
           </div>
         ) : gridDisplayMetrics ? (
           <div className="flex h-full w-full items-center justify-center">

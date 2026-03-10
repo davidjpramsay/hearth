@@ -91,7 +91,8 @@ CREATE TABLE IF NOT EXISTS devices (
   target_selection_json TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen_ip TEXT
 );
 `;
 
@@ -637,6 +638,12 @@ export const createDatabase = (filePath: string): Database.Database => {
     "chores",
     "starts_on",
     "ALTER TABLE chores ADD COLUMN starts_on TEXT",
+  );
+  ensureColumnExists(
+    db,
+    "devices",
+    "last_seen_ip",
+    "ALTER TABLE devices ADD COLUMN last_seen_ip TEXT",
   );
 
   ensureUniqueLayoutNames(db);

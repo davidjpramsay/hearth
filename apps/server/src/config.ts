@@ -43,42 +43,53 @@ const parseEnvEntry = (line: string): { key: string; value: string } | null => {
   };
 };
 
-const loadEnvDefaultsFromFile = (filePath: string): void => {
-  if (!existsSync(filePath)) {
-    return;
-  }
-
-  const contents = readFileSync(filePath, "utf8");
-  for (const line of contents.split(/\r?\n/)) {
-    const entry = parseEnvEntry(line);
-    if (!entry) {
-      continue;
-    }
-    if (process.env[entry.key] !== undefined) {
-      continue;
-    }
-    process.env[entry.key] = entry.value;
-  }
-};
-
 const loadEnvDefaults = (): void => {
-  const candidates = [
-    resolve(process.cwd(), ".env"),
-    resolve(process.cwd(), "../.env"),
-    resolve(process.cwd(), "../../.env"),
-    resolve(currentDir, "../../.env"),
-    resolve(currentDir, "../../../.env"),
-    resolve(currentDir, "../.env"),
+  const externalEnvKeys = new Set(Object.keys(process.env));
+  const workspaceRoot = resolve(currentDir, "../../..");
+  const serverRoot = resolve(currentDir, "..");
+  const candidatePaths = [
+    resolve(workspaceRoot, ".env"),
+    resolve(serverRoot, ".env"),
+    resolve(workspaceRoot, ".env.local"),
+    resolve(serverRoot, ".env.local"),
   ];
 
   const seen = new Set<string>();
-  for (const candidatePath of candidates) {
+  const loadedFileKeys = new Set<string>();
+  const localOverrideKeys = new Set<string>();
+
+  for (const candidatePath of candidatePaths) {
     const normalized = resolve(candidatePath);
     if (seen.has(normalized)) {
       continue;
     }
     seen.add(normalized);
-    loadEnvDefaultsFromFile(normalized);
+
+    const contents = existsSync(normalized) ? readFileSync(normalized, "utf8") : null;
+    if (contents === null) {
+      continue;
+    }
+
+    const isLocalOverride = normalized.endsWith(".env.local");
+
+    for (const line of contents.split(/\r?\n/)) {
+      const entry = parseEnvEntry(line);
+      if (!entry) {
+        continue;
+      }
+      if (externalEnvKeys.has(entry.key)) {
+        continue;
+      }
+      if (!isLocalOverride && (loadedFileKeys.has(entry.key) || localOverrideKeys.has(entry.key))) {
+        continue;
+      }
+      process.env[entry.key] = entry.value;
+      if (isLocalOverride) {
+        localOverrideKeys.add(entry.key);
+      } else {
+        loadedFileKeys.add(entry.key);
+      }
+    }
   }
 };
 
@@ -86,6 +97,11 @@ loadEnvDefaults();
 
 const resolvePath = (value: string): string =>
   isAbsolute(value) ? value : resolve(process.cwd(), value);
+
+const resolveOptionalPath = (value: string | undefined): string | null => {
+  const trimmed = value?.trim() ?? "";
+  return trimmed.length > 0 ? resolvePath(trimmed) : null;
+};
 
 const parsePositiveNumber = (value: string | undefined, fallback: number): number => {
   if (!value) {
@@ -145,7 +161,7 @@ mkdirSync(backupDir, { recursive: true });
 
 export const config = {
   appName: process.env.APP_NAME ?? "Hearth",
-  host: process.env.HOST ?? "0.0.0.0",
+  host: process.env.HOST ?? "127.0.0.1",
   port: Number(process.env.PORT ?? 3000),
   dataDir,
   dbPath: resolvePath(process.env.DB_PATH ?? defaultDbPath),
@@ -157,5 +173,8 @@ export const config = {
   backupRetentionDays: parsePositiveNumber(process.env.BACKUP_RETENTION_DAYS, 30),
   corsOrigins: parseCsv(process.env.CORS_ORIGINS),
   esvApiKey: (process.env.ESV_API_KEY ?? "").trim(),
+  koboReaderAppDbPath: resolveOptionalPath(process.env.KOBO_READER_APP_DB_PATH),
+  koboReaderLibraryDbPath: resolveOptionalPath(process.env.KOBO_READER_LIBRARY_DB_PATH),
+  koboReaderLibraryRoot: resolveOptionalPath(process.env.KOBO_READER_LIBRARY_ROOT),
   webDistPath: resolve(currentDir, "../../web/dist"),
 };

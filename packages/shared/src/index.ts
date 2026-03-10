@@ -8,6 +8,7 @@ export * from "./time.js";
 export * from "./modules/bible-verse.js";
 export * from "./modules/calendar.js";
 export * from "./modules/chores.js";
+export * from "./modules/kobo-reader.js";
 export * from "./modules/photos.js";
 export * from "./modules/presentation.js";
 export * from "./modules/weather.js";

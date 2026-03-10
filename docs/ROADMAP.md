@@ -110,8 +110,7 @@ Scope:
 - Add a device identity model (stable device id + user-friendly name/label).
 - Add an admin "Devices" view to assign each device:
   - follow a set, or
-  - pin a layout, or
-  - inherit default routing policy.
+  - pin a layout.
 - Resolve layout in this order:
   - device override (if present)
   - default set/layout routing
@@ -120,7 +119,7 @@ Scope:
 Done criteria:
 
 - A device can be assigned and persistently uses its configured layout behavior.
-- Devices can be switched back to "inherit defaults" without losing global routing config.
+- Devices can be reassigned between saved sets and pinned layouts without losing global routing config.
 - Multi-device installs can run different layouts simultaneously without conflicts.
 
 Status: Completed for current milestone.

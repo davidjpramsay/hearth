@@ -72,9 +72,9 @@ React frontend with two routes:
 Current behavior:
 
 - Per-screen routing is server-managed through a persisted device record:
-  - `targetSelection = null` to inherit default routing/fallback behavior
   - `targetSelection.kind = "set"` to follow a layout set
   - `targetSelection.kind = "layout"` to pin one layout directly
+- Existing `targetSelection = null` records are treated as a compatibility fallback and resolve through the first available set before the layout fallback chain.
 - Per-screen theme is also server-managed on that same device record.
 - In set mode:
   - admin authoring is stored as `logicBlocks` (currently a `photo-router` block graph with layout nodes, connections, and node positions)

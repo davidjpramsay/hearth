@@ -7,6 +7,7 @@ import {
   type ScreenProfileLayouts,
 } from "@hearth/shared";
 import {
+  deleteDisplayDevice,
   getDisplayDevices,
   getLayouts,
   getScreenProfileLayouts,
@@ -17,7 +18,7 @@ import { AdminNavActions } from "../components/admin/AdminNavActions";
 import { PageShell } from "../components/PageShell";
 import { THEME_OPTIONS, type ThemeId } from "../theme/theme";
 
-type DeviceRoutingMode = "inherit" | "set" | "layout";
+type DeviceRoutingMode = "set" | "layout";
 
 interface DeviceDraft {
   name: string;
@@ -25,7 +26,11 @@ interface DeviceDraft {
   routingMode: DeviceRoutingMode;
   setId: string;
   layoutName: string;
+  preserveImplicitSelection: boolean;
+  implicitSetId: string | null;
 }
+
+type BusyDeviceAction = "save" | "delete";
 
 const defaultProfileLayouts: ScreenProfileLayouts = screenProfileLayoutsSchema.parse({});
 
@@ -56,6 +61,7 @@ const toDeviceDraft = (input: {
   device: DisplayDevice;
   availableSetIds: Set<string>;
   availableLayoutNames: Set<string>;
+  firstAvailableSetId: string;
 }): DeviceDraft => {
   const normalizedTargetSelection = normalizeDeviceTargetSelection({
     targetSelection: input.device.targetSelection,
@@ -67,9 +73,15 @@ const toDeviceDraft = (input: {
     return {
       name: input.device.name,
       themeId: input.device.themeId,
-      routingMode: "inherit",
-      setId: "",
+      routingMode: "set",
+      setId: input.firstAvailableSetId,
       layoutName: "",
+      preserveImplicitSelection:
+        input.device.targetSelection === null && input.firstAvailableSetId.length > 0,
+      implicitSetId:
+        input.device.targetSelection === null && input.firstAvailableSetId.length > 0
+          ? input.firstAvailableSetId
+          : null,
     };
   }
 
@@ -80,6 +92,8 @@ const toDeviceDraft = (input: {
       routingMode: "set",
       setId: normalizedTargetSelection.setId ?? "",
       layoutName: "",
+      preserveImplicitSelection: false,
+      implicitSetId: null,
     };
   }
 
@@ -89,6 +103,8 @@ const toDeviceDraft = (input: {
     routingMode: "layout",
     setId: "",
     layoutName: normalizedTargetSelection.layoutName ?? "",
+    preserveImplicitSelection: false,
+    implicitSetId: null,
   };
 };
 
@@ -100,7 +116,10 @@ const toUpdatePayload = (draft: DeviceDraft): {
   name: draft.name.trim().slice(0, 80),
   themeId: draft.themeId,
   targetSelection:
-    draft.routingMode === "inherit"
+    draft.preserveImplicitSelection &&
+    draft.routingMode === "set" &&
+    draft.implicitSetId !== null &&
+    draft.setId === draft.implicitSetId
       ? null
       : draft.routingMode === "set"
         ? {
@@ -141,10 +160,6 @@ const formatLastSeen = (value: string): string => {
 };
 
 const hasValidRoutingTarget = (draft: DeviceDraft): boolean => {
-  if (draft.routingMode === "inherit") {
-    return true;
-  }
-
   if (draft.routingMode === "set") {
     return draft.setId.trim().length > 0;
   }
@@ -159,7 +174,10 @@ export const AdminDevicesPage = () => {
     useState<ScreenProfileLayouts>(defaultProfileLayouts);
   const [layoutNames, setLayoutNames] = useState<string[]>([]);
   const [drafts, setDrafts] = useState<Record<string, DeviceDraft>>({});
-  const [busyDeviceId, setBusyDeviceId] = useState<string | null>(null);
+  const [busyDeviceState, setBusyDeviceState] = useState<{
+    deviceId: string;
+    action: BusyDeviceAction;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const availableSetOptions = useMemo(
@@ -198,6 +216,7 @@ export const AdminDevicesPage = () => {
       setScreenProfileLayouts(profileResponse);
 
       const nextAvailableSetIds = new Set(Object.keys(profileResponse.families));
+      const nextFirstAvailableSetId = Object.keys(profileResponse.families)[0] ?? "";
       const nextAvailableLayoutNames = new Set(layoutsResponse.map((layout) => layout.name));
       setDrafts(
         Object.fromEntries(
@@ -207,6 +226,7 @@ export const AdminDevicesPage = () => {
               device,
               availableSetIds: nextAvailableSetIds,
               availableLayoutNames: nextAvailableLayoutNames,
+              firstAvailableSetId: nextFirstAvailableSetId,
             }),
           ]),
         ),
@@ -252,7 +272,7 @@ export const AdminDevicesPage = () => {
     }
 
     try {
-      setBusyDeviceId(deviceId);
+      setBusyDeviceState({ deviceId, action: "save" });
       setError(null);
       const updated = await updateDisplayDevice(token, deviceId, toUpdatePayload(draft));
       setDevices((current) =>
@@ -264,19 +284,51 @@ export const AdminDevicesPage = () => {
           device: updated,
           availableSetIds,
           availableLayoutNames,
+          firstAvailableSetId,
         }),
       }));
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Failed to update device");
     } finally {
-      setBusyDeviceId((current) => (current === deviceId ? null : current));
+      setBusyDeviceState((current) => (current?.deviceId === deviceId ? null : current));
+    }
+  };
+
+  const onDeleteDevice = async (device: DisplayDevice) => {
+    const token = getAuthToken();
+    if (!token) {
+      navigate("/admin/login", { replace: true });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Remove device "${device.name}"? If the screen checks in again it will be recreated with a fresh routing assignment.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setBusyDeviceState({ deviceId: device.id, action: "delete" });
+      setError(null);
+      await deleteDisplayDevice(token, device.id);
+      setDevices((current) => current.filter((entry) => entry.id !== device.id));
+      setDrafts((current) => {
+        const nextDrafts = { ...current };
+        delete nextDrafts[device.id];
+        return nextDrafts;
+      });
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete device");
+    } finally {
+      setBusyDeviceState((current) => (current?.deviceId === device.id ? null : current));
     }
   };
 
   return (
     <PageShell
       title="Devices"
-      subtitle="Manage per-device display theme and routing."
+      subtitle="Manage per-device names, display theme, and routing."
       rightActions={<AdminNavActions current="devices" onLogout={onLogout} />}
     >
       {error ? (
@@ -290,7 +342,8 @@ export const AdminDevicesPage = () => {
           <div>
             <h2 className="text-lg font-semibold text-slate-100">Connected displays</h2>
             <p className="mt-1 text-sm text-slate-400">
-              Devices appear here after they open the display page once.
+              Devices appear here after they open the display page once. Give each one a
+              custom name so it is easy to tell your screens apart.
             </p>
           </div>
           <button
@@ -314,6 +367,7 @@ export const AdminDevicesPage = () => {
               device,
               availableSetIds,
               availableLayoutNames,
+              firstAvailableSetId,
             });
             const payload = toUpdatePayload({
               ...draft,
@@ -324,11 +378,14 @@ export const AdminDevicesPage = () => {
                 device,
                 availableSetIds,
                 availableLayoutNames,
+                firstAvailableSetId,
               }),
             );
             const isValidDraft = hasValidRoutingTarget(draft);
             const isDirty = JSON.stringify(payload) !== JSON.stringify(baselinePayload);
-            const isBusy = busyDeviceId === device.id;
+            const isBusy = busyDeviceState?.deviceId === device.id;
+            const isSaving = isBusy && busyDeviceState?.action === "save";
+            const isDeleting = isBusy && busyDeviceState?.action === "delete";
 
             return (
               <article
@@ -340,22 +397,35 @@ export const AdminDevicesPage = () => {
                     <h2 className="text-lg font-semibold text-slate-100">{device.name}</h2>
                     <p className="mt-1 text-xs text-slate-400">ID: {device.id}</p>
                     <p className="mt-1 text-xs text-slate-400">
+                      Last seen IP: {device.lastSeenIp ?? "Unavailable"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
                       Last seen: {formatLastSeen(device.lastSeenAt)}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    disabled={!isDirty || !isValidDraft || isBusy}
-                    onClick={() => void onSaveDevice(device.id)}
-                    className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isBusy ? "Saving..." : "Save changes"}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => void onDeleteDevice(device)}
+                      className="rounded-lg border border-rose-500/70 px-4 py-2 text-sm font-semibold text-rose-200 hover:border-rose-400 hover:text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isDeleting ? "Removing..." : "Remove device"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!isDirty || !isValidDraft || isBusy}
+                      onClick={() => void onSaveDevice(device.id)}
+                      className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isSaving ? "Saving..." : "Save changes"}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-2">
                   <label className="flex flex-col gap-2 text-sm text-slate-300">
-                    <span>Name</span>
+                    <span>Display name</span>
                     <input
                       value={draft.name}
                       onChange={(event) =>
@@ -366,7 +436,9 @@ export const AdminDevicesPage = () => {
                       }
                       className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
                     />
-                    <span className="text-xs text-slate-400">Device names must be unique.</span>
+                    <span className="text-xs text-slate-400">
+                      Custom device names must be unique.
+                    </span>
                   </label>
 
                   <label className="flex flex-col gap-2 text-sm text-slate-300">
@@ -414,12 +486,12 @@ export const AdminDevicesPage = () => {
                               nextRoutingMode === "layout"
                                 ? nextLayoutName
                                 : current.layoutName,
+                            preserveImplicitSelection: false,
                           };
                         })
                       }
                       className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
                     >
-                      <option value="inherit">Inherit default</option>
                       <option value="set">Follow set</option>
                       <option value="layout">Pin layout</option>
                     </select>
@@ -434,6 +506,7 @@ export const AdminDevicesPage = () => {
                           updateDraft(device.id, (current) => ({
                             ...current,
                             setId: event.target.value,
+                            preserveImplicitSelection: false,
                           }))
                         }
                         className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
@@ -448,7 +521,7 @@ export const AdminDevicesPage = () => {
                         ))}
                       </select>
                     </label>
-                  ) : draft.routingMode === "layout" ? (
+                  ) : (
                     <label className="flex flex-col gap-2 text-sm text-slate-300">
                       <span>Pinned layout</span>
                       <select
@@ -457,6 +530,7 @@ export const AdminDevicesPage = () => {
                           updateDraft(device.id, (current) => ({
                             ...current,
                             layoutName: event.target.value,
+                            preserveImplicitSelection: false,
                           }))
                         }
                         className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
@@ -471,10 +545,6 @@ export const AdminDevicesPage = () => {
                         ))}
                       </select>
                     </label>
-                  ) : (
-                    <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2 text-sm text-slate-400">
-                      This device will use the default routing behavior.
-                    </div>
                   )}
                 </div>
               </article>

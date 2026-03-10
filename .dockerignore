@@ -2,6 +2,16 @@ node_modules
 .pnpm-store
 .git
 .gitignore
+.env
+.env.local
+.env.*.local
 **/dist
 **/*.log
 data
+coverage
+docs
+.github
+README.md
+HANDOFF.md
+apps/server/test
+apps/web/test

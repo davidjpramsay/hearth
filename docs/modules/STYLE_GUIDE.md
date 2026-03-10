@@ -8,6 +8,29 @@ Use `apps/web/src/modules/ui/ModuleFrame.tsx` for new SDK modules:
 - consistent loading/error/empty presentation
 - status/updated indicator
 
+For modules with richer internal layouts, prefer the shared visual primitives in `apps/web/src/index.css`:
+
+- `.module-panel-shell` for the main inner surface
+- `.module-panel-card` for inset cards and stat blocks
+- `.module-panel-chip` for compact labels
+- `.module-panel-label` for quiet uppercase section labels
+- `.module-panel-progress` for progress rails
+
+## Visual philosophy
+
+- Design for calm legibility first. The information should read clearly before any decorative layer is noticed.
+- Keep visual depth subtle. Use one restrained glow or gradient wash, not multiple competing effects.
+- Avoid novelty badges and status chrome unless they add information the module would otherwise lose.
+- Reuse the same surface, chip, card, and progress patterns across modules so the dashboard feels like one system.
+- Let imagery and data carry personality. Structure, spacing, and text treatment should stay stable.
+
+## Theme compatibility
+
+- Build module surfaces from the shared theme tokens in `apps/web/src/index.css`, not hard-coded palette values.
+- If a module needs an accent, derive it from theme tokens such as `--color-text-accent-rgb` or the status token RGB values.
+- Keep accent overlays low contrast so Nord, Solarized, Monokai, and the default theme all remain readable.
+- Favor neutral cards and text tokens for secondary information. Accent color should highlight, not repaint the whole tile.
+
 ## Settings UX
 
 - Keep settings panel simple and explicit.
@@ -55,4 +78,5 @@ Avoid one-off controls like `timeFontSizeRem` or `eventTitleFontSize`. If a modu
 - Local time: `apps/web/src/modules/sdk/clock.module.tsx`
 - REST + status frame: `apps/web/src/modules/sdk/server-status.module.tsx`
 - Role-sized layouts: `apps/web/src/modules/sdk/weather.module.tsx`
+- Shared panel language: `apps/web/src/modules/sdk/kobo-reader.module.tsx`
 - Role-sized calendar lists/grids: `apps/web/src/modules/sdk/calendar.module.tsx`

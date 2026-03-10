@@ -28,6 +28,8 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import {
+  DEFAULT_LANDSCAPE_LAYOUT_LOGIC_CONDITION_TYPE,
+  DEFAULT_PORTRAIT_LAYOUT_LOGIC_CONDITION_TYPE,
   PHOTO_COLLECTION_ACTION_PARAM_KEY,
   getPrimaryPhotoRouterBlock,
   setPrimaryPhotoRouterBlock,
@@ -51,7 +53,6 @@ import {
   getDefaultConditionTypeForTrigger,
   parseActionParamsByType,
   parseConditionParamsByType,
-  getTriggerLabel,
   type LogicParamFieldDefinition,
 } from "./logicNodeRegistry";
 
@@ -124,24 +125,47 @@ const EDGE_DASH_PATTERN = "8 12";
 const BRANCH_META: Record<
   BranchKey,
   {
-    label: string;
     color: string;
     bgClassName: string;
     borderClassName: string;
   }
 > = {
   portrait: {
-    label: "Portrait",
     color: "#22d3ee",
     bgClassName: "bg-cyan-500/10 text-cyan-100",
     borderClassName: "border-cyan-400/50",
   },
   fallback: {
-    label: "Not Portrait",
     color: "#f59e0b",
     bgClassName: "bg-amber-500/10 text-amber-100",
     borderClassName: "border-amber-400/50",
   },
+};
+
+const getConditionBranchCopy = (conditionType: string | null | undefined) => {
+  const normalizedConditionType = conditionType?.trim() ?? "";
+
+  if (normalizedConditionType === DEFAULT_LANDSCAPE_LAYOUT_LOGIC_CONDITION_TYPE) {
+    return {
+      title: "Landscape photo",
+      matchedLabel: "Landscape",
+      fallbackLabel: "Not Landscape",
+    };
+  }
+
+  if (normalizedConditionType === DEFAULT_PORTRAIT_LAYOUT_LOGIC_CONDITION_TYPE) {
+    return {
+      title: "Portrait photo",
+      matchedLabel: "Portrait",
+      fallbackLabel: "Not Portrait",
+    };
+  }
+
+  return {
+    title: "Condition branch",
+    matchedLabel: "Matches",
+    fallbackLabel: "Otherwise",
+  };
 };
 
 const clampCycleSeconds = (value: number): number =>
@@ -819,6 +843,8 @@ const buildFlowGraph = (input: {
   } satisfies TerminalNodeType);
 
   actionNodes.forEach((node, index) => {
+    const conditionBranchCopy = getConditionBranchCopy(node.portrait.conditionType);
+
     nodes.push({
       id: node.id,
       type: "routerNode",
@@ -843,9 +869,12 @@ const buildFlowGraph = (input: {
         onRemove: () => input.onRemoveNode(node.id),
         routes: ROUTER_ROUTE_ORDER.map((branchKey) => ({
           key: branchKey,
-          label: BRANCH_META[branchKey].label,
+          label:
+            branchKey === "portrait"
+              ? conditionBranchCopy.matchedLabel
+              : conditionBranchCopy.fallbackLabel,
           count: connectionBySourceHandle.has(`${node.id}::${branchKey}`) ? 1 : 0,
-          enabled: branchKey === "portrait" ? node.portrait.enabled : true,
+          enabled: true,
         })),
       },
     } satisfies RouterNodeType);
@@ -944,12 +973,7 @@ const buildFlowGraph = (input: {
       : sourceNode && isPhotoOrientationNode(sourceNode)
         ? "#94a3b8"
         : "#94a3b8";
-    const dashed =
-      branchKey === "portrait"
-        ? sourceNode && isPhotoOrientationNode(sourceNode)
-          ? !sourceNode.portrait.enabled
-          : false
-        : false;
+    const dashed = false;
 
     return createEdge({
       id: connection.id,
@@ -1032,7 +1056,7 @@ export const PhotoRouterBlockEditor = ({
       photoActionType: getDefaultCanvasActionTypeId(),
       photoActionCollectionId: null,
       portrait: {
-        enabled: false,
+        enabled: true,
         conditionType: getDefaultConditionTypeForTrigger("portrait-photo"),
         conditionParams: parseConditionParamsByType(
           getDefaultConditionTypeForTrigger("portrait-photo"),
@@ -1394,29 +1418,17 @@ export const PhotoRouterBlockEditor = ({
       branch.conditionType,
       branch.conditionParams,
     );
+    const conditionBranchCopy = getConditionBranchCopy(branch.conditionType);
 
     return (
       <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-slate-100">{getTriggerLabel(trigger)}</p>
-            <p className="mt-1 text-xs text-slate-400">
-              Connect this output to the first layout node for the branch.
-            </p>
-          </div>
-          <label className="flex items-center gap-2 text-sm text-slate-200">
-            <input
-              type="checkbox"
-              checked={branch.enabled}
-              onChange={(event) =>
-                updateBranch((current) => ({
-                  ...current,
-                  enabled: event.target.checked,
-                }))
-              }
-            />
-            Enabled
-          </label>
+        <div>
+          <p className="text-sm font-semibold text-slate-100">
+            {conditionBranchCopy.title}
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Connect this output to the first layout node when the condition matches.
+          </p>
         </div>
 
         <label className="mt-4 block">
@@ -1429,18 +1441,20 @@ export const PhotoRouterBlockEditor = ({
             onChange={(event) =>
               updateBranch((current) => ({
                 ...current,
+                enabled: true,
                 conditionType: event.target.value,
                 conditionParams: parseConditionParamsByType(event.target.value, {}),
               }))
             }
           >
-            {LOGIC_CONDITION_TYPES.filter((entry) => entry.trigger === trigger).map(
-              (condition) => (
-                <option key={condition.id} value={condition.id}>
-                  {condition.label}
-                </option>
-              ),
-            )}
+            {LOGIC_CONDITION_TYPES.filter(
+              (condition) =>
+                condition.trigger === trigger || condition.trigger === "landscape-photo",
+            ).map((condition) => (
+              <option key={condition.id} value={condition.id}>
+                {condition.label}
+              </option>
+            ))}
           </select>
         </label>
 
@@ -1645,10 +1659,13 @@ export const PhotoRouterBlockEditor = ({
               <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4">
                 <div>
                   <p className="text-base font-semibold text-slate-100">
+                    Layout Node
+                  </p>
+                  <p className="mt-1 text-sm text-slate-300">
                     {selectedLayoutNode.layoutName}
                   </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    Layout node {selectedLayoutNode.id.slice(0, 8)}
+                  <p className="mt-1 text-xs text-slate-500">
+                    Node {selectedLayoutNode.id.slice(0, 8)}
                   </p>
                 </div>
 
@@ -1699,28 +1716,6 @@ export const PhotoRouterBlockEditor = ({
                     />
                   </label>
 
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                      Action
-                    </span>
-                    <select
-                      className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
-                      value={selectedLayoutNode.actionType}
-                      onChange={(event) =>
-                        updateSelectedLayoutNode((current) => ({
-                          ...current,
-                          actionType: event.target.value,
-                          actionParams: getDefaultActionParams(event.target.value),
-                        }))
-                      }
-                    >
-                      {LOGIC_ACTION_TYPES.map((action) => (
-                        <option key={action.id} value={action.id}>
-                          {action.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
                 </div>
               </div>
 

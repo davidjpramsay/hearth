@@ -16,6 +16,12 @@ services:
       BACKUP_INTERVAL_MINUTES: ${BACKUP_INTERVAL_MINUTES:-360}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
       ESV_API_KEY: ${ESV_API_KEY:-}
+      KOBO_READER_APP_DB_PATH: ${KOBO_READER_APP_DB_PATH:-}
+      KOBO_READER_LIBRARY_DB_PATH: ${KOBO_READER_LIBRARY_DB_PATH:-}
+      KOBO_READER_LIBRARY_ROOT: ${KOBO_READER_LIBRARY_ROOT:-}
     volumes:
       - ./data:/app/data
+      # Optional Kobo Reader mounts:
+      # - /path/to/calibreweb-config:/external/calibreweb:ro
+      # - /path/to/calibre-library:/external/books:ro
     restart: unless-stopped

@@ -152,7 +152,7 @@ const validateManagedDeviceTargetSelection = (input: {
     if (targetSelection.setId === null) {
       return {
         ok: false,
-        message: "Choose a set or switch routing to Inherit default.",
+        message: "Choose a set.",
       };
     }
 
@@ -172,7 +172,7 @@ const validateManagedDeviceTargetSelection = (input: {
   if (targetSelection.layoutName === null) {
     return {
       ok: false,
-      message: "Choose a layout or switch routing to Inherit default.",
+      message: "Choose a layout.",
     };
   }
 
@@ -207,7 +207,10 @@ export class ScreenProfileService {
     });
   }
 
-  reportScreenProfile(input: ReportScreenProfileRequest): ReportScreenProfileResponse {
+  reportScreenProfile(
+    input: ReportScreenProfileRequest,
+    options?: { lastSeenIp?: string | null },
+  ): ReportScreenProfileResponse {
     const payload = reportScreenProfileRequestSchema.parse(input);
     const nowMs = Date.now();
     this.pruneStaleSessions(nowMs);
@@ -231,6 +234,7 @@ export class ScreenProfileService {
             deviceId: payload.screenSessionId,
             reportedTargetSelection: requestedTargetSelection,
             reportedThemeId: payload.reportedThemeId,
+            lastSeenIp: options?.lastSeenIp ?? null,
           })
         : {
             id: payload.screenSessionId,

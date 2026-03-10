@@ -14,7 +14,12 @@ services:
       BACKUP_INTERVAL_MINUTES: ${BACKUP_INTERVAL_MINUTES:-360}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
       ESV_API_KEY: ${ESV_API_KEY:-}
+      KOBO_READER_APP_DB_PATH: ${KOBO_READER_APP_DB_PATH:-/external/calibreweb/app.db}
+      KOBO_READER_LIBRARY_DB_PATH: ${KOBO_READER_LIBRARY_DB_PATH:-/external/books/metadata.db}
+      KOBO_READER_LIBRARY_ROOT: ${KOBO_READER_LIBRARY_ROOT:-/external/books}
     volumes:
       # Recommended Synology data path.
       - /volume1/docker/hearth/data:/app/data
+      - /volume1/docker/calibreweb:/external/calibreweb:ro
+      - /volume1/media/Books:/external/books:ro
     restart: unless-stopped

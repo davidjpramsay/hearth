@@ -24,7 +24,7 @@ test("dashboard bootstrap state follows the latest server-managed device setting
   });
 });
 
-test("dashboard bootstrap state falls back to inherit when the device has no explicit target", () => {
+test("dashboard bootstrap state preserves the compatibility fallback when the device has no explicit target", () => {
   const state = getDashboardDeviceBootstrapStateFromResolution({
     device: {
       id: "device-2",

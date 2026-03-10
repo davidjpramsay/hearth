@@ -669,7 +669,10 @@ function normalizePhotoRouterPhotoOrientationGraphNode(
     photoActionType: input.photoActionType?.trim() || DEFAULT_PHOTO_ACTION_TYPE,
     photoActionCollectionId: input.photoActionCollectionId ?? null,
     portrait: normalizePhotoRouterActionRoute({
-      route: input.portrait,
+      route: {
+        ...input.portrait,
+        enabled: true,
+      },
       defaultConditionType: PORTRAIT_CONDITION_TYPE,
     }),
     landscape: normalizePhotoRouterActionRoute({
@@ -1099,7 +1102,7 @@ function deriveLegacyBranchesFromPrimaryAction(input: {
             ),
     }),
     portrait: photoRouterConditionalBranchSchema.parse({
-      enabled: input.actionNode?.portrait.enabled ?? false,
+      enabled: input.actionNode ? true : false,
       conditionType:
         input.actionNode?.portrait.conditionType?.trim() || PORTRAIT_CONDITION_TYPE,
       conditionParams: toLogicParams(input.actionNode?.portrait.conditionParams),
@@ -1533,52 +1536,50 @@ function compilePhotoRouterGraphToLogicGraph(input: PhotoRouterBlock): LayoutSet
       }),
     );
 
-    if (graphNode.portrait.enabled) {
-      const portraitConditionId = `if-portrait:${graphNode.id}`;
-      appendNode({
-        id: portraitConditionId,
-        type: "if-portrait",
-        conditionType:
-          graphNode.portrait.conditionType?.trim() || PORTRAIT_CONDITION_TYPE,
-        conditionParams: toLogicParams(graphNode.portrait.conditionParams),
-      });
-      appendEdge(
-        toEdge({
-          id: `edge-${selectId}-portrait`,
-          from: selectId,
-          to: portraitConditionId,
-        }),
-      );
-      const portraitTargetId = getPhotoRouterConnectionTarget({
-        connectionsBySourceHandle,
-        source: graphNode.id,
-        sourceHandle: "portrait",
-      });
-      appendEdge(
-        toEdge({
-          id: `edge-${portraitConditionId}-yes`,
-          from: portraitConditionId,
-          to: portraitTargetId ? compileTarget(portraitTargetId) : defaultTarget,
-          when: "yes",
-        }),
-      );
-      appendEdge(
-        toEdge({
-          id: `edge-${portraitConditionId}-no`,
-          from: portraitConditionId,
-          to: defaultTarget,
-          when: "no",
-        }),
-      );
-    } else {
-      appendEdge(
-        toEdge({
-          id: `edge-${selectId}-default`,
-          from: selectId,
-          to: defaultTarget,
-        }),
-      );
-    }
+    const conditionTrigger =
+      resolveConditionTrigger("if-portrait", graphNode.portrait.conditionType) ??
+      "portrait-photo";
+    const conditionNodeType =
+      conditionTrigger === "landscape-photo" ? "if-landscape" : "if-portrait";
+    const conditionNodeId = `${conditionNodeType}:${graphNode.id}`;
+    appendNode({
+      id: conditionNodeId,
+      type: conditionNodeType,
+      conditionType:
+        graphNode.portrait.conditionType?.trim() ||
+        (conditionTrigger === "landscape-photo"
+          ? LANDSCAPE_CONDITION_TYPE
+          : PORTRAIT_CONDITION_TYPE),
+      conditionParams: toLogicParams(graphNode.portrait.conditionParams),
+    });
+    appendEdge(
+      toEdge({
+        id: `edge-${selectId}-condition`,
+        from: selectId,
+        to: conditionNodeId,
+      }),
+    );
+    const portraitTargetId = getPhotoRouterConnectionTarget({
+      connectionsBySourceHandle,
+      source: graphNode.id,
+      sourceHandle: "portrait",
+    });
+    appendEdge(
+      toEdge({
+        id: `edge-${conditionNodeId}-yes`,
+        from: conditionNodeId,
+        to: portraitTargetId ? compileTarget(portraitTargetId) : defaultTarget,
+        when: "yes",
+      }),
+    );
+    appendEdge(
+      toEdge({
+        id: `edge-${conditionNodeId}-no`,
+        from: conditionNodeId,
+        to: defaultTarget,
+        when: "no",
+      }),
+    );
 
     compiledEntries.set(graphNodeId, selectId);
     compilingNodeIds.delete(graphNodeId);
@@ -2298,7 +2299,16 @@ export interface LayoutLogicResolvedTarget {
 
 const resolveConditionTrigger = (
   nodeType: LayoutSetLogicNode["type"],
+  conditionType?: string | null,
 ): Exclude<AutoLayoutTargetTrigger, "always"> | null => {
+  const normalizedConditionType = conditionType?.trim() ?? "";
+
+  if (normalizedConditionType === PORTRAIT_CONDITION_TYPE) {
+    return "portrait-photo";
+  }
+  if (normalizedConditionType === LANDSCAPE_CONDITION_TYPE) {
+    return "landscape-photo";
+  }
   if (nodeType === "if-portrait") {
     return "portrait-photo";
   }
@@ -2320,37 +2330,21 @@ const chooseNextEdge = (input: {
     return null;
   }
 
-  if (input.node.type === "if-portrait") {
-    const trigger = resolveConditionTrigger(input.node.type);
-    const fallbackExpected = input.orientation === "portrait";
+  if (input.node.type === "if-portrait" || input.node.type === "if-landscape") {
+    const trigger = resolveConditionTrigger(input.node.type, input.node.conditionType);
+    const fallbackExpected =
+      trigger === "landscape-photo"
+        ? input.orientation === "landscape"
+        : input.orientation === "portrait";
+    const defaultConditionType =
+      trigger === "landscape-photo"
+        ? LANDSCAPE_CONDITION_TYPE
+        : PORTRAIT_CONDITION_TYPE;
     const evaluated =
       trigger && input.evaluateCondition
         ? input.evaluateCondition({
             conditionType:
-              input.node.conditionType?.trim() || PORTRAIT_CONDITION_TYPE,
-            conditionParams: toLogicParams(input.node.conditionParams),
-            trigger,
-            orientation: input.orientation,
-          })
-        : null;
-    const expected =
-      typeof evaluated === "boolean" ? (evaluated ? "yes" : "no") : fallbackExpected ? "yes" : "no";
-    return (
-      input.outgoing.find((edge) => edge.when === expected) ??
-      input.outgoing.find((edge) => edge.when === "always") ??
-      input.outgoing[0] ??
-      null
-    );
-  }
-
-  if (input.node.type === "if-landscape") {
-    const trigger = resolveConditionTrigger(input.node.type);
-    const fallbackExpected = input.orientation === "landscape";
-    const evaluated =
-      trigger && input.evaluateCondition
-        ? input.evaluateCondition({
-            conditionType:
-              input.node.conditionType?.trim() || LANDSCAPE_CONDITION_TYPE,
+              input.node.conditionType?.trim() || defaultConditionType,
             conditionParams: toLogicParams(input.node.conditionParams),
             trigger,
             orientation: input.orientation,
@@ -2584,6 +2578,7 @@ export const displayThemeIdSchema = z.enum([
 
 export const displayDeviceIdSchema = z.string().trim().min(1).max(128);
 export const displayDeviceNameSchema = z.string().trim().min(1).max(80);
+export const displayDeviceIpSchema = z.string().trim().min(1).max(255);
 
 export const displayDeviceRuntimeSchema = z.object({
   id: displayDeviceIdSchema,
@@ -2596,6 +2591,7 @@ export const displayDeviceSchema = displayDeviceRuntimeSchema.extend({
   createdAt: z.string(),
   updatedAt: z.string(),
   lastSeenAt: z.string(),
+  lastSeenIp: displayDeviceIpSchema.nullable().default(null),
 });
 
 export const displayDevicesResponseSchema = z.object({

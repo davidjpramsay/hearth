@@ -7,7 +7,7 @@ It is built to run on low-power hardware (Raspberry Pi / mini PCs) and provides:
 - Visual layout editor (`/admin`)
 - Devices admin for per-display theme + routing assignment
 - Fullscreen display dashboard (`/`)
-- Modular tiles (Photos, Calendar, Clock, Chores, Weather, Bible verse, Welcome, Count Down)
+- Modular tiles (Photos, Calendar, Clock, Chores, Weather, Bible verse, Welcome, Count Down, Kobo Reader)
 - SQLite persistence
 - Live layout updates via SSE
 - Automatic encrypted calendar-source storage in the database
@@ -138,6 +138,16 @@ Use:
 - [Synology Update Routine](docs/SYNOLOGY_UPDATE.md) for repeat deploys after the first install
 - [Image Publishing](docs/IMAGE_PUBLISHING.md) for the GitHub Actions release workflow
 
+## Kobo Reader Setup
+
+The `Kobo Reader` module reads Calibre-Web Kobo sync data from the Calibre-Web
+`app.db` file and joins it to the Calibre library `metadata.db` + cover files.
+
+- Mount the Calibre-Web config folder read-only into the Hearth container.
+- Mount the Calibre library folder read-only into the Hearth container.
+- Set `KOBO_READER_APP_DB_PATH`, `KOBO_READER_LIBRARY_DB_PATH`, and `KOBO_READER_LIBRARY_ROOT` to the in-container paths.
+- Synology example mounts are included in `docker-compose.synology.yml`.
+
 ## Container Releases
 
 Hearth now supports an image-first deployment workflow.
@@ -152,11 +162,14 @@ Hearth now supports an image-first deployment workflow.
 - `3000`:
   - runtime server (`pnpm start`, Docker)
   - serves the built web app + API from one process
-  - default bind is `0.0.0.0`, so LAN devices can access `http://<LAN-IP>:3000`
+  - native/default bind is `127.0.0.1`, so local `pnpm start` stays on the same machine unless you opt in
+  - Docker compose files still set `HOST=0.0.0.0` for LAN/kiosk deployments
 - `5173`:
   - Vite web dev server only (`pnpm dev`)
   - not used for installed/runtime deployments
-- To restrict runtime to localhost only, set `HOST=127.0.0.1`.
+- To allow LAN devices to reach a native install, set `HOST=0.0.0.0`.
+- To keep a Docker install localhost-only, publish `127.0.0.1:3000:3000` instead of `3000:3000`.
+- Do not expose port `3000` directly to the internet. Hearth's display routes are intentionally unauthenticated for kiosk screens.
 
 ## Fullscreen / Kiosk Setup (Best Practice)
 
@@ -188,8 +201,7 @@ Notes:
 
 - Display routing is per-screen and server-managed from Admin > Devices.
 - Devices register automatically after they open `/` once, then can be renamed and managed remotely.
-- Each device has three routing modes:
-  - `Inherit default`: use the default routing policy and fallback behavior
+- Each device has two routing modes:
   - `Layout Set`: follow one specific set and that set's logic graph
   - `Single Layout`: pin one specific layout (no set logic)
 - Each device also has its own theme selection in Admin > Devices.
@@ -261,7 +273,7 @@ Current admin control:
 
 - `DATA_DIR` (default: `~/.hearth`, or existing `./data` if already present)
 - `DB_PATH` (default: `DATA_DIR/hearth.db`)
-- `HOST` (default: `0.0.0.0`)
+- `HOST` (default: `127.0.0.1` for native/server runs; Docker compose files set `0.0.0.0`)
 - `PORT` (default: `3000`)
 - `CORS_ORIGINS` (optional CSV allowlist, e.g. `https://dashboard.local,https://admin.local`)
 - `BACKUP_DIR` (default: `DATA_DIR/backups`)
@@ -274,8 +286,9 @@ Current admin control:
 
 Local env loading for `pnpm dev` / `pnpm start`:
 
-- Server reads `.env` automatically from the workspace root (and `apps/server/.env` as fallback).
-- Existing shell/container environment variables always take precedence over `.env` values.
+- Server reads `.env` automatically from the workspace root (and nearby fallbacks).
+- If present, `.env.local` loads after `.env` and overrides file-based values on that machine.
+- Existing shell/container environment variables always take precedence over `.env` and `.env.local`.
 
 ## Data Safety Defaults
 
@@ -304,6 +317,15 @@ docker compose up -d
 Suggested volume mounts:
 
 - `./data:/app/data`
+- optional Kobo Reader mounts:
+  - `/path/to/calibreweb-config:/external/calibreweb:ro`
+  - `/path/to/calibre-library:/external/books:ro`
+
+If you enable Kobo Reader in Docker, set these env vars to the in-container paths:
+
+- `KOBO_READER_APP_DB_PATH=/external/calibreweb/app.db`
+- `KOBO_READER_LIBRARY_DB_PATH=/external/books/metadata.db`
+- `KOBO_READER_LIBRARY_ROOT=/external/books`
 
 For a local source-build container install instead of the published image:
 

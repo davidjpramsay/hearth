@@ -9,17 +9,34 @@ import {
 } from "@hearth/shared";
 import { readdir } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { config } from "../config.js";
 import { DuplicateDeviceNameError } from "../repositories/device-name.js";
+import { sanitizeLayoutRecordForPublicDisplay } from "../services/public-layout.js";
 import type { AppServices } from "../types.js";
 
 const PHOTO_LIBRARY_ROOT = resolve(config.dataDir, "photos");
 const MAX_FOLDER_OPTIONS = 4096;
+const MAX_DEVICE_IP_LENGTH = 255;
 const displayDeviceParamsSchema = z.object({
   id: z.string().trim().min(1).max(128),
 });
+
+const normalizeRequestIp = (value: string | string[] | undefined): string | null => {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  if (typeof rawValue !== "string") {
+    return null;
+  }
+
+  const candidate = rawValue.split(",")[0]?.trim().slice(0, MAX_DEVICE_IP_LENGTH) ?? "";
+  return candidate.length > 0 ? candidate : null;
+};
+
+const getRequestDeviceIp = (request: FastifyRequest): string | null =>
+  normalizeRequestIp(request.headers["x-forwarded-for"]) ??
+  normalizeRequestIp(request.headers["x-real-ip"]) ??
+  normalizeRequestIp(request.ip);
 
 const toRelativeFolderPath = (absolutePath: string): string | null => {
   const rel = relative(PHOTO_LIBRARY_ROOT, absolutePath);
@@ -141,6 +158,33 @@ export const registerDisplayRoutes = (
     return reply.send(updatedDevice);
   });
 
+  app.delete("/display/devices/:id", async (request, reply) => {
+    await app.authenticate(request, reply);
+
+    if (reply.sent) {
+      return;
+    }
+
+    const parsedParams = displayDeviceParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.code(400).send({ message: parsedParams.error.message });
+    }
+
+    const deleted = services.deviceRepository.deleteDevice(parsedParams.data.id);
+    if (!deleted) {
+      return reply.code(404).send({ message: "Device not found" });
+    }
+
+    services.layoutEventBus.publish({
+      type: "display-device-updated",
+      deviceId: parsedParams.data.id,
+      changedAt: new Date().toISOString(),
+      reason: "device-updated",
+    });
+
+    return reply.code(204).send();
+  });
+
   app.get("/display/screen-profiles", async (request, reply) => {
     await app.authenticate(request, reply);
 
@@ -220,7 +264,14 @@ export const registerDisplayRoutes = (
       return reply.code(400).send({ message: parsedBody.error.message });
     }
 
-    const result = services.screenProfileService.reportScreenProfile(parsedBody.data);
-    return reply.send(reportScreenProfileResponseSchema.parse(result));
+    const result = services.screenProfileService.reportScreenProfile(parsedBody.data, {
+      lastSeenIp: getRequestDeviceIp(request),
+    });
+    return reply.send(
+      reportScreenProfileResponseSchema.parse({
+        ...result,
+        layout: sanitizeLayoutRecordForPublicDisplay(result.layout),
+      }),
+    );
   });
 };
