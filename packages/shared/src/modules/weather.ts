@@ -13,6 +13,8 @@ const weatherModuleConfigObjectSchema = withModulePresentation(
     windSpeedUnit: weatherWindSpeedUnitSchema.default("knots"),
     refreshIntervalSeconds: z.number().int().min(60).max(3600).default(600),
     showForecast: z.boolean().default(true),
+    showTodayConditionLabel: z.boolean().default(true),
+    showTodayConditionIcon: z.boolean().default(true),
     showTodayMinTemperature: z.boolean().default(true),
     showTodayPrecipitation: z.boolean().default(true),
     showTodayWind: z.boolean().default(true),

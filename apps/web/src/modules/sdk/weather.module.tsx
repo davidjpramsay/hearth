@@ -392,7 +392,8 @@ export const moduleDefinition = defineModule({
       );
       const compactForecastCards = density === "sm";
       const showForecast = forecastDays.length > 0;
-      const showTopCondition = density !== "xs";
+      const showTopCondition = settings.showTodayConditionLabel && density !== "xs";
+      const showHeroIcon = settings.showTodayConditionIcon;
       const showForecastWind = settings.showForecastWind && density !== "xs";
       const showForecastPrecipitation =
         settings.showForecastPrecipitation && density !== "xs";
@@ -564,7 +565,11 @@ export const moduleDefinition = defineModule({
           {!loading && !connectivityState.blockingError ? (
             <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
               {useStructuredHero ? (
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-4">
+                <div
+                  className={`grid items-stretch gap-4 ${
+                    showHeroIcon ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1"
+                  }`}
+                >
                   <div className="flex min-w-0 flex-col gap-4">
                     <div className="flex items-end gap-3">
                       <p
@@ -599,22 +604,25 @@ export const moduleDefinition = defineModule({
                     ) : null}
                   </div>
 
-                  <div className="flex shrink-0 self-stretch flex-col items-center justify-between py-1 text-center">
-                    <div
-                      className="module-panel-card flex h-20 w-20 items-center justify-center rounded-full border"
-                      style={WEATHER_ORB_STYLE}
-                    >
-                      <span
-                        aria-hidden
-                        className={heroIconClass}
-                        style={{
-                          color: "rgb(var(--module-accent-rgb, var(--color-text-accent-rgb)))",
-                        }}
+                  {showHeroIcon ? (
+                    <div className="flex shrink-0 self-stretch flex-col items-center justify-between py-1 text-center">
+                      <div
+                        className="module-panel-card flex h-20 w-20 items-center justify-center rounded-full border"
+                        style={WEATHER_ORB_STYLE}
                       >
-                        {weatherSymbolForCode(payload.conditionCode, payload.isDay)}
-                      </span>
+                        <span
+                          aria-hidden
+                          className={heroIconClass}
+                          style={{
+                            color:
+                              "rgb(var(--module-accent-rgb, var(--color-text-accent-rgb)))",
+                          }}
+                        >
+                          {weatherSymbolForCode(payload.conditionCode, payload.isDay)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
@@ -653,22 +661,25 @@ export const moduleDefinition = defineModule({
                       ) : null}
                     </div>
 
-                    <div className="flex shrink-0 flex-col items-center gap-3 text-center">
-                      <div
-                        className="module-panel-card flex h-20 w-20 items-center justify-center rounded-full border"
-                        style={WEATHER_ORB_STYLE}
-                      >
-                        <span
-                          aria-hidden
-                          className={heroIconClass}
-                          style={{
-                            color: "rgb(var(--module-accent-rgb, var(--color-text-accent-rgb)))",
-                          }}
+                    {showHeroIcon ? (
+                      <div className="flex shrink-0 flex-col items-center gap-3 text-center">
+                        <div
+                          className="module-panel-card flex h-20 w-20 items-center justify-center rounded-full border"
+                          style={WEATHER_ORB_STYLE}
                         >
-                          {weatherSymbolForCode(payload.conditionCode, payload.isDay)}
-                        </span>
+                          <span
+                            aria-hidden
+                            className={heroIconClass}
+                            style={{
+                              color:
+                                "rgb(var(--module-accent-rgb, var(--color-text-accent-rgb)))",
+                            }}
+                          >
+                            {weatherSymbolForCode(payload.conditionCode, payload.isDay)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    ) : null}
                   </div>
                 </div>
               )}
@@ -1006,6 +1017,20 @@ export const moduleDefinition = defineModule({
               </p>
             </div>
             <div className="space-y-2">
+              <WeatherSettingsToggle
+                label="Show condition text"
+                checked={settings.showTodayConditionLabel}
+                onChange={(showTodayConditionLabel) =>
+                  applyPatch({ showTodayConditionLabel })
+                }
+              />
+              <WeatherSettingsToggle
+                label="Show condition symbol"
+                checked={settings.showTodayConditionIcon}
+                onChange={(showTodayConditionIcon) =>
+                  applyPatch({ showTodayConditionIcon })
+                }
+              />
               <WeatherSettingsToggle
                 label="Show max / min"
                 checked={settings.showTodayMinTemperature}

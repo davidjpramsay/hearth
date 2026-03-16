@@ -222,12 +222,12 @@ export const moduleDefinition = defineModule({
           className="module-panel-shell relative isolate flex h-full w-full text-[color:var(--color-text-primary)]"
         >
           <div className="relative z-10 flex h-full w-full flex-col justify-between gap-4 px-4 py-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="module-text-small font-display uppercase tracking-[0.18em] text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
-                  {settings.showDate ? dayFormatter.format(now) : "Local time"}
-                </p>
-                {settings.showDate ? (
+            {settings.showDate ? (
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="module-text-small font-display uppercase tracking-[0.18em] text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
+                    {dayFormatter.format(now)}
+                  </p>
                   <p
                     className={`mt-1 font-medium text-[color:var(--color-text-primary)] ${
                       "module-text-body"
@@ -235,9 +235,9 @@ export const moduleDefinition = defineModule({
                   >
                     {dateFormatter.format(now)}
                   </p>
-                ) : null}
+                </div>
               </div>
-            </div>
+            ) : null}
 
             <div className={`flex w-full ${timeRowClass}`}>
               <p

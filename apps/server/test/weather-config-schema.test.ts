@@ -19,6 +19,8 @@ test("weather config schema defaults wind speed to knots", () => {
   });
 
   assert.equal(parsed.windSpeedUnit, "knots");
+  assert.equal(parsed.showTodayConditionLabel, true);
+  assert.equal(parsed.showTodayConditionIcon, true);
   assert.equal(parsed.showTodayMinTemperature, true);
   assert.equal(parsed.showTodayPrecipitation, true);
 });
