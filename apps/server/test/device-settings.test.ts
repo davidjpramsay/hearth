@@ -4,14 +4,24 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import Database from "better-sqlite3";
+import {
+  compileLayoutSetAuthoringToLogicGraph,
+  LOCAL_WARNING_AUTO_LAYOUT_LABEL,
+  LOCAL_WARNING_CANVAS_ACTION_TYPE,
+  LOCAL_WARNING_CONDITION_TYPE,
+  LOCAL_WARNING_MODULE_ID,
+  setPrimaryPhotoRouterBlock,
+} from "@hearth/shared";
 import { createDatabase } from "../src/db";
+import { configureLayoutLogicRegistry } from "../src/layout-logic/registry";
 import { DeviceRepository } from "../src/repositories/device-repository";
 import { DuplicateDeviceNameError } from "../src/repositories/device-name";
 import { LayoutRepository } from "../src/repositories/layout-repository";
 import { SettingsRepository } from "../src/repositories/settings-repository";
+import type { LocalWarningService } from "../src/services/local-warning-service";
 import { ScreenProfileService } from "../src/services/screen-profile-service";
 
-const createHarness = () => {
+const createHarness = (localWarningService: LocalWarningService | null = null) => {
   const directory = mkdtempSync(join(tmpdir(), "hearth-device-settings-"));
   const db = createDatabase(join(directory, "hearth.sqlite"));
   const layoutRepository = new LayoutRepository(db, {
@@ -23,10 +33,12 @@ const createHarness = () => {
     layoutRepository,
     settingsRepository,
     deviceRepository,
+    localWarningService,
   );
 
   return {
     deviceRepository,
+    settingsRepository,
     screenProfileService,
     dispose: () => {
       db.close();
@@ -135,6 +147,261 @@ test("server-managed device settings override later reported local values", () =
     assert.equal(response.resolvedTargetSelection.setId, "set-1");
     assert.equal(response.layout?.name, "16:9 Standard Landscape");
   } finally {
+    harness.dispose();
+  }
+});
+
+test("reportScreenProfile returns the automatic warning layout for warning targets", () => {
+  const harness = createHarness();
+
+  try {
+    configureLayoutLogicRegistry({
+      localWarningService: {
+        hasEscalatingWarning: () => true,
+      } as unknown as LocalWarningService,
+    });
+    const warningAuthoring = setPrimaryPhotoRouterBlock({
+      authoring: {
+        version: 1,
+        blocks: [],
+      },
+      block: {
+        id: "photo-router",
+        type: "photo-router",
+        nodes: [
+          {
+            id: "warning-a",
+            nodeType: "photo-orientation",
+            title: "Warning Node",
+            photoActionType: LOCAL_WARNING_CANVAS_ACTION_TYPE,
+            photoActionCollectionId: null,
+            portrait: {
+              enabled: true,
+              conditionType: LOCAL_WARNING_CONDITION_TYPE,
+              conditionParams: {
+                locationQuery: "Perth, AU",
+              },
+            },
+            landscape: {
+              enabled: false,
+              conditionType: "photo.orientation.landscape",
+              conditionParams: {},
+            },
+          },
+          {
+            id: "layout-fallback",
+            nodeType: "layout",
+            layoutName: "16:9 Standard Landscape",
+            cycleSeconds: 20,
+            actionType: "layout.display",
+            actionParams: {},
+          },
+        ],
+        title: "Photo Orientation",
+        photoActionType: LOCAL_WARNING_CANVAS_ACTION_TYPE,
+        photoActionCollectionId: null,
+        layoutNodes: [],
+        connections: [
+          {
+            id: "__start__::default::warning-a",
+            source: "__start__",
+            sourceHandle: null,
+            target: "warning-a",
+          },
+          {
+            id: "warning-a::fallback::layout-fallback",
+            source: "warning-a",
+            sourceHandle: "fallback",
+            target: "layout-fallback",
+          },
+          {
+            id: "layout-fallback::next::__end__",
+            source: "layout-fallback",
+            sourceHandle: "next",
+            target: "__end__",
+          },
+        ],
+        nodePositions: {},
+        fallback: {
+          steps: [],
+        },
+        portrait: {
+          enabled: true,
+          conditionType: LOCAL_WARNING_CONDITION_TYPE,
+          conditionParams: {},
+          steps: [],
+        },
+        landscape: {
+          enabled: false,
+          conditionType: "photo.orientation.landscape",
+          conditionParams: {},
+          steps: [],
+        },
+      },
+    });
+    const mapping = harness.settingsRepository.getScreenProfileLayouts();
+    harness.settingsRepository.setScreenProfileLayouts({
+      ...mapping,
+      families: {
+        ...mapping.families,
+        "set-1": {
+          ...mapping.families["set-1"],
+          logicBlocks: warningAuthoring,
+          logicGraph: compileLayoutSetAuthoringToLogicGraph(warningAuthoring),
+        },
+      },
+    });
+
+    const response = harness.screenProfileService.reportScreenProfile({
+      screenSessionId: "device-warning-1",
+      reportedThemeId: "default",
+    });
+
+    assert.equal(response.layout?.name, LOCAL_WARNING_AUTO_LAYOUT_LABEL);
+    assert.equal(response.layout?.config.modules[0]?.moduleId, LOCAL_WARNING_MODULE_ID);
+    assert.equal(
+      response.layout?.config.modules[0]?.config.locationQuery,
+      "Perth, AU",
+    );
+    assert.equal(response.warningTicker, null);
+  } finally {
+    configureLayoutLogicRegistry({
+      localWarningService: null,
+    });
+    harness.dispose();
+  }
+});
+
+test("minor warnings stay on the normal layout and return a ticker payload", () => {
+  const localWarningService = {
+    hasEscalatingWarning: () => false,
+    listCachedActiveWarnings: () => [
+      {
+        id: "warn-1",
+        serviceKind: "emergency-wa" as const,
+        serviceLabel: "Emergency WA",
+        categoryLabel: "Fire",
+        alertLevel: "Bushfire Advice",
+        headline: "Bushfire Advice MONITOR CONDITIONS - YANCHEP",
+        severity: "Minor",
+        urgency: "Future",
+        eventLabel: "Bushfire",
+        areaLabels: ["Yanchep"],
+        detailUrl: "https://emergency.wa.gov.au/warnings/test-warning",
+      },
+    ],
+  } as unknown as LocalWarningService;
+  const harness = createHarness(localWarningService);
+
+  try {
+    configureLayoutLogicRegistry({
+      localWarningService,
+    });
+    const warningAuthoring = setPrimaryPhotoRouterBlock({
+      authoring: {
+        version: 1,
+        blocks: [],
+      },
+      block: {
+        id: "photo-router",
+        type: "photo-router",
+        nodes: [
+          {
+            id: "warning-a",
+            nodeType: "photo-orientation",
+            title: "Warning Node",
+            photoActionType: LOCAL_WARNING_CANVAS_ACTION_TYPE,
+            photoActionCollectionId: null,
+            portrait: {
+              enabled: true,
+              conditionType: LOCAL_WARNING_CONDITION_TYPE,
+              conditionParams: {
+                locationQuery: "Yanchep, AU",
+              },
+            },
+            landscape: {
+              enabled: false,
+              conditionType: "photo.orientation.landscape",
+              conditionParams: {},
+            },
+          },
+          {
+            id: "layout-fallback",
+            nodeType: "layout",
+            layoutName: "16:9 Standard Landscape",
+            cycleSeconds: 20,
+            actionType: "layout.display",
+            actionParams: {},
+          },
+        ],
+        title: "Photo Orientation",
+        photoActionType: LOCAL_WARNING_CANVAS_ACTION_TYPE,
+        photoActionCollectionId: null,
+        layoutNodes: [],
+        connections: [
+          {
+            id: "__start__::default::warning-a",
+            source: "__start__",
+            sourceHandle: null,
+            target: "warning-a",
+          },
+          {
+            id: "warning-a::fallback::layout-fallback",
+            source: "warning-a",
+            sourceHandle: "fallback",
+            target: "layout-fallback",
+          },
+          {
+            id: "layout-fallback::next::__end__",
+            source: "layout-fallback",
+            sourceHandle: "next",
+            target: "__end__",
+          },
+        ],
+        nodePositions: {},
+        fallback: {
+          steps: [],
+        },
+        portrait: {
+          enabled: true,
+          conditionType: LOCAL_WARNING_CONDITION_TYPE,
+          conditionParams: {},
+          steps: [],
+        },
+        landscape: {
+          enabled: false,
+          conditionType: "photo.orientation.landscape",
+          conditionParams: {},
+          steps: [],
+        },
+      },
+    });
+    const mapping = harness.settingsRepository.getScreenProfileLayouts();
+    harness.settingsRepository.setScreenProfileLayouts({
+      ...mapping,
+      families: {
+        ...mapping.families,
+        "set-1": {
+          ...mapping.families["set-1"],
+          logicBlocks: warningAuthoring,
+          logicGraph: compileLayoutSetAuthoringToLogicGraph(warningAuthoring),
+        },
+      },
+    });
+
+    const response = harness.screenProfileService.reportScreenProfile({
+      screenSessionId: "device-warning-ticker-1",
+      reportedThemeId: "default",
+    });
+
+    assert.equal(response.layout?.name, "16:9 Standard Landscape");
+    assert.equal(response.warningTicker?.locationLabel, "Yanchep, AU");
+    assert.equal(response.warningTicker?.warnings.length, 1);
+    assert.equal(response.warningTicker?.warnings[0]?.alertLevel, "Bushfire Advice");
+  } finally {
+    configureLayoutLogicRegistry({
+      localWarningService: null,
+    });
     harness.dispose();
   }
 });

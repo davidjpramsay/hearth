@@ -20,6 +20,9 @@ import {
   DEFAULT_LAYOUT_LOGIC_PHOTO_ACTION_TYPE,
   DEFAULT_PORTRAIT_LAYOUT_LOGIC_CONDITION_TYPE,
   getDefaultLayoutLogicConditionTypeForTrigger,
+  LOCAL_WARNING_CANVAS_ACTION_TYPE,
+  LOCAL_WARNING_CONDITION_TYPE,
+  localWarningConditionParamsSchema,
   renderBuiltinLayoutLogicRuleSummary,
   resolveBuiltinLayoutLogicAction,
   type LayoutLogicResolvedTarget as SharedLayoutLogicResolvedTarget,
@@ -86,8 +89,37 @@ const DEFAULT_RULE_ACTION_FIELDS: LayoutLogicRuleActionTypeDefinition["fields"] 
   },
 ];
 
-const customConditionTypes: LayoutLogicConditionTypeDefinition[] = [];
-const customCanvasActionTypes: LayoutLogicCanvasActionTypeDefinition[] = [];
+const customConditionTypes: LayoutLogicConditionTypeDefinition[] = [
+  {
+    id: LOCAL_WARNING_CONDITION_TYPE,
+    label: "Local warning is active",
+    description:
+      "Match when Emergency WA reports an active local warning for the chosen place.",
+    trigger: "portrait-photo",
+    paramsSchema: localWarningConditionParamsSchema,
+    paramFields: [
+      {
+        key: "locationQuery",
+        label: "Location",
+        kind: "location-search",
+        placeholder: "Perth, AU",
+        latitudeKey: "latitude",
+        longitudeKey: "longitude",
+        searchPath: "/api/modules/weather/locations",
+        allowDeviceLocation: true,
+      },
+    ],
+  },
+];
+const customCanvasActionTypes: LayoutLogicCanvasActionTypeDefinition[] = [
+  {
+    id: LOCAL_WARNING_CANVAS_ACTION_TYPE,
+    label: "Check local warnings",
+    nodeLabel: "Local warning check",
+    description:
+      "Checks Emergency WA local warnings, then shows the automatic warning layout when active.",
+  },
+];
 const customRuleActionTypes: LayoutLogicRuleActionTypeDefinition[] = [];
 
 const toSdkResolvedTarget = (

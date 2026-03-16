@@ -1,11 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { z } from "zod";
 import { withModulePresentation } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
-import {
-  ModulePresentationControls,
-  scaleRoleRem,
-} from "../ui/ModulePresentationControls";
+import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
@@ -272,7 +269,23 @@ export const moduleDefinition = defineModule({
   },
   settingsSchema,
   runtime: {
-    Component: ({ instanceId, settings }) => {
+    Component: ({ instanceId, settings, isEditing }) => {
+      if (isEditing) {
+        return (
+          <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
+            <p className="module-text-title text-slate-100">
+              Count Down preview
+            </p>
+            <p className="module-text-small mt-2 text-slate-300">
+              {settings.eventName.trim() || "Upcoming Event"}
+            </p>
+            <p className="module-text-small mt-1 text-slate-400">
+              Mode: {settings.mode === "time" ? "Duration" : "Date"}
+            </p>
+          </div>
+        );
+      }
+
       const [nowMs, setNowMs] = useState(() => Date.now());
       const [durationTargetMs, setDurationTargetMs] = useState(() =>
         Date.now() + durationToMs(settings),
@@ -323,43 +336,48 @@ export const moduleDefinition = defineModule({
       const countdown = useMemo(() => splitDuration(remainingMs), [remainingMs]);
       const complete = remainingMs <= 0;
       const displayEventName = settings.eventName.trim() || "Upcoming Event";
-      const eventLabelSize = scaleRoleRem(0.75, settings.presentation.headingScale);
-      const eventNameSize = scaleRoleRem(1, settings.presentation.headingScale);
-      const segmentValueSize = scaleRoleRem(1.5, settings.presentation.primaryScale);
-      const segmentLabelSize = scaleRoleRem(0.6875, settings.presentation.supportingScale);
       const timeSegments = [
         { label: "Days", value: String(countdown.days) },
         { label: "Hours", value: String(countdown.hours).padStart(2, "0") },
         { label: "Minutes", value: String(countdown.minutes).padStart(2, "0") },
         { label: "Seconds", value: String(countdown.seconds).padStart(2, "0") },
       ] as const;
+      const shellStyle = {
+        ["--module-accent-rgb" as string]: complete
+          ? "var(--color-status-ok-rgb)"
+          : "var(--color-text-accent-rgb)",
+        boxShadow: complete ? "0 0 20px rgb(var(--color-status-ok-rgb) / 0.16)" : undefined,
+      } as CSSProperties;
 
       return (
         <div
-          className={`relative flex h-full w-full flex-col overflow-hidden rounded-xl px-3 py-3 text-cyan-100 ${
-            complete
-              ? "border border-emerald-300/70 bg-gradient-to-br from-slate-900 via-emerald-950/50 to-slate-800 shadow-[0_0_24px_rgba(16,185,129,0.35)]"
-              : "border border-cyan-600/40 bg-gradient-to-br from-slate-900 to-slate-800"
-          }`}
+          className="module-panel-shell relative flex h-full w-full flex-col overflow-hidden px-3 py-3 text-[color:var(--color-text-primary)]"
+          style={shellStyle}
         >
           {complete ? (
-            <>
-              <div className="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-emerald-300/50 animate-pulse" />
-            </>
+            <div
+              className="pointer-events-none absolute inset-0 animate-pulse rounded-[inherit]"
+              style={{
+                boxShadow:
+                  "inset 0 0 0 1px rgb(var(--color-status-ok-rgb) / 0.42), 0 0 0 1px rgb(var(--color-status-ok-rgb) / 0.12)",
+              }}
+            />
           ) : null}
 
           <div>
             <p
-              className="truncate uppercase tracking-wide text-cyan-200/80"
-              style={{ fontSize: eventLabelSize }}
+              className="module-text-small truncate font-display uppercase tracking-wide text-[color:var(--color-text-secondary)]"
             >
               Event
             </p>
             <p
-              className={`truncate font-semibold ${
-                complete ? "animate-pulse text-emerald-200 drop-shadow-[0_0_10px_rgba(52,211,153,0.7)]" : ""
-              }`}
-              style={{ fontSize: eventNameSize }}
+              className={`module-text-title truncate ${complete ? "animate-pulse" : ""}`}
+              style={{
+                color: complete ? "var(--color-status-ok)" : "var(--color-text-primary)",
+                textShadow: complete
+                  ? "0 0 10px rgb(var(--color-status-ok-rgb) / 0.22)"
+                  : undefined,
+              }}
               title={displayEventName}
             >
               {displayEventName}
@@ -371,21 +389,26 @@ export const moduleDefinition = defineModule({
               {timeSegments.map((segment) => (
                 <div
                   key={segment.label}
-                  className={`flex min-h-[90px] min-w-0 flex-col items-center justify-center rounded border px-2 py-2 ${
+                  className="module-panel-card flex min-h-[90px] min-w-0 flex-col items-center justify-center rounded px-2 py-2"
+                  style={
                     complete
-                      ? "border-emerald-300/40 bg-emerald-500/10"
-                      : "border-slate-700 bg-slate-900/70"
-                  }`}
+                      ? {
+                          borderColor: "rgb(var(--color-status-ok-rgb) / 0.35)",
+                          background: "rgb(var(--color-status-ok-rgb) / 0.12)",
+                        }
+                      : undefined
+                  }
                 >
                   <p
-                    className="font-semibold leading-none text-cyan-200"
-                    style={{ fontSize: segmentValueSize }}
+                    className="module-text-title leading-none"
+                    style={{
+                      color: complete ? "var(--color-status-ok)" : "var(--color-text-accent)",
+                    }}
                   >
                     {segment.value}
                   </p>
                   <p
-                    className="mt-2 uppercase tracking-wide text-slate-300"
-                    style={{ fontSize: segmentLabelSize }}
+                    className="module-text-small mt-2 font-display uppercase tracking-[0.18em] text-slate-300"
                   >
                     {segment.label}
                   </p>

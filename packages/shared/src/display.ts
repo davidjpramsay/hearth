@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { layoutRecordSchema } from "./layout.js";
 import {
+  LOCAL_WARNING_AUTO_LAYOUT_NAME,
+  LOCAL_WARNING_CANVAS_ACTION_TYPE,
+} from "./layout-logic-warnings.js";
+import { localWarningItemSchema } from "./modules/local-warnings.js";
+import {
   photoCollectionIdSchema,
   photosOrientationSchema,
 } from "./modules/photos.js";
@@ -29,6 +34,10 @@ const conditionTypeSchema = z.string().trim().min(1).max(120);
 export const layoutLogicParamsSchema = z
   .record(z.string().trim().min(1).max(64), z.unknown())
   .default({});
+
+export const isLocalWarningAutoLayoutName = (
+  value: string | null | undefined,
+): boolean => (value?.trim() ?? "") === LOCAL_WARNING_AUTO_LAYOUT_NAME;
 
 const clampCycleSeconds = (value: number): number =>
   Math.max(3, Math.min(3600, Math.round(value)));
@@ -1535,6 +1544,8 @@ function compilePhotoRouterGraphToLogicGraph(input: PhotoRouterBlock): LayoutSet
         sourceHandle: "fallback",
       }),
     );
+    const isWarningActionNode =
+      (graphNode.photoActionType?.trim() ?? "") === LOCAL_WARNING_CANVAS_ACTION_TYPE;
 
     const conditionTrigger =
       resolveConditionTrigger("if-portrait", graphNode.portrait.conditionType) ??
@@ -1559,16 +1570,43 @@ function compilePhotoRouterGraphToLogicGraph(input: PhotoRouterBlock): LayoutSet
         to: conditionNodeId,
       }),
     );
-    const portraitTargetId = getPhotoRouterConnectionTarget({
-      connectionsBySourceHandle,
-      source: graphNode.id,
-      sourceHandle: "portrait",
-    });
+    const portraitTargetId = isWarningActionNode
+      ? null
+      : getPhotoRouterConnectionTarget({
+          connectionsBySourceHandle,
+          source: graphNode.id,
+          sourceHandle: "portrait",
+        });
+    const warningDisplayNodeId = `display-warning:${graphNode.id}`;
+    if (isWarningActionNode) {
+      appendNode(
+        toDisplayNode({
+          id: warningDisplayNodeId,
+          layoutName: LOCAL_WARNING_AUTO_LAYOUT_NAME,
+          cycleSeconds: DEFAULT_TARGET_CYCLE_SECONDS,
+          actionType: DEFAULT_ACTION_TYPE,
+          actionParams: toLogicParams(graphNode.portrait.conditionParams),
+          conditionType: graphNode.portrait.conditionType?.trim() || null,
+          conditionParams: toLogicParams(graphNode.portrait.conditionParams),
+        }),
+      );
+      appendEdge(
+        toEdge({
+          id: `edge-${warningDisplayNodeId}-next`,
+          from: warningDisplayNodeId,
+          to: "return",
+        }),
+      );
+    }
     appendEdge(
       toEdge({
         id: `edge-${conditionNodeId}-yes`,
         from: conditionNodeId,
-        to: portraitTargetId ? compileTarget(portraitTargetId) : defaultTarget,
+        to: isWarningActionNode
+          ? warningDisplayNodeId
+          : portraitTargetId
+            ? compileTarget(portraitTargetId)
+            : defaultTarget,
         when: "yes",
       }),
     );
@@ -2505,7 +2543,8 @@ export const normalizeLayoutSetLogicGraph = (input: {
   const parsed = layoutSetLogicGraphSchema.parse(input.graph);
   const nodes = parsed.nodes.filter((node) =>
     node.type === "display"
-      ? input.knownLayoutNames.has(node.layoutName?.trim() ?? "")
+      ? input.knownLayoutNames.has(node.layoutName?.trim() ?? "") ||
+        isLocalWarningAutoLayoutName(node.layoutName)
       : true,
   );
   const nodeIds = new Set(nodes.map((node) => node.id));
@@ -2630,6 +2669,11 @@ export const reportScreenProfileLayoutOptionSchema = z.object({
   name: layoutNameSchema,
 });
 
+export const reportScreenProfileWarningTickerSchema = z.object({
+  locationLabel: z.string().trim().min(1).max(120),
+  warnings: z.array(localWarningItemSchema).max(24).default([]),
+});
+
 export const reportScreenProfileResponseSchema = z.object({
   family: screenFamilySchema,
   availableSets: z.array(reportScreenProfileSetOptionSchema).max(24).default([]),
@@ -2643,6 +2687,7 @@ export const reportScreenProfileResponseSchema = z.object({
   device: displayDeviceRuntimeSchema,
   resolvedTargetSelection: reportScreenTargetSelectionSchema,
   layout: layoutRecordSchema.nullable(),
+  warningTicker: reportScreenProfileWarningTickerSchema.nullable().default(null),
   reason: reportScreenProfileReasonSchema,
 });
 
@@ -2665,4 +2710,7 @@ export type ReportScreenProfileRequest = z.infer<typeof reportScreenProfileReque
 export type ReportScreenProfileReason = z.infer<typeof reportScreenProfileReasonSchema>;
 export type ReportScreenProfileSetOption = z.infer<typeof reportScreenProfileSetOptionSchema>;
 export type ReportScreenProfileLayoutOption = z.infer<typeof reportScreenProfileLayoutOptionSchema>;
+export type ReportScreenProfileWarningTicker = z.infer<
+  typeof reportScreenProfileWarningTickerSchema
+>;
 export type ReportScreenProfileResponse = z.infer<typeof reportScreenProfileResponseSchema>;

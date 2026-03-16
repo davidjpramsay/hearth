@@ -29,10 +29,13 @@ import {
 } from "@xyflow/react";
 import {
   DEFAULT_LANDSCAPE_LAYOUT_LOGIC_CONDITION_TYPE,
+  LOCAL_WARNING_CANVAS_ACTION_TYPE,
+  LOCAL_WARNING_CONDITION_TYPE,
   DEFAULT_PORTRAIT_LAYOUT_LOGIC_CONDITION_TYPE,
   PHOTO_COLLECTION_ACTION_PARAM_KEY,
   getPrimaryPhotoRouterBlock,
   setPrimaryPhotoRouterBlock,
+  weatherLocationSearchResponseSchema,
   type LayoutSetAuthoring,
   type PhotoRouterBlock,
   type PhotoRouterConnection,
@@ -43,7 +46,6 @@ import {
 import type { RuntimeHealthReport } from "../../pages/layout-set-runtime-health";
 import {
   LOGIC_ACTION_TYPES,
-  LOGIC_CANVAS_ACTION_TYPES,
   LOGIC_CONDITION_TYPES,
   getActionTypeById,
   getCanvasActionTypeById,
@@ -54,6 +56,7 @@ import {
   parseActionParamsByType,
   parseConditionParamsByType,
   type LogicParamFieldDefinition,
+  type LogicParams,
 } from "./logicNodeRegistry";
 
 interface LayoutOption {
@@ -76,20 +79,23 @@ interface PhotoRouterBlockEditorProps {
 
 type ConditionalTrigger = "portrait-photo";
 type BranchKey = "fallback" | "portrait";
+type ActionNodeKind = "photo" | "warning";
 type StepNodeType = Node<LayoutNodeData, "layoutNode">;
 type RouterNodeType = Node<RouterNodeData, "routerNode">;
 type TerminalNodeType = Node<TerminalNodeData, "terminalNode">;
 
 interface RouterNodeData extends Record<string, unknown> {
   title: string;
-  photoActionLabel: string;
-  photoSourceLabel: string;
+  kindLabel: string;
+  actionSummary: string;
+  sourceLabel: string | null;
   onRemove?: () => void;
   routes: Array<{
     key: BranchKey;
     label: string;
     count: number;
     enabled: boolean;
+    connectable?: boolean;
   }>;
 }
 
@@ -158,6 +164,14 @@ const getConditionBranchCopy = (conditionType: string | null | undefined) => {
       title: "Portrait photo",
       matchedLabel: "Portrait",
       fallbackLabel: "Not Portrait",
+    };
+  }
+
+  if (normalizedConditionType === LOCAL_WARNING_CONDITION_TYPE) {
+    return {
+      title: "Warning check",
+      matchedLabel: "Warning Active",
+      fallbackLabel: "No Warning",
     };
   }
 
@@ -231,6 +245,246 @@ const toParamBooleanValue = (value: unknown): boolean => {
   return false;
 };
 
+interface LocationSearchResult {
+  id: string;
+  label: string;
+  latitude: number;
+  longitude: number;
+}
+
+const searchWeatherLocations = async (
+  query: string,
+  path: string,
+): Promise<{
+  results: LocationSearchResult[];
+  warning: string | null;
+}> => {
+  const response = await fetch(`${path}?q=${encodeURIComponent(query)}`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const message =
+      payload && typeof payload.message === "string"
+        ? payload.message
+        : `Request failed (${response.status})`;
+    throw new Error(message);
+  }
+
+  const parsed = weatherLocationSearchResponseSchema.parse(await response.json());
+  return {
+    results: parsed.results.map((result) => ({
+      id: result.id,
+      label: result.label,
+      latitude: result.latitude,
+      longitude: result.longitude,
+    })),
+    warning: parsed.warning,
+  };
+};
+
+const LocationSearchFieldEditor = ({
+  field,
+  params,
+  onPatch,
+}: {
+  field: LogicParamFieldDefinition;
+  params: LogicParams;
+  onPatch: (patch: LogicParams) => void;
+}) => {
+  const [results, setResults] = useState<LocationSearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  const [geoLoading, setGeoLoading] = useState(false);
+
+  const locationValue = toParamStringValue(params[field.key]);
+  const latitudeKey = field.latitudeKey ?? "latitude";
+  const longitudeKey = field.longitudeKey ?? "longitude";
+  const latitudeValue = params[latitudeKey];
+  const longitudeValue = params[longitudeKey];
+  const hasPinnedCoordinates =
+    typeof latitudeValue === "number" && typeof longitudeValue === "number";
+
+  const applyLocationResult = (result: LocationSearchResult) => {
+    onPatch({
+      [field.key]: result.label,
+      [latitudeKey]: result.latitude,
+      [longitudeKey]: result.longitude,
+    });
+    setResults([]);
+    setError(null);
+    setWarning(null);
+  };
+
+  const runSearch = async () => {
+    const query = locationValue.trim();
+    if (!query) {
+      setError("Enter a location to search.");
+      setWarning(null);
+      setResults([]);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setWarning(null);
+
+    try {
+      const payload = await searchWeatherLocations(
+        query,
+        field.searchPath ?? "/api/modules/weather/locations",
+      );
+      setResults(payload.results);
+      setWarning(
+        payload.warning ?? (payload.results.length === 0 ? "No matching locations found." : null),
+      );
+    } catch (nextError) {
+      setResults([]);
+      setWarning(null);
+      setError(
+        nextError instanceof Error ? nextError.message : "Failed to search locations.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const useDeviceLocation = async () => {
+    if (!("geolocation" in navigator)) {
+      setError("Geolocation is not available in this browser.");
+      return;
+    }
+
+    setGeoLoading(true);
+    setError(null);
+
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 15_000,
+          maximumAge: 60_000,
+        });
+      });
+
+      const latitude = Number(position.coords.latitude.toFixed(6));
+      const longitude = Number(position.coords.longitude.toFixed(6));
+      onPatch({
+        [field.key]: `Local (${latitude.toFixed(3)}, ${longitude.toFixed(3)})`,
+        [latitudeKey]: latitude,
+        [longitudeKey]: longitude,
+      });
+      setResults([]);
+      setWarning(null);
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error ? nextError.message : "Unable to read this device location.",
+      );
+    } finally {
+      setGeoLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-3 md:col-span-2">
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          {field.label}
+        </span>
+        <input
+          type="text"
+          value={locationValue}
+          placeholder={field.placeholder}
+          className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+          onChange={(event) =>
+            onPatch({
+              [field.key]: event.target.value,
+              [latitudeKey]: null,
+              [longitudeKey]: null,
+            })
+          }
+        />
+      </label>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="rounded border border-cyan-500/60 bg-cyan-500/20 px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/30 disabled:opacity-60"
+          onClick={() => void runSearch()}
+          disabled={loading}
+        >
+          {loading ? "Searching..." : "Search places"}
+        </button>
+        {field.allowDeviceLocation ? (
+          <button
+            type="button"
+            className="rounded border border-emerald-500/60 bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/30 disabled:opacity-60"
+            onClick={() => void useDeviceLocation()}
+            disabled={geoLoading}
+          >
+            {geoLoading ? "Locating..." : "Use this device location"}
+          </button>
+        ) : null}
+        {hasPinnedCoordinates ? (
+          <button
+            type="button"
+            className="rounded border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:border-slate-400"
+            onClick={() =>
+              onPatch({
+                [latitudeKey]: null,
+                [longitudeKey]: null,
+              })
+            }
+          >
+            Clear pinned coordinates
+          </button>
+        ) : null}
+      </div>
+
+      {hasPinnedCoordinates ? (
+        <p className="mt-3 rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-200">
+          Using pinned coordinates: {(latitudeValue as number).toFixed(4)}, {" "}
+          {(longitudeValue as number).toFixed(4)}
+        </p>
+      ) : (
+        <p className="mt-3 rounded border border-slate-700 bg-slate-950/60 px-2 py-1 text-xs text-slate-300">
+          Using the place name for Emergency WA matching. Pinned coordinates improve local area
+          matching when the warning feed includes map geometry.
+        </p>
+      )}
+
+      {error ? (
+        <p className="mt-3 rounded border border-rose-500/50 bg-rose-500/10 px-2 py-1 text-xs text-rose-200">
+          {error}
+        </p>
+      ) : null}
+
+      {warning ? (
+        <p className="mt-3 rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs text-amber-200">
+          {warning}
+        </p>
+      ) : null}
+
+      {results.length > 0 ? (
+        <div className="mt-3 max-h-44 space-y-1 overflow-y-auto rounded border border-slate-700 bg-slate-950/70 p-1">
+          {results.map((result) => (
+            <button
+              key={result.id}
+              type="button"
+              className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1.5 text-left text-xs text-slate-100 hover:border-cyan-400"
+              onClick={() => applyLocationResult(result)}
+            >
+              {result.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 const createStepId = (): string => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -283,6 +537,52 @@ const isLayoutGraphNode = (
 const isPhotoOrientationNode = (
   node: PhotoRouterGraphNode,
 ): node is PhotoRouterPhotoOrientationNode => node.nodeType === "photo-orientation";
+
+const isWarningCanvasActionType = (
+  actionType: string | null | undefined,
+): boolean => (actionType?.trim() ?? "") === LOCAL_WARNING_CANVAS_ACTION_TYPE;
+
+const getActionNodeKind = (
+  actionType: string | null | undefined,
+): ActionNodeKind => (isWarningCanvasActionType(actionType) ? "warning" : "photo");
+
+const getAvailableConditionTypes = (
+  kind: ActionNodeKind,
+  trigger: ConditionalTrigger,
+) =>
+  LOGIC_CONDITION_TYPES.filter((condition) => {
+    if (kind === "warning") {
+      return condition.id === LOCAL_WARNING_CONDITION_TYPE;
+    }
+    if (condition.id === LOCAL_WARNING_CONDITION_TYPE) {
+      return false;
+    }
+    return condition.trigger === trigger || condition.trigger === "landscape-photo";
+  });
+
+const getNormalizedConditionTypeForNodeKind = (
+  kind: ActionNodeKind,
+  trigger: ConditionalTrigger,
+  conditionType: string | null | undefined,
+): string | null => {
+  const availableConditionTypes = getAvailableConditionTypes(kind, trigger);
+  const normalizedConditionType = conditionType?.trim() ?? "";
+  if (availableConditionTypes.some((condition) => condition.id === normalizedConditionType)) {
+    return normalizedConditionType;
+  }
+  return availableConditionTypes[0]?.id ?? getDefaultConditionTypeForTrigger(trigger);
+};
+
+const getActionNodeKindLabel = (kind: ActionNodeKind): string =>
+  kind === "warning" ? "Warning" : "Photo Orientation";
+
+const getDefaultActionNodeTitle = (
+  kind: ActionNodeKind,
+  existingCount: number,
+): string => {
+  const baseTitle = kind === "warning" ? "Warning Node" : "Photo Orientation Node";
+  return existingCount === 0 ? baseTitle : `${baseTitle} ${existingCount + 1}`;
+};
 
 const isBranchKey = (value: string | null | undefined): value is BranchKey =>
   value === "portrait" || value === "fallback";
@@ -363,13 +663,19 @@ const createEdge = (input: {
 
 const ParamFieldEditor = ({
   field,
-  value,
-  onChange,
+  params,
+  onPatch,
 }: {
   field: LogicParamFieldDefinition;
-  value: unknown;
-  onChange: (value: string | number | boolean | null) => void;
+  params: LogicParams;
+  onPatch: (patch: LogicParams) => void;
 }) => {
+  if (field.kind === "location-search") {
+    return <LocationSearchFieldEditor field={field} params={params} onPatch={onPatch} />;
+  }
+
+  const value = params[field.key];
+
   if (field.kind === "boolean") {
     return (
       <label className="flex items-center justify-between rounded border border-slate-700 bg-slate-800/40 px-3 py-2">
@@ -377,7 +683,7 @@ const ParamFieldEditor = ({
         <input
           type="checkbox"
           checked={toParamBooleanValue(value)}
-          onChange={(event) => onChange(event.target.checked)}
+          onChange={(event) => onPatch({ [field.key]: event.target.checked })}
         />
       </label>
     );
@@ -403,7 +709,7 @@ const ParamFieldEditor = ({
             if (!Number.isFinite(parsed)) {
               return;
             }
-            onChange(parsed);
+            onPatch({ [field.key]: parsed });
           }}
         />
       </label>
@@ -419,7 +725,7 @@ const ParamFieldEditor = ({
         <select
           className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
           value={toParamStringValue(value)}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => onPatch({ [field.key]: event.target.value })}
         >
           {(field.options ?? []).map((option) => (
             <option key={option.value} value={option.value}>
@@ -440,7 +746,7 @@ const ParamFieldEditor = ({
         type="text"
         value={toParamStringValue(value)}
         className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => onPatch({ [field.key]: event.target.value })}
       />
     </label>
   );
@@ -461,13 +767,15 @@ const RouterNode = ({ data, selected }: NodeProps<RouterNodeType>) => (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
         <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-200/90">
-          Action
+          {data.kindLabel}
         </p>
         <h4 className="mt-1 text-lg font-semibold text-slate-100">{data.title}</h4>
-        <p className="mt-2 text-sm text-slate-300">{data.photoActionLabel}</p>
-        <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
-          Source: {data.photoSourceLabel}
-        </p>
+        <p className="mt-2 text-sm text-slate-300">{data.actionSummary}</p>
+        {data.sourceLabel ? (
+          <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
+            Source: {data.sourceLabel}
+          </p>
+        ) : null}
       </div>
       {data.onRemove ? (
         <button
@@ -492,24 +800,26 @@ const RouterNode = ({ data, selected }: NodeProps<RouterNodeType>) => (
       ) : null}
     </div>
 
-    <div className="mt-4 grid grid-cols-2 gap-2">
+    <div className={`mt-4 grid gap-2 ${data.routes.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
       {data.routes.map((route) => (
         <div
           key={route.key}
           className={`relative rounded-lg border px-3 py-2 text-sm ${BRANCH_META[route.key].borderClassName} ${BRANCH_META[route.key].bgClassName}`}
         >
-          <Handle
-            type="source"
-            id={route.key}
-            position={Position.Bottom}
-            className="!h-3 !w-3 !border-none"
-            style={{
-              bottom: -7,
-              left: "50%",
-              transform: "translateX(-50%)",
-              backgroundColor: BRANCH_META[route.key].color,
-            }}
-          />
+          {route.connectable !== false ? (
+            <Handle
+              type="source"
+              id={route.key}
+              position={Position.Bottom}
+              className="!h-3 !w-3 !border-none"
+              style={{
+                bottom: -7,
+                left: "50%",
+                transform: "translateX(-50%)",
+                backgroundColor: BRANCH_META[route.key].color,
+              }}
+            />
+          ) : null}
           <div className="text-center">
             <span className="block font-semibold">{route.label}</span>
             <span className="mt-1 block text-[11px] uppercase tracking-wide opacity-80">
@@ -776,6 +1086,7 @@ const buildFlowGraph = (input: {
   selectedNodeId: string | null;
   photoCollectionOptions: PhotoCollectionOption[];
   onRemoveNode: (nodeId: string) => void;
+  isCanvasInteractive: boolean;
 }): { nodes: Node[]; edges: Edge[] } => {
   const actionNodes = input.block.nodes.filter(
     (node): node is PhotoRouterPhotoOrientationNode => isPhotoOrientationNode(node),
@@ -783,10 +1094,21 @@ const buildFlowGraph = (input: {
   const layoutNodes = input.block.nodes.filter(
     (node): node is PhotoRouterLayoutNode => isLayoutGraphNode(node),
   );
+  const hiddenWarningPortraitSources = new Set(
+    actionNodes
+      .filter((node) => getActionNodeKind(node.photoActionType) === "warning")
+      .map((node) => `${node.id}::portrait`),
+  );
+  const visibleConnections = input.block.connections.filter(
+    (connection) =>
+      !hiddenWarningPortraitSources.has(
+        `${connection.source}::${connection.sourceHandle?.trim() || "default"}`,
+      ),
+  );
   const incomingCounts = new Map<string, number>();
   const connectionBySourceHandle = new Map<string, PhotoRouterConnection>();
 
-  input.block.connections.forEach((connection) => {
+  visibleConnections.forEach((connection) => {
     incomingCounts.set(
       connection.target,
       (incomingCounts.get(connection.target) ?? 0) + 1,
@@ -829,7 +1151,7 @@ const buildFlowGraph = (input: {
           (startAnchorEntry?.position.y ?? firstGraphNodePosition.y) - START_NODE_GAP,
         ),
       },
-    draggable: true,
+    draggable: input.isCanvasInteractive,
     selectable: false,
     deletable: false,
     style: {
@@ -843,7 +1165,14 @@ const buildFlowGraph = (input: {
   } satisfies TerminalNodeType);
 
   actionNodes.forEach((node, index) => {
-    const conditionBranchCopy = getConditionBranchCopy(node.portrait.conditionType);
+    const actionNodeKind = getActionNodeKind(node.photoActionType);
+    const conditionBranchCopy = getConditionBranchCopy(
+      getNormalizedConditionTypeForNodeKind(
+        actionNodeKind,
+        "portrait-photo",
+        node.portrait.conditionType,
+      ),
+    );
 
     nodes.push({
       id: node.id,
@@ -851,7 +1180,7 @@ const buildFlowGraph = (input: {
       position:
         input.block.nodePositions[node.id] ??
         getDefaultGraphNodePosition({ node, index }),
-      draggable: true,
+      draggable: input.isCanvasInteractive,
       selectable: true,
       deletable: true,
       style: {
@@ -861,21 +1190,37 @@ const buildFlowGraph = (input: {
       selected: input.selectedNodeId === node.id,
       data: {
         title: node.title,
-        photoActionLabel: getCanvasActionTypeById(node.photoActionType).description,
-        photoSourceLabel: toPhotoSourceLabel(
-          node.photoActionCollectionId,
-          input.photoCollectionOptions,
-        ),
+        kindLabel: getActionNodeKindLabel(actionNodeKind),
+        actionSummary: getCanvasActionTypeById(node.photoActionType).description,
+        sourceLabel:
+          actionNodeKind === "warning"
+            ? null
+            : toPhotoSourceLabel(
+                node.photoActionCollectionId,
+                input.photoCollectionOptions,
+              ),
         onRemove: () => input.onRemoveNode(node.id),
-        routes: ROUTER_ROUTE_ORDER.map((branchKey) => ({
-          key: branchKey,
-          label:
-            branchKey === "portrait"
-              ? conditionBranchCopy.matchedLabel
-              : conditionBranchCopy.fallbackLabel,
-          count: connectionBySourceHandle.has(`${node.id}::${branchKey}`) ? 1 : 0,
-          enabled: true,
-        })),
+        routes:
+          actionNodeKind === "warning"
+            ? [
+                {
+                  key: "fallback" as const,
+                  label: conditionBranchCopy.fallbackLabel,
+                  count: connectionBySourceHandle.has(`${node.id}::fallback`) ? 1 : 0,
+                  enabled: true,
+                  connectable: true,
+                },
+              ]
+            : ROUTER_ROUTE_ORDER.map((branchKey) => ({
+                key: branchKey,
+                label:
+                  branchKey === "portrait"
+                    ? conditionBranchCopy.matchedLabel
+                    : conditionBranchCopy.fallbackLabel,
+                count: connectionBySourceHandle.has(`${node.id}::${branchKey}`) ? 1 : 0,
+                enabled: true,
+                connectable: true,
+              })),
       },
     } satisfies RouterNodeType);
   });
@@ -894,7 +1239,7 @@ const buildFlowGraph = (input: {
           node,
           index: actionNodes.length + index,
         }),
-      draggable: true,
+      draggable: input.isCanvasInteractive,
       selectable: true,
       deletable: true,
       style: {
@@ -950,7 +1295,7 @@ const buildFlowGraph = (input: {
           TERMINAL_NODE_SIZE / 2,
         y: lowestNodeEntry.position.y + lowestNodeSize.height + END_NODE_GAP,
       },
-    draggable: true,
+    draggable: input.isCanvasInteractive,
     selectable: false,
     deletable: false,
     style: {
@@ -963,7 +1308,7 @@ const buildFlowGraph = (input: {
     },
   } satisfies TerminalNodeType);
 
-  const edges = input.block.connections.map((connection) => {
+  const edges = visibleConnections.map((connection) => {
     const sourceNode = getGraphNodeById(input.block, connection.source);
     const branchKey = isBranchKey(connection.sourceHandle)
       ? connection.sourceHandle
@@ -1044,24 +1389,32 @@ export const PhotoRouterBlockEditor = ({
     }));
   }, [block.nodes, layoutOptions, updateBlock]);
 
-  const addPhotoOrientationNodeAtPosition = useCallback((position: { x: number; y: number }) => {
-    const existingActionCount = block.nodes.filter((node) => isPhotoOrientationNode(node)).length;
+  const addActionNodeAtPosition = useCallback((
+    kind: ActionNodeKind,
+    position: { x: number; y: number },
+  ) => {
+    const existingActionCount = block.nodes.filter(
+      (node) =>
+        isPhotoOrientationNode(node) &&
+        getActionNodeKind(node.photoActionType) === kind,
+    ).length;
+    const nextConditionType =
+      kind === "warning"
+        ? LOCAL_WARNING_CONDITION_TYPE
+        : getDefaultConditionTypeForTrigger("portrait-photo");
     const nextActionNode: PhotoRouterPhotoOrientationNode = {
       id: createActionNodeId(),
       nodeType: "photo-orientation",
-      title:
-        existingActionCount === 0
-          ? "Photo Orientation"
-          : `Photo Orientation ${existingActionCount + 1}`,
-      photoActionType: getDefaultCanvasActionTypeId(),
+      title: getDefaultActionNodeTitle(kind, existingActionCount),
+      photoActionType:
+        kind === "warning"
+          ? LOCAL_WARNING_CANVAS_ACTION_TYPE
+          : getDefaultCanvasActionTypeId(),
       photoActionCollectionId: null,
       portrait: {
         enabled: true,
-        conditionType: getDefaultConditionTypeForTrigger("portrait-photo"),
-        conditionParams: parseConditionParamsByType(
-          getDefaultConditionTypeForTrigger("portrait-photo"),
-          {},
-        ),
+        conditionType: nextConditionType,
+        conditionParams: parseConditionParamsByType(nextConditionType, {}),
       },
       landscape: {
         enabled: false,
@@ -1148,8 +1501,9 @@ export const PhotoRouterBlockEditor = ({
         selectedNodeId,
         photoCollectionOptions,
         onRemoveNode: removeNodeById,
+        isCanvasInteractive,
       }),
-    [block, photoCollectionOptions, removeNodeById, selectedNodeId],
+    [block, isCanvasInteractive, photoCollectionOptions, removeNodeById, selectedNodeId],
   );
   const [nodes, setNodes] = useState<Node[]>(graph.nodes);
   const [edges, setEdges] = useState<Edge[]>(graph.edges);
@@ -1211,6 +1565,13 @@ export const PhotoRouterBlockEditor = ({
       return !wouldCreateGraphCycle(block, source, target);
     }
 
+    if (
+      getActionNodeKind(sourceNode.photoActionType) === "warning" &&
+      (candidate.sourceHandle?.trim() ?? null) === "portrait"
+    ) {
+      return false;
+    }
+
     return (
       isBranchKey(candidate.sourceHandle?.trim() ?? null) &&
       !wouldCreateGraphCycle(block, source, target)
@@ -1262,14 +1623,23 @@ export const PhotoRouterBlockEditor = ({
   };
 
   const handleNodesChange = (changes: NodeChange[]) => {
+    if (!isCanvasInteractive) {
+      return;
+    }
     setNodes((current) => applyNodeChanges(changes, current));
   };
 
   const handleEdgesChange = (changes: EdgeChange[]) => {
+    if (!isCanvasInteractive) {
+      return;
+    }
     setEdges((current) => applyEdgeChanges(changes, current));
   };
 
   const handleNodeDragStop = (_event: unknown, node: Node) => {
+    if (!isCanvasInteractive) {
+      return;
+    }
     updateBlock((current) => ({
       ...current,
       nodePositions: {
@@ -1298,12 +1668,16 @@ export const PhotoRouterBlockEditor = ({
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    if (!reactFlowInstance) {
+    if (!reactFlowInstance || !isCanvasInteractive) {
       return;
     }
 
     const blockType = event.dataTransfer.getData(GRAPH_NODE_DRAG_TYPE);
-    if (blockType !== "layout-node" && blockType !== "photo-orientation-node") {
+    if (
+      blockType !== "layout-node" &&
+      blockType !== "photo-node" &&
+      blockType !== "warning-node"
+    ) {
       return;
     }
 
@@ -1312,8 +1686,13 @@ export const PhotoRouterBlockEditor = ({
       y: event.clientY,
     });
 
-    if (blockType === "photo-orientation-node") {
-      addPhotoOrientationNodeAtPosition(position);
+    if (blockType === "photo-node") {
+      addActionNodeAtPosition("photo", position);
+      return;
+    }
+
+    if (blockType === "warning-node") {
+      addActionNodeAtPosition("warning", position);
       return;
     }
 
@@ -1326,7 +1705,7 @@ export const PhotoRouterBlockEditor = ({
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
+    event.dataTransfer.dropEffect = isCanvasInteractive ? "copy" : "none";
   };
 
   const selectedLayoutNode = selectedNodeId
@@ -1341,9 +1720,13 @@ export const PhotoRouterBlockEditor = ({
           node.id === selectedNodeId && isPhotoOrientationNode(node),
       ) ?? null
     : null;
+  const selectedActionKind = selectedActionNode
+    ? getActionNodeKind(selectedActionNode.photoActionType)
+    : null;
   const selectedCanvasAction = getCanvasActionTypeById(
     selectedActionNode?.photoActionType || getDefaultCanvasActionTypeId(),
   );
+  const selectedActionUsesPhotoSource = selectedActionKind === "photo";
   const runtimeStatusMeta = useMemo(() => {
     if (!runtimeHealth) {
       return null;
@@ -1406,19 +1789,78 @@ export const PhotoRouterBlockEditor = ({
     }));
   };
 
+  useEffect(() => {
+    let hasChanges = false;
+
+    for (const node of block.nodes) {
+      if (!isPhotoOrientationNode(node)) {
+        continue;
+      }
+      const nextConditionType = getNormalizedConditionTypeForNodeKind(
+        getActionNodeKind(node.photoActionType),
+        "portrait-photo",
+        node.portrait.conditionType,
+      );
+      if ((node.portrait.conditionType?.trim() ?? "") !== (nextConditionType ?? "")) {
+        hasChanges = true;
+        break;
+      }
+    }
+
+    if (!hasChanges) {
+      return;
+    }
+
+    updateBlock((current) => ({
+      ...current,
+      nodes: current.nodes.map((node) => {
+        if (!isPhotoOrientationNode(node)) {
+          return node;
+        }
+        const nextConditionType = getNormalizedConditionTypeForNodeKind(
+          getActionNodeKind(node.photoActionType),
+          "portrait-photo",
+          node.portrait.conditionType,
+        );
+        if ((node.portrait.conditionType?.trim() ?? "") === (nextConditionType ?? "")) {
+          return node;
+        }
+        return {
+          ...node,
+          portrait: {
+            ...node.portrait,
+            conditionType: nextConditionType,
+            conditionParams: parseConditionParamsByType(
+              nextConditionType,
+              node.portrait.conditionParams,
+            ),
+          },
+        };
+      }),
+    }));
+  }, [block.nodes, updateBlock]);
+
   const renderConditionalSettings = (
+    actionKind: ActionNodeKind,
     trigger: ConditionalTrigger,
     branch: PhotoRouterPhotoOrientationNode["portrait"],
     updateBranch: (
       updater: (current: PhotoRouterPhotoOrientationNode["portrait"]) => PhotoRouterPhotoOrientationNode["portrait"],
     ) => void,
   ) => {
-    const conditionDefinition = getConditionTypeById(branch.conditionType);
-    const conditionParams = parseConditionParamsByType(
+    const availableConditionTypes = getAvailableConditionTypes(actionKind, trigger);
+    const normalizedConditionType = getNormalizedConditionTypeForNodeKind(
+      actionKind,
+      trigger,
       branch.conditionType,
+    );
+    const conditionDefinition = getConditionTypeById(normalizedConditionType);
+    const conditionParams = parseConditionParamsByType(
+      normalizedConditionType,
       branch.conditionParams,
     );
-    const conditionBranchCopy = getConditionBranchCopy(branch.conditionType);
+    const conditionBranchCopy = getConditionBranchCopy(normalizedConditionType);
+    const autoWarningLayout = actionKind === "warning";
 
     return (
       <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
@@ -1427,40 +1869,50 @@ export const PhotoRouterBlockEditor = ({
             {conditionBranchCopy.title}
           </p>
           <p className="mt-1 text-xs text-slate-400">
-            Connect this output to the first layout node when the condition matches.
+            {autoWarningLayout
+              ? "When active, this node shows the automatic warning layout. Connect No Warning to continue the normal flow."
+              : "Connect this output to the first layout node when the condition matches."}
           </p>
         </div>
 
-        <label className="mt-4 block">
-          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Condition
-          </span>
-          <select
-            className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
-            value={branch.conditionType ?? getDefaultConditionTypeForTrigger(trigger) ?? ""}
-            onChange={(event) =>
-              updateBranch((current) => ({
-                ...current,
-                enabled: true,
-                conditionType: event.target.value,
-                conditionParams: parseConditionParamsByType(event.target.value, {}),
-              }))
-            }
-          >
-            {LOGIC_CONDITION_TYPES.filter(
-              (condition) =>
-                condition.trigger === trigger || condition.trigger === "landscape-photo",
-            ).map((condition) => (
-              <option key={condition.id} value={condition.id}>
-                {condition.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {actionKind === "warning" ? (
+          <div className="mt-4">
+            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              Condition
+            </span>
+            <div className="flex h-10 items-center rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100">
+              {conditionDefinition?.label ?? "Local warning is active"}
+            </div>
+          </div>
+        ) : (
+          <label className="mt-4 block">
+            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              Condition
+            </span>
+            <select
+              className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+              value={normalizedConditionType ?? ""}
+              onChange={(event) =>
+                updateBranch((current) => ({
+                  ...current,
+                  enabled: true,
+                  conditionType: event.target.value,
+                  conditionParams: parseConditionParamsByType(event.target.value, {}),
+                }))
+              }
+            >
+              {availableConditionTypes.map((condition) => (
+                <option key={condition.id} value={condition.id}>
+                  {condition.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <p className="mt-2 text-xs text-slate-400">
           {conditionDefinition?.description ??
-            "Select which photo condition must match before this route runs."}
+            "Select which condition must match before this route runs."}
         </p>
 
         {conditionDefinition?.paramFields?.length ? (
@@ -1469,13 +1921,14 @@ export const PhotoRouterBlockEditor = ({
               <ParamFieldEditor
                 key={field.key}
                 field={field}
-                value={conditionParams[field.key]}
-                onChange={(value) =>
+                params={conditionParams}
+                onPatch={(patch) =>
                   updateBranch((current) => ({
                     ...current,
+                    conditionType: normalizedConditionType,
                     conditionParams: {
                       ...conditionParams,
-                      [field.key]: value,
+                      ...patch,
                     },
                   }))
                 }
@@ -1518,22 +1971,36 @@ export const PhotoRouterBlockEditor = ({
               <span className="block text-sm font-semibold">Layout Node</span>
             </button>
             <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Action Nodes
+              Routing Nodes
             </p>
             <button
               type="button"
               draggable
               className="mt-3 flex w-full items-center justify-between rounded-xl border border-emerald-500/50 bg-emerald-500/10 px-3 py-3 text-left text-emerald-100 transition hover:bg-emerald-500/20"
               onDragStart={(event) => {
-                event.dataTransfer.setData(
-                  GRAPH_NODE_DRAG_TYPE,
-                  "photo-orientation-node",
-                );
+                event.dataTransfer.setData(GRAPH_NODE_DRAG_TYPE, "photo-node");
                 event.dataTransfer.effectAllowed = "copy";
               }}
-              onClick={() => addPhotoOrientationNodeAtPosition(DEFAULT_ROUTER_POSITION)}
+              onClick={() => addActionNodeAtPosition("photo", DEFAULT_ROUTER_POSITION)}
             >
               <span className="block text-sm font-semibold">Photo Orientation Node</span>
+            </button>
+            <button
+              type="button"
+              draggable
+              className="mt-3 flex w-full items-center justify-between rounded-xl border border-amber-500/50 bg-amber-500/10 px-3 py-3 text-left text-amber-100 transition hover:bg-amber-500/20"
+              onDragStart={(event) => {
+                event.dataTransfer.setData(GRAPH_NODE_DRAG_TYPE, "warning-node");
+                event.dataTransfer.effectAllowed = "copy";
+              }}
+              onClick={() =>
+                addActionNodeAtPosition("warning", {
+                  x: DEFAULT_ROUTER_POSITION.x + 48,
+                  y: DEFAULT_ROUTER_POSITION.y + 48,
+                })
+              }
+            >
+              <span className="block text-sm font-semibold">Warning Node</span>
             </button>
           </div>
 
@@ -1649,8 +2116,8 @@ export const PhotoRouterBlockEditor = ({
               {selectedLayoutNode
                 ? "Edit the selected layout node."
                 : selectedActionNode
-                  ? "Edit the action node settings and portrait route."
-                  : "Select an action or layout node to edit it."}
+                  ? `Edit the selected ${selectedActionKind === "warning" ? "warning" : "photo orientation"} node settings.`
+                  : "Select a photo orientation, warning, or layout node to edit it."}
             </p>
           </div>
 
@@ -1767,13 +2234,13 @@ export const PhotoRouterBlockEditor = ({
                         <ParamFieldEditor
                           key={field.key}
                           field={field}
-                          value={actionParams[field.key]}
-                          onChange={(value) =>
+                          params={actionParams}
+                          onPatch={(patch) =>
                             updateSelectedLayoutNode((current) => ({
                               ...current,
                               actionParams: {
                                 ...actionParams,
-                                [field.key]: value,
+                                ...patch,
                               },
                             }))
                           }
@@ -1787,7 +2254,11 @@ export const PhotoRouterBlockEditor = ({
           ) : selectedActionNode ? (
             <>
               <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4">
-                <p className="text-base font-semibold text-slate-100">Action node settings</p>
+                <p className="text-base font-semibold text-slate-100">
+                  {selectedActionKind === "warning"
+                    ? "Warning node settings"
+                    : "Photo orientation node settings"}
+                </p>
                 <div className="mt-4 space-y-3">
                   <label className="block">
                     <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -1806,60 +2277,48 @@ export const PhotoRouterBlockEditor = ({
                     />
                   </label>
 
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                      Photo action
-                    </span>
-                    <select
-                      className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
-                      value={selectedCanvasAction.id}
-                      onChange={(event) =>
-                        updateSelectedActionNode((current) => ({
-                          ...current,
-                          photoActionType:
-                            event.target.value.trim() || getDefaultCanvasActionTypeId(),
-                        }))
-                      }
-                    >
-                      {LOGIC_CANVAS_ACTION_TYPES.map((action) => (
-                        <option key={action.id} value={action.id}>
-                          {action.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                      Photo source
-                    </span>
-                    <select
-                      className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
-                      value={selectedActionNode.photoActionCollectionId ?? ""}
-                      onChange={(event) =>
-                        updateSelectedActionNode((current) => ({
-                          ...current,
-                          photoActionCollectionId: event.target.value.trim() || null,
-                        }))
-                      }
-                    >
-                      <option value="">/photos</option>
-                      {photoCollectionOptions.map((collection) => (
-                        <option key={collection.id} value={collection.id}>
-                          Collection: {collection.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  {selectedActionUsesPhotoSource ? (
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                        Photo source
+                      </span>
+                      <select
+                        className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+                        value={selectedActionNode.photoActionCollectionId ?? ""}
+                        onChange={(event) =>
+                          updateSelectedActionNode((current) => ({
+                            ...current,
+                            photoActionCollectionId: event.target.value.trim() || null,
+                          }))
+                        }
+                      >
+                        <option value="">/photos</option>
+                        {photoCollectionOptions.map((collection) => (
+                          <option key={collection.id} value={collection.id}>
+                            Collection: {collection.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <p className="rounded border border-slate-700 bg-slate-900/70 px-3 py-2 text-xs text-slate-300">
+                      This node does not need a photo source. When a warning is active it shows
+                      the automatic warning layout, and the No Warning output continues the graph.
+                    </p>
+                  )}
                 </div>
                 <p className="mt-3 text-xs text-slate-400">{selectedCanvasAction.description}</p>
               </div>
 
-              {renderConditionalSettings("portrait-photo", selectedActionNode.portrait, (updater) =>
-                updateSelectedActionNode((current) => ({
-                  ...current,
-                  portrait: updater(current.portrait),
-                }))
+              {renderConditionalSettings(
+                selectedActionKind ?? "photo",
+                "portrait-photo",
+                selectedActionNode.portrait,
+                (updater) =>
+                  updateSelectedActionNode((current) => ({
+                    ...current,
+                    portrait: updater(current.portrait),
+                  })),
               )}
             </>
           ) : null}

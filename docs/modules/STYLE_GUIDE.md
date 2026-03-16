@@ -13,8 +13,17 @@ For modules with richer internal layouts, prefer the shared visual primitives in
 - `.module-panel-shell` for the main inner surface
 - `.module-panel-card` for inset cards and stat blocks
 - `.module-panel-chip` for compact labels
-- `.module-panel-label` for quiet uppercase section labels
 - `.module-panel-progress` for progress rails
+- `.module-text-small` for compact labels, metadata, and helper text
+- `.module-text-body` for normal readable copy
+- `.module-text-title` for headings and emphasized values
+- `.module-text-display` for hero values like clocks and temperatures
+
+Use utility classes for treatment, not extra text classes:
+
+- `font-display uppercase tracking-[0.18em]` for small uppercase labels
+- `font-medium` / `font-semibold` for emphasis
+- color utilities for hierarchy and state
 
 ## Visual philosophy
 
@@ -28,6 +37,7 @@ For modules with richer internal layouts, prefer the shared visual primitives in
 
 - Build module surfaces from the shared theme tokens in `apps/web/src/index.css`, not hard-coded palette values.
 - If a module needs an accent, derive it from theme tokens such as `--color-text-accent-rgb` or the status token RGB values.
+- Avoid hard-coded Tailwind hue utilities and arbitrary `rgba(...)`/hex shadows for display chrome. If a module needs info, warning, success, or error emphasis, route it through the shared theme-mapped utilities in `apps/web/src/index.css` or inline CSS variables.
 - Keep accent overlays low contrast so Nord, Solarized, Monokai, and the default theme all remain readable.
 - Favor neutral cards and text tokens for secondary information. Accent color should highlight, not repaint the whole tile.
 
@@ -36,23 +46,15 @@ For modules with richer internal layouts, prefer the shared visual primitives in
 - Keep settings panel simple and explicit.
 - Use clear labels and sensible defaults.
 - Clamp numeric values in schema and input handlers.
-- Use one shared `presentation` block for module-level sizing.
-- Prefer the shared `ModulePresentationControls` UI over custom per-element font inputs.
+- Keep typography decisions in the module unless there is a concrete product need for a user-facing size control.
+- Avoid generic global sizing sliders that try to remap every text role in a module.
 
-## Presentation roles
+## Typography
 
-Every active SDK module should map visible module content into these roles:
-
-- `heading`: labels, section headings, member names, day names
-- `primary`: the module's main value/content, plus small hero visuals tied to it
-- `supporting`: secondary metadata, helper text, warnings, empty states, legend dots
-
-Small non-text elements can use the same roles when they track the same visual importance:
-
-- weather emoji -> `primary`
-- calendar legend dots -> `supporting`
-
-Avoid one-off controls like `timeFontSizeRem` or `eventTitleFontSize`. If a module needs tweakable sizing, route it through `presentation.headingScale`, `presentation.primaryScale`, or `presentation.supportingScale`.
+- Use a fixed, intentional hierarchy inside each module instead of exposing generic font controls.
+- Prefer the shared module text classes in `apps/web/src/index.css` over inline `fontSize` styles.
+- If a module needs a user-facing size option, tie it to a specific content need and make the layout impact obvious.
+- Avoid one-off font fields unless the module genuinely needs that exact setting.
 
 ## Data handling
 
@@ -77,6 +79,6 @@ Avoid one-off controls like `timeFontSizeRem` or `eventTitleFontSize`. If a modu
 - UI-only: `apps/web/src/modules/sdk/welcome.module.tsx`
 - Local time: `apps/web/src/modules/sdk/clock.module.tsx`
 - REST + status frame: `apps/web/src/modules/sdk/server-status.module.tsx`
-- Role-sized layouts: `apps/web/src/modules/sdk/weather.module.tsx`
+- Dense data layout: `apps/web/src/modules/sdk/weather.module.tsx`
 - Shared panel language: `apps/web/src/modules/sdk/kobo-reader.module.tsx`
-- Role-sized calendar lists/grids: `apps/web/src/modules/sdk/calendar.module.tsx`
+- Calendar lists/grids: `apps/web/src/modules/sdk/calendar.module.tsx`

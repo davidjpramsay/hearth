@@ -1,10 +1,12 @@
 import {
+  LOCAL_WARNING_CONDITION_TYPE,
   resolveBuiltinLayoutLogicAction,
   resolveBuiltinLayoutLogicCondition,
   type LayoutLogicActionResolutionInput,
   type LayoutLogicConditionEvaluationInput,
   type LayoutLogicResolvedTarget,
 } from "@hearth/shared";
+import type { LocalWarningService } from "../services/local-warning-service.js";
 
 type ConditionResolver = (
   input: LayoutLogicConditionEvaluationInput,
@@ -15,8 +17,19 @@ type ActionResolver = (
 ) => LayoutLogicResolvedTarget | LayoutLogicResolvedTarget[] | null;
 
 // Add custom condition/action handlers here to extend layout logic behavior.
-const customConditionResolvers: Record<string, ConditionResolver> = {};
+let localWarningService: LocalWarningService | null = null;
+
+const customConditionResolvers: Record<string, ConditionResolver> = {
+  [LOCAL_WARNING_CONDITION_TYPE]: (input) =>
+    localWarningService?.hasEscalatingWarning(input.conditionParams) ?? false,
+};
 const customActionResolvers: Record<string, ActionResolver> = {};
+
+export const configureLayoutLogicRegistry = (input: {
+  localWarningService: LocalWarningService | null;
+}): void => {
+  localWarningService = input.localWarningService;
+};
 
 export const resolveLayoutLogicCondition = (
   input: LayoutLogicConditionEvaluationInput,

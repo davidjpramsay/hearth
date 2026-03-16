@@ -36,7 +36,8 @@ export type LayoutLogicParamFieldKind =
   | "text"
   | "number"
   | "boolean"
-  | "select";
+  | "select"
+  | "location-search";
 
 export interface LayoutLogicParamFieldOption {
   label: string;
@@ -48,10 +49,15 @@ export interface LayoutLogicParamFieldDefinition {
   label: string;
   kind: LayoutLogicParamFieldKind;
   description?: string;
+  placeholder?: string;
   min?: number;
   max?: number;
   step?: number;
   options?: LayoutLogicParamFieldOption[];
+  latitudeKey?: string;
+  longitudeKey?: string;
+  searchPath?: string;
+  allowDeviceLocation?: boolean;
 }
 
 export interface LayoutLogicConditionTypeDefinition {
@@ -162,6 +168,10 @@ const normalizeParamFields = (
       key,
       label: field.label.trim(),
       description: field.description?.trim(),
+      placeholder: field.placeholder?.trim(),
+      latitudeKey: field.latitudeKey?.trim(),
+      longitudeKey: field.longitudeKey?.trim(),
+      searchPath: field.searchPath?.trim(),
     };
 
     if (normalizedField.kind === "select") {
@@ -188,6 +198,14 @@ const normalizeParamFields = (
           value: option.value.trim(),
         };
       });
+    }
+
+    if (normalizedField.kind === "location-search") {
+      if (!normalizedField.latitudeKey || !normalizedField.longitudeKey) {
+        throw new Error(
+          `${ownerType} '${id}' param field '${key}' must define latitudeKey and longitudeKey for location-search.`,
+        );
+      }
     }
 
     return normalizedField;

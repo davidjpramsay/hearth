@@ -20,6 +20,7 @@ const COVER_MIME_TYPES: Record<string, string> = {
 };
 
 class KoboReaderConfigurationError extends Error {}
+class KoboReaderUnavailableError extends Error {}
 
 interface KoboReaderPaths {
   appDbPath: string;
@@ -67,6 +68,27 @@ const resolveConfiguredKoboReaderPaths = (): KoboReaderPaths => {
 
   const libraryRoot = config.koboReaderLibraryRoot ?? dirname(config.koboReaderLibraryDbPath);
 
+  if (!existsSync(dirname(config.koboReaderAppDbPath)) || !existsSync(config.koboReaderAppDbPath)) {
+    throw new KoboReaderUnavailableError(
+      "Kobo Reader data is not available in this environment. Check that the Calibre-Web config folder is mounted and KOBO_READER_APP_DB_PATH points to a real file.",
+    );
+  }
+
+  if (
+    !existsSync(dirname(config.koboReaderLibraryDbPath)) ||
+    !existsSync(config.koboReaderLibraryDbPath)
+  ) {
+    throw new KoboReaderUnavailableError(
+      "Kobo Reader library data is not available in this environment. Check that the Calibre library is mounted and KOBO_READER_LIBRARY_DB_PATH points to a real file.",
+    );
+  }
+
+  if (!existsSync(libraryRoot)) {
+    throw new KoboReaderUnavailableError(
+      "Kobo Reader library root is not available in this environment. Check that KOBO_READER_LIBRARY_ROOT points to the mounted Calibre library.",
+    );
+  }
+
   return {
     appDbPath: config.koboReaderAppDbPath,
     libraryDbPath: config.koboReaderLibraryDbPath,
@@ -79,6 +101,33 @@ const openReadonlyDatabase = (filePath: string): Database.Database =>
     readonly: true,
     fileMustExist: true,
   });
+
+const classifyKoboReaderError = (error: unknown): Error => {
+  if (
+    error instanceof KoboReaderConfigurationError ||
+    error instanceof KoboReaderUnavailableError
+  ) {
+    return error;
+  }
+
+  if (!(error instanceof Error)) {
+    return new Error("Failed to load Kobo reading data.");
+  }
+
+  const normalizedMessage = error.message.toLowerCase();
+  if (
+    normalizedMessage.includes("unable to open database file") ||
+    normalizedMessage.includes("directory does not exist") ||
+    normalizedMessage.includes("no such file or directory") ||
+    normalizedMessage.includes("cannot open database")
+  ) {
+    return new KoboReaderUnavailableError(
+      "Kobo Reader data is not available in this environment. Check that the Kobo and Calibre folders are mounted and reachable by the server.",
+    );
+  }
+
+  return error;
+};
 
 const withReadonlyDatabase = <T,>(
   filePath: string,
@@ -334,9 +383,13 @@ export const koboReaderAdapter: ModuleServerAdapter = {
           .header("cache-control", "no-store")
           .send(readKoboUsers());
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Failed to load Kobo users.";
-        const statusCode = error instanceof KoboReaderConfigurationError ? 503 : 500;
+        const classifiedError = classifyKoboReaderError(error);
+        const message = classifiedError.message || "Failed to load Kobo users.";
+        const statusCode =
+          classifiedError instanceof KoboReaderConfigurationError ||
+          classifiedError instanceof KoboReaderUnavailableError
+            ? 503
+            : 500;
         return reply.code(statusCode).send({ message });
       }
     });
@@ -352,9 +405,13 @@ export const koboReaderAdapter: ModuleServerAdapter = {
           .header("cache-control", "no-store")
           .send(readLatestKoboBook(parsedQuery.data.userName));
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Failed to load Kobo reading data.";
-        const statusCode = error instanceof KoboReaderConfigurationError ? 503 : 500;
+        const classifiedError = classifyKoboReaderError(error);
+        const message = classifiedError.message || "Failed to load Kobo reading data.";
+        const statusCode =
+          classifiedError instanceof KoboReaderConfigurationError ||
+          classifiedError instanceof KoboReaderUnavailableError
+            ? 503
+            : 500;
         return reply.code(statusCode).send({ message });
       }
     });
@@ -377,9 +434,13 @@ export const koboReaderAdapter: ModuleServerAdapter = {
         reply.type(mimeType);
         return reply.send(createReadStream(cover.coverFilePath));
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Failed to load Kobo cover image.";
-        const statusCode = error instanceof KoboReaderConfigurationError ? 503 : 500;
+        const classifiedError = classifyKoboReaderError(error);
+        const message = classifiedError.message || "Failed to load Kobo cover image.";
+        const statusCode =
+          classifiedError instanceof KoboReaderConfigurationError ||
+          classifiedError instanceof KoboReaderUnavailableError
+            ? 503
+            : 500;
         return reply.code(statusCode).send({ message });
       }
     });

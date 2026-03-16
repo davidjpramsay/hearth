@@ -116,6 +116,11 @@ const parsePositiveNumber = (value: string | undefined, fallback: number): numbe
   return parsed;
 };
 
+const parseBoolean = (value: string | undefined): boolean => {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+};
+
 const parseCsv = (value: string | undefined): string[] =>
   (value ?? "")
     .split(",")
@@ -160,6 +165,7 @@ const backupDir = resolvePath(process.env.BACKUP_DIR ?? join(dataDir, "backups")
 mkdirSync(backupDir, { recursive: true });
 
 export const config = {
+  nodeEnv: (process.env.NODE_ENV ?? "development").trim() || "development",
   appName: process.env.APP_NAME ?? "Hearth",
   host: process.env.HOST ?? "127.0.0.1",
   port: Number(process.env.PORT ?? 3000),
@@ -176,5 +182,8 @@ export const config = {
   koboReaderAppDbPath: resolveOptionalPath(process.env.KOBO_READER_APP_DB_PATH),
   koboReaderLibraryDbPath: resolveOptionalPath(process.env.KOBO_READER_LIBRARY_DB_PATH),
   koboReaderLibraryRoot: resolveOptionalPath(process.env.KOBO_READER_LIBRARY_ROOT),
+  localWarningDevForceActive:
+    (process.env.NODE_ENV ?? "development").trim() !== "production" &&
+    parseBoolean(process.env.LOCAL_WARNING_DEV_FORCE_ACTIVE),
   webDistPath: resolve(currentDir, "../../web/dist"),
 };

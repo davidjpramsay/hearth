@@ -2,12 +2,19 @@ import {
   displayThemeIdSchema,
   applyLayoutSetLogicEdgeState,
   getPhotoCollectionIdFromActionParams,
+  layoutRecordSchema,
+  LOCAL_WARNING_AUTO_LAYOUT_LABEL,
+  LOCAL_WARNING_AUTO_LAYOUT_NAME,
+  LOCAL_WARNING_CONDITION_TYPE,
+  LOCAL_WARNING_MODULE_ID,
+  localWarningsModuleConfigSchema,
   reportScreenProfileRequestSchema,
   reportScreenProfileResponseSchema,
   reportScreenTargetSelectionSchema,
   resolveDisplaySequenceFromLogicGraph,
   screenFamilyLayoutTargetSchema,
   type AutoLayoutTarget,
+  type LayoutRecord,
   type PhotosOrientation,
   type ReportScreenProfileLayoutOption,
   type ReportScreenProfileRequest,
@@ -20,6 +27,10 @@ import {
   resolveLayoutLogicAction,
   resolveLayoutLogicCondition,
 } from "../layout-logic/registry.js";
+import {
+  isEscalatingLocalWarning,
+  type LocalWarningService,
+} from "./local-warning-service.js";
 import type { DeviceRepository } from "../repositories/device-repository.js";
 import type { LayoutRepository } from "../repositories/layout-repository.js";
 import type { SettingsRepository } from "../repositories/settings-repository.js";
@@ -27,6 +38,8 @@ import type { SettingsRepository } from "../repositories/settings-repository.js"
 const DEFAULT_TARGET_CYCLE_SECONDS = 20;
 const SESSION_STATE_TTL_MS = 12 * 60 * 60 * 1000;
 const DEFAULT_SET_ID = "set-1";
+const LOCAL_WARNING_LAYOUT_ID = 2_147_483_000;
+const LOCAL_WARNING_MODULE_INSTANCE_ID = "local-warnings-auto";
 
 const clampCycleSeconds = (value: number): number =>
   Math.max(3, Math.min(3600, Math.round(value)));
@@ -51,6 +64,43 @@ const toAvailableLayouts = (
   names: string[],
 ): ReportScreenProfileLayoutOption[] =>
   names.map((name) => ({ name }));
+
+const createAutomaticWarningLayout = (
+  actionParams: Record<string, unknown> | null | undefined,
+): LayoutRecord =>
+  layoutRecordSchema.parse({
+    id: LOCAL_WARNING_LAYOUT_ID,
+    name: LOCAL_WARNING_AUTO_LAYOUT_LABEL,
+    active: false,
+    version: 1,
+    createdAt: new Date(0).toISOString(),
+    updatedAt: new Date().toISOString(),
+    config: {
+      cols: 12,
+      rows: 12,
+      rowHeight: 54,
+      typography: {},
+      items: [
+        {
+          i: LOCAL_WARNING_MODULE_INSTANCE_ID,
+          x: 0,
+          y: 0,
+          w: 12,
+          h: 12,
+        },
+      ],
+      modules: [
+        {
+          id: LOCAL_WARNING_MODULE_INSTANCE_ID,
+          moduleId: LOCAL_WARNING_MODULE_ID,
+          config: localWarningsModuleConfigSchema.parse({
+            ...actionParams,
+            refreshIntervalSeconds: 300,
+          }),
+        },
+      ],
+    },
+  });
 
 const toRequestedTargetSelection = (
   payload: ReportScreenProfileRequest,
@@ -196,6 +246,7 @@ export class ScreenProfileService {
     private readonly layoutRepository: LayoutRepository,
     private readonly settingsRepository: SettingsRepository,
     private readonly deviceRepository: DeviceRepository,
+    private readonly localWarningService: LocalWarningService | null = null,
   ) {}
 
   validateManagedDeviceTargetSelection(
@@ -279,6 +330,8 @@ export class ScreenProfileService {
             nextCycleAtMs: null,
             selectedCycleSeconds: null,
             selectedPhotoCollectionId: null,
+            selectedActionParams: {},
+            effectiveLogicGraph: null,
           }
         : this.resolveTargetLayout({
             familyId: family,
@@ -287,8 +340,16 @@ export class ScreenProfileService {
             nowMs,
             screenSessionId: payload.screenSessionId,
           });
+    const warningTicker =
+      effectiveTargetSelection.kind === "set"
+        ? this.resolveWarningTicker({
+            effectiveLogicGraph: resolution.effectiveLogicGraph,
+          })
+        : null;
     const targetLayout = resolution.layoutName
-      ? this.layoutRepository.getByName(resolution.layoutName)
+      ? resolution.layoutName === LOCAL_WARNING_AUTO_LAYOUT_NAME
+        ? createAutomaticWarningLayout(resolution.selectedActionParams)
+        : this.layoutRepository.getByName(resolution.layoutName)
       : null;
     const autoCycleSeconds =
       resolution.selectedCycleSeconds ?? Math.max(3, mapping.autoCycleSeconds);
@@ -323,6 +384,8 @@ export class ScreenProfileService {
         },
         resolvedTargetSelection,
         layout: targetLayout,
+        warningTicker:
+          resolution.layoutName === LOCAL_WARNING_AUTO_LAYOUT_NAME ? null : warningTicker,
         reason: "resolved",
       });
     }
@@ -347,6 +410,7 @@ export class ScreenProfileService {
         },
         resolvedTargetSelection,
         layout: activeLayout,
+        warningTicker,
         reason: "fallback-active",
       });
     }
@@ -371,6 +435,7 @@ export class ScreenProfileService {
         },
         resolvedTargetSelection,
         layout: firstLayout,
+        warningTicker,
         reason: "fallback-first",
       });
     }
@@ -390,11 +455,12 @@ export class ScreenProfileService {
         name: trackedDevice.name,
         themeId: trackedDevice.themeId,
         targetSelection: deviceTargetSelection,
-      },
-      resolvedTargetSelection,
-      layout: null,
-      reason: "no-layout",
-    });
+        },
+        resolvedTargetSelection,
+        layout: null,
+        warningTicker,
+        reason: "no-layout",
+      });
   }
 
   private getDeviceTargetCatalog(): DeviceTargetCatalog {
@@ -486,6 +552,8 @@ export class ScreenProfileService {
     nextCycleAtMs: number | null;
     selectedCycleSeconds: number | null;
     selectedPhotoCollectionId: string | null;
+    selectedActionParams: Record<string, unknown>;
+    effectiveLogicGraph: ReturnType<typeof applyLayoutSetLogicEdgeState>;
   } {
     const effectiveLogicGraph = applyLayoutSetLogicEdgeState({
       graph: input.familyTargets.logicGraph,
@@ -507,6 +575,8 @@ export class ScreenProfileService {
         nextCycleAtMs: null,
         selectedCycleSeconds: null,
         selectedPhotoCollectionId: input.familyTargets.photoActionCollectionId ?? null,
+        selectedActionParams: {},
+        effectiveLogicGraph,
       };
     }
 
@@ -527,6 +597,71 @@ export class ScreenProfileService {
         getPhotoCollectionIdFromActionParams(selected?.actionParams) ??
         input.familyTargets.photoActionCollectionId ??
         null,
+      selectedActionParams:
+        selected && selected.actionParams && typeof selected.actionParams === "object"
+          ? selected.actionParams
+          : {},
+      effectiveLogicGraph,
+    };
+  }
+
+  private resolveWarningTicker(input: {
+    effectiveLogicGraph: ReturnType<typeof applyLayoutSetLogicEdgeState> | null;
+  }) {
+    if (!this.localWarningService || !input.effectiveLogicGraph) {
+      return null;
+    }
+
+    const warningNodes = input.effectiveLogicGraph.nodes.filter(
+      (node) =>
+        node.type === "display" &&
+        node.layoutName === LOCAL_WARNING_AUTO_LAYOUT_NAME &&
+        node.conditionType === LOCAL_WARNING_CONDITION_TYPE,
+    );
+
+    if (warningNodes.length === 0) {
+      return null;
+    }
+
+    const warningById = new Map<string, Awaited<ReturnType<LocalWarningService["listActiveWarnings"]>>[number]>();
+    let locationLabel: string | null = null;
+
+    for (const node of warningNodes) {
+      const conditionParams =
+        node.conditionParams && typeof node.conditionParams === "object"
+          ? node.conditionParams
+          : {};
+      const warnings = this.localWarningService.listCachedActiveWarnings(conditionParams);
+      const nextLocationLabel =
+        typeof conditionParams.locationQuery === "string" && conditionParams.locationQuery.trim()
+          ? conditionParams.locationQuery.trim()
+          : null;
+      if (!locationLabel && nextLocationLabel) {
+        locationLabel = nextLocationLabel;
+      }
+      for (const warning of warnings) {
+        if (
+          isEscalatingLocalWarning({
+            alertLevel: warning.alertLevel,
+            severity: warning.severity,
+            eventLabel: warning.eventLabel,
+            categoryLabel: warning.categoryLabel,
+            headline: warning.headline,
+          })
+        ) {
+          continue;
+        }
+        warningById.set(warning.id, warning);
+      }
+    }
+
+    if (warningById.size === 0) {
+      return null;
+    }
+
+    return {
+      locationLabel: locationLabel ?? "Local area",
+      warnings: Array.from(warningById.values()),
     };
   }
 }

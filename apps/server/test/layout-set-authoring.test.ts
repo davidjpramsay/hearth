@@ -5,6 +5,9 @@ import {
   createLayoutSetLogicGraphFromBranches,
   deriveLayoutSetAuthoringFromLogicGraph,
   getPrimaryPhotoRouterBlock,
+  LOCAL_WARNING_AUTO_LAYOUT_NAME,
+  LOCAL_WARNING_CANVAS_ACTION_TYPE,
+  LOCAL_WARNING_CONDITION_TYPE,
   normalizeScreenProfileLayoutsConfig,
   resolveDisplaySequenceFromLogicGraph,
   setPrimaryPhotoRouterBlock,
@@ -518,6 +521,115 @@ test("multi-action graph paths can chain into another action node", () => {
     ["Follow up layout"],
   );
   assert.equal(landscapeSequence[0]?.actionParams.photoCollectionId, "family");
+});
+
+test("warning action nodes auto-resolve to the built-in warning layout on match", () => {
+  const authoring = setPrimaryPhotoRouterBlock({
+    authoring: {
+      version: 1,
+      blocks: [],
+    },
+    block: {
+      id: "photo-router",
+      type: "photo-router",
+      nodes: [
+        {
+          id: "warning-a",
+          nodeType: "photo-orientation",
+          title: "Warning Node",
+          photoActionType: LOCAL_WARNING_CANVAS_ACTION_TYPE,
+          photoActionCollectionId: null,
+          portrait: {
+            enabled: true,
+            conditionType: LOCAL_WARNING_CONDITION_TYPE,
+            conditionParams: {
+              locationQuery: "Perth, AU",
+            },
+          },
+          landscape: {
+            enabled: false,
+            conditionType: "photo.orientation.landscape",
+            conditionParams: {},
+          },
+        },
+        {
+          id: "layout-fallback",
+          nodeType: "layout",
+          layoutName: "Fallback layout",
+          cycleSeconds: 20,
+          actionType: "layout.display",
+          actionParams: {},
+        },
+      ],
+      title: "Photo Orientation",
+      photoActionType: LOCAL_WARNING_CANVAS_ACTION_TYPE,
+      photoActionCollectionId: null,
+      layoutNodes: [],
+      connections: [
+        {
+          id: "__start__::default::warning-a",
+          source: "__start__",
+          sourceHandle: null,
+          target: "warning-a",
+        },
+        {
+          id: "warning-a::fallback::layout-fallback",
+          source: "warning-a",
+          sourceHandle: "fallback",
+          target: "layout-fallback",
+        },
+        {
+          id: "layout-fallback::next::__end__",
+          source: "layout-fallback",
+          sourceHandle: "next",
+          target: "__end__",
+        },
+      ],
+      nodePositions: {},
+      fallback: {
+        steps: [],
+      },
+      portrait: {
+        enabled: true,
+        conditionType: LOCAL_WARNING_CONDITION_TYPE,
+        conditionParams: {},
+        steps: [],
+      },
+      landscape: {
+        enabled: false,
+        conditionType: "photo.orientation.landscape",
+        conditionParams: {},
+        steps: [],
+      },
+    },
+  });
+
+  const logicGraph = compileLayoutSetAuthoringToLogicGraph(authoring);
+  const warningActiveSequence = resolveDisplaySequenceFromLogicGraph({
+    graph: logicGraph,
+    orientation: "portrait",
+    evaluateCondition: (input) =>
+      input.conditionType === LOCAL_WARNING_CONDITION_TYPE ? true : null,
+  });
+  const clearSequence = resolveDisplaySequenceFromLogicGraph({
+    graph: logicGraph,
+    orientation: "portrait",
+    evaluateCondition: (input) =>
+      input.conditionType === LOCAL_WARNING_CONDITION_TYPE ? false : null,
+  });
+
+  assert.deepEqual(
+    warningActiveSequence.map((target) => target.layoutName),
+    [LOCAL_WARNING_AUTO_LAYOUT_NAME],
+  );
+  assert.equal(
+    warningActiveSequence[0]?.actionParams.locationQuery,
+    "Perth, AU",
+  );
+  assert.deepEqual(
+    clearSequence.map((target) => target.layoutName),
+    ["Fallback layout"],
+  );
 });
 
 test("photo-router action nodes can match landscape photos without an enabled toggle", () => {

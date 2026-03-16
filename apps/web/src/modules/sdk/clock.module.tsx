@@ -7,7 +7,6 @@ import {
 import { defineModule } from "@hearth/module-sdk";
 import {
   ModulePresentationControls,
-  scaleRoleRem,
 } from "../ui/ModulePresentationControls";
 import { useTileDensity } from "../ui/useTileDensity";
 
@@ -55,7 +54,7 @@ type Settings = z.infer<typeof settingsSchema>;
 
 const buildClockParts = (date: Date, use24Hour: boolean) => {
   const parts = new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
+    hour: use24Hour ? "2-digit" : "numeric",
     minute: "2-digit",
     second: "2-digit",
     hour12: !use24Hour,
@@ -155,7 +154,31 @@ export const moduleDefinition = defineModule({
   },
   settingsSchema,
   runtime: {
-    Component: ({ settings }) => {
+    Component: ({ settings, isEditing }) => {
+      if (isEditing) {
+        return (
+          <div className="module-panel-shell flex h-full flex-col justify-between px-4 py-4 text-[color:var(--color-text-primary)]">
+            <div>
+              <p className="module-text-small font-display uppercase tracking-[0.18em] text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
+                Local time
+              </p>
+              <p className="module-text-title mt-2 text-[color:var(--color-text-primary)]">
+                Clock preview
+              </p>
+            </div>
+            <div className="module-panel-card w-fit px-3 py-2">
+              <p className="module-text-body text-[color:var(--color-text-primary)]">
+                {settings.use24Hour ? "24-hour" : "12-hour"} format
+              </p>
+              <p className="module-text-small mt-1 text-[color:var(--color-text-secondary)]">
+                Seconds: {settings.showSeconds ? "Shown" : "Hidden"} | Date:{" "}
+                {settings.showDate ? "Shown" : "Hidden"}
+              </p>
+            </div>
+          </div>
+        );
+      }
+
       const { ref, metrics } = useTileDensity<HTMLDivElement>();
       const [now, setNow] = useState(() => new Date());
 
@@ -170,7 +193,6 @@ export const moduleDefinition = defineModule({
       }, []);
 
       const dateFormatter = new Intl.DateTimeFormat(undefined, {
-        weekday: "short",
         month: "short",
         day: "numeric",
         year: "numeric",
@@ -183,106 +205,57 @@ export const moduleDefinition = defineModule({
         [now, settings.use24Hour],
       );
       const compact = metrics.width < 320 || metrics.height < 150;
+      const showTimeMeta = settings.showSeconds || (!settings.use24Hour && timeParts.dayPeriod);
+      const inlineTime = settings.showSeconds
+        ? `${timeParts.primary}:${timeParts.second}`
+        : timeParts.primary;
+      const inlineDayPeriod =
+        !settings.use24Hour && timeParts.dayPeriod
+          ? timeParts.dayPeriod.toLowerCase()
+          : null;
+      const timeRowClass = compact ? "items-end gap-2.5" : "items-end gap-3";
+      const timeInlineMetaClass = compact ? "module-text-body" : "module-text-title";
 
       return (
         <div
           ref={ref}
           className="module-panel-shell relative isolate flex h-full w-full text-[color:var(--color-text-primary)]"
         >
-          <div
-            className={`relative z-10 flex h-full w-full flex-col ${
-              compact
-                ? "justify-between gap-3 px-4 py-4"
-                : "items-center justify-center gap-4 px-5 py-5"
-            }`}
-          >
-            <div
-              className={`flex w-full ${compact ? "items-start justify-between gap-3" : "flex-col items-center gap-3"}`}
-            >
-              {settings.showDate ? (
-                <div className="module-panel-chip rounded-full px-3 py-1.5 text-center">
+          <div className="relative z-10 flex h-full w-full flex-col justify-between gap-4 px-4 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="module-text-small font-display uppercase tracking-[0.18em] text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
+                  {settings.showDate ? dayFormatter.format(now) : "Local time"}
+                </p>
+                {settings.showDate ? (
                   <p
-                    className="font-medium text-[color:var(--color-text-secondary)]"
-                    style={{
-                      fontSize: scaleRoleRem(
-                        compact ? 0.82 : 0.98,
-                        settings.presentation.supportingScale,
-                      ),
-                    }}
+                    className={`mt-1 font-medium text-[color:var(--color-text-primary)] ${
+                      "module-text-body"
+                    }`}
                   >
                     {dateFormatter.format(now)}
                   </p>
-                </div>
-              ) : (
-                <p
-                  className="module-panel-label"
-                  style={{
-                    fontSize: scaleRoleRem(0.6, settings.presentation.supportingScale),
-                  }}
-                >
-                  {dayFormatter.format(now)}
-                </p>
-              )}
+                ) : null}
+              </div>
             </div>
 
-            <div
-              className={`flex w-full items-end ${
-                compact ? "justify-between gap-3" : "justify-center gap-4"
-              }`}
-            >
+            <div className={`flex w-full ${timeRowClass}`}>
               <p
-                className="font-semibold leading-none tracking-[-0.06em] text-[color:var(--color-text-accent)]"
-                style={{
-                  fontSize: scaleRoleRem(
-                    compact ? 2.2 : 2.9,
-                    settings.presentation.primaryScale,
-                  ),
-                }}
+                className={`font-semibold leading-none text-[color:var(--color-text-accent)] ${
+                  "module-text-display"
+                }`}
               >
-                {timeParts.primary}
+                {inlineTime}
+                {inlineDayPeriod ? (
+                  <span
+                    className={`${timeInlineMetaClass} ml-2 align-baseline font-medium text-[color:var(--color-text-secondary)]`}
+                  >
+                    {inlineDayPeriod}
+                  </span>
+                ) : null}
               </p>
-
-              {settings.showSeconds ? (
-                <div className="module-panel-card mb-[0.2em] rounded-2xl px-3 py-2 text-right">
-                  <p
-                    className="font-semibold leading-none text-[color:var(--color-text-primary)]"
-                    style={{
-                      fontSize: scaleRoleRem(
-                        compact ? 0.95 : 1.15,
-                        settings.presentation.headingScale,
-                      ),
-                    }}
-                  >
-                    {timeParts.second}
-                  </p>
-                  {!settings.use24Hour && timeParts.dayPeriod ? (
-                    <p
-                      className="mt-1 text-[color:var(--color-text-muted)]"
-                      style={{
-                        fontSize: scaleRoleRem(0.5, settings.presentation.supportingScale),
-                        letterSpacing: "0.22em",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      {timeParts.dayPeriod}
-                    </p>
-                  ) : null}
-                </div>
-              ) : !settings.use24Hour && timeParts.dayPeriod ? (
-                <div className="module-panel-card mb-[0.2em] rounded-full px-3 py-1.5">
-                  <p
-                    className="text-[color:var(--color-text-muted)]"
-                    style={{
-                      fontSize: scaleRoleRem(0.62, settings.presentation.supportingScale),
-                      letterSpacing: "0.24em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {timeParts.dayPeriod}
-                  </p>
-                </div>
-              ) : null}
             </div>
+
           </div>
         </div>
       );

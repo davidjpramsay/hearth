@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createLayout,
@@ -20,7 +20,6 @@ import {
   analyzeSetRuntimeHealth,
   type RuntimeHealthReport,
 } from "./layout-set-runtime-health";
-import { PhotoRouterBlockEditor } from "../components/admin/PhotoRouterBlockEditor";
 import {
   compileLayoutSetAuthoringToLogicGraph,
   getLayoutSetLogicBranches,
@@ -41,6 +40,17 @@ import {
   type LayoutRecord,
   type ScreenProfileLayouts,
 } from "@hearth/shared";
+
+const PhotoRouterBlockEditor = lazy(async () => {
+  const module = await import("../components/admin/PhotoRouterBlockEditor");
+  return { default: module.PhotoRouterBlockEditor };
+});
+
+const GraphEditorLoading = () => (
+  <div className="flex min-h-[22rem] items-center justify-center rounded-lg border border-slate-800 bg-slate-950/40 px-4 text-sm text-slate-400">
+    Loading graph editor...
+  </div>
+);
 
 const defaultProfileLayouts: ScreenProfileLayouts = screenProfileLayoutsSchema.parse({});
 const defaultPhotoCollections: PhotoCollectionsConfig = photoCollectionsConfigSchema.parse({});
@@ -1362,15 +1372,17 @@ export const AdminLayoutsPage = () => {
                   </button>
                 </div>
 
-                <PhotoRouterBlockEditor
-                  authoring={setConfig.logicBlocks}
-                  layoutOptions={layoutOptions}
-                  photoCollectionOptions={photoCollectionOptions}
-                  runtimeHealth={runtimeHealth}
-                  onChange={(nextAuthoring) => {
-                    void onUpdateSetAuthoring(setId, nextAuthoring);
-                  }}
-                />
+                <Suspense fallback={<GraphEditorLoading />}>
+                  <PhotoRouterBlockEditor
+                    authoring={setConfig.logicBlocks}
+                    layoutOptions={layoutOptions}
+                    photoCollectionOptions={photoCollectionOptions}
+                    runtimeHealth={runtimeHealth}
+                    onChange={(nextAuthoring) => {
+                      void onUpdateSetAuthoring(setId, nextAuthoring);
+                    }}
+                  />
+                </Suspense>
               </article>
             );
           })}

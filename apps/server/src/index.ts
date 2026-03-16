@@ -9,7 +9,9 @@ import { SettingsRepository } from "./repositories/settings-repository.js";
 import { CalendarFeedService } from "./services/calendar-feed-service.js";
 import { DatabaseBackupService } from "./services/database-backup-service.js";
 import { LayoutEventBus } from "./services/layout-event-bus.js";
+import { configureLayoutLogicRegistry } from "./layout-logic/registry.js";
 import { PhotosSlideshowService } from "./services/photos-slideshow-service.js";
+import { LocalWarningService } from "./services/local-warning-service.js";
 import { ScreenProfileService } from "./services/screen-profile-service.js";
 import { ModuleAdapterService } from "./modules/service.js";
 import { createApp } from "./app.js";
@@ -42,6 +44,17 @@ if (!settingsRepository.getAdminPasswordHash()) {
 }
 const layoutEventBus = new LayoutEventBus();
 const moduleAdapterService = ModuleAdapterService.createDefault();
+const localWarningService = new LocalWarningService({
+  devForceActive: config.localWarningDevForceActive,
+});
+if (config.localWarningDevForceActive) {
+  console.warn(
+    "[startup] LOCAL_WARNING_DEV_FORCE_ACTIVE is enabled. Warning node and local warnings module will always show a synthetic test warning.",
+  );
+}
+configureLayoutLogicRegistry({
+  localWarningService,
+});
 const backupService = new DatabaseBackupService(database, {
   backupDir: config.backupDir,
   intervalMinutes: config.backupIntervalMinutes,
@@ -59,10 +72,12 @@ const services = {
   moduleStateRepository,
   calendarFeedService: new CalendarFeedService(),
   photosSlideshowService: new PhotosSlideshowService(moduleStateRepository),
+  localWarningService,
   screenProfileService: new ScreenProfileService(
     layoutRepository,
     settingsRepository,
     deviceRepository,
+    localWarningService,
   ),
   layoutEventBus,
   moduleAdapterService,
@@ -70,10 +85,12 @@ const services = {
 
 const app = await createApp(services);
 backupService.start();
+localWarningService.start();
 await moduleAdapterService.start();
 
 const shutdown = async () => {
   await moduleAdapterService.stop();
+  await localWarningService.stop();
   await backupService.stop();
   await app.close();
   database.close();

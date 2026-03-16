@@ -12,9 +12,11 @@ import { defineModule } from "@hearth/module-sdk";
 import { getAuthToken } from "../../auth/storage";
 import { getDeviceId } from "../../device/device-id";
 import {
-  ModulePresentationControls,
-  scaleRoleRem,
-} from "../ui/ModulePresentationControls";
+  resolveModuleConnectivityState,
+  useBrowserOnlineStatus,
+} from "../data/connection-state";
+import { ModulePresentationControls } from "../ui/ModulePresentationControls";
+import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 
 const LAYOUT_CROSSFADE_DATA_ATTRIBUTE = "data-hearth-layout-crossfade";
 const DISPLAY_SOURCE_KIND_STORAGE_KEY = "hearth:display-source-kind";
@@ -268,6 +270,13 @@ export const moduleDefinition = defineModule({
       const [imageVisible, setImageVisible] = useState(false);
       const [error, setError] = useState<string | null>(null);
       const [loading, setLoading] = useState(true);
+      const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(null);
+      const browserOnline = useBrowserOnlineStatus();
+      const connectivityState = resolveModuleConnectivityState({
+        error,
+        hasSnapshot: lastUpdatedMs !== null,
+        isOnline: browserOnline,
+      });
 
       useEffect(() => {
         const applyCurrentContext = (event?: Event) => {
@@ -323,6 +332,7 @@ export const moduleDefinition = defineModule({
             }
 
             setFrameData(next);
+            setLastUpdatedMs(Date.now());
             setError(null);
 
             if (!next.frame) {
@@ -412,22 +422,20 @@ export const moduleDefinition = defineModule({
         settings.collectionId && settings.collectionId.trim().length > 0
           ? `Collection: ${settings.collectionId.trim()}`
           : "/photos";
-      const headingSize = scaleRoleRem(0.875, settings.presentation.headingScale);
-      const supportingSize = scaleRoleRem(0.75, settings.presentation.supportingScale);
 
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="font-semibold text-slate-100" style={{ fontSize: headingSize }}>
+            <p className="module-text-title text-slate-100">
               Photo slideshow preview
             </p>
-            <p className="mt-2 text-slate-300" style={{ fontSize: supportingSize }}>
+            <p className="module-text-small mt-2 text-slate-300">
               Photo source: {previewSourceLabel}
             </p>
-            <p className="mt-1 text-slate-400" style={{ fontSize: supportingSize }}>
+            <p className="module-text-small mt-1 text-slate-400">
               Every {effectiveIntervalSeconds}s | {settings.shuffle ? "Shuffle" : "In order"}
             </p>
-            <p className="mt-1 text-slate-400" style={{ fontSize: supportingSize }}>
+            <p className="module-text-small mt-1 text-slate-400">
               Layout lock: {getLayoutRatioLabel(settings.layoutOrientation)}
             </p>
           </div>
@@ -436,25 +444,20 @@ export const moduleDefinition = defineModule({
 
       return (
         <div className="relative h-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950">
+          <ModuleConnectionBadge visible={connectivityState.showDisconnected} />
           {loading ? (
-            <div
-              className="flex h-full items-center justify-center text-slate-300"
-              style={{ fontSize: supportingSize }}
-            >
+            <div className="module-text-small flex h-full items-center justify-center text-slate-300">
               Loading photos...
             </div>
           ) : null}
 
-          {!loading && error ? (
-            <div
-              className="flex h-full items-center justify-center px-3 text-center text-rose-200"
-              style={{ fontSize: supportingSize }}
-            >
-              {error}
+          {!loading && connectivityState.blockingError ? (
+            <div className="module-text-small flex h-full items-center justify-center px-3 text-center text-rose-200">
+              {connectivityState.blockingError}
             </div>
           ) : null}
 
-          {!loading && !error && displayFrame ? (
+          {!loading && !connectivityState.blockingError && displayFrame ? (
             <img
               key={displayFrame.imageId}
               src={displayFrame.imageUrl}
@@ -468,11 +471,11 @@ export const moduleDefinition = defineModule({
             />
           ) : null}
 
-          {!loading && !error && !displayFrame && frameData.warning ? (
-            <div
-              className="flex h-full items-center justify-center px-3 text-center text-slate-300"
-              style={{ fontSize: supportingSize }}
-            >
+          {!loading &&
+          !connectivityState.blockingError &&
+          !displayFrame &&
+          frameData.warning ? (
+            <div className="module-text-small flex h-full items-center justify-center px-3 text-center text-slate-300">
               {frameData.warning}
             </div>
           ) : null}

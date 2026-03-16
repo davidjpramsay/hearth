@@ -1,5 +1,6 @@
 import {
   applyLayoutSetLogicEdgeState,
+  isLocalWarningAutoLayoutName,
   layoutSetLogicGraphSchema,
   resolveDisplaySequenceFromLogicGraph,
   type AutoLayoutTarget,
@@ -83,7 +84,7 @@ const sequenceSummary = (sequence: AutoLayoutTarget[]): string => {
   return sequence
     .map(
       (target) =>
-        `${target.layoutName} (${Math.max(3, Math.round(target.cycleSeconds ?? 20))}s)`,
+        `${isLocalWarningAutoLayoutName(target.layoutName) ? "Local warnings (auto)" : target.layoutName} (${Math.max(3, Math.round(target.cycleSeconds ?? 20))}s)`,
     )
     .join(" -> ");
 };
@@ -233,7 +234,10 @@ export const analyzeSetRuntimeHealth = (input: {
       const layoutName = node.layoutName?.trim() ?? "";
       if (!layoutName) {
         addIssue("warning", `Display node "${node.id}" has no layout selected.`);
-      } else if (!input.knownLayoutNames.has(layoutName)) {
+      } else if (
+        !isLocalWarningAutoLayoutName(layoutName) &&
+        !input.knownLayoutNames.has(layoutName)
+      ) {
         addIssue("warning", `Display node "${node.id}" uses unknown layout "${layoutName}".`);
       }
     }

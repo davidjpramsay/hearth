@@ -8,6 +8,7 @@ import {
 import {
   type GridItem,
   type LayoutRecord,
+  type LayoutTypography,
   type ModuleManifest,
 } from "@hearth/shared";
 import GridLayout from "react-grid-layout";
@@ -31,6 +32,14 @@ import {
   inferLayoutRows,
   sanitizeGridItems,
 } from "../layout/grid-math";
+import {
+  buildLayoutTypographyStyle,
+  DEFAULT_LAYOUT_TYPOGRAPHY,
+  formatLayoutTypographyValue,
+  LAYOUT_TYPOGRAPHY_CONTROLS,
+  normalizeLayoutTypography,
+  snapLayoutTypographyValue,
+} from "../layout/layout-typography";
 import { moduleRegistry } from "../registry/module-registry";
 
 const PREVIEW_CANVAS_BASE_WIDTH = 1920;
@@ -115,6 +124,102 @@ const renderResizeHandle = (
     <span className="hearth-layout-resize-handle__grip" />
   </span>
 );
+
+interface LayoutTypographyPanelProps {
+  value: LayoutTypography;
+  onChange: (next: LayoutTypography) => void;
+  onReset: () => void;
+}
+
+const LayoutTypographyPanel = ({
+  value,
+  onChange,
+  onReset,
+}: LayoutTypographyPanelProps) => {
+  const updateValue = (key: keyof LayoutTypography, nextValue: number) => {
+    if (!Number.isFinite(nextValue)) {
+      return;
+    }
+
+    const control = LAYOUT_TYPOGRAPHY_CONTROLS.find((entry) => entry.key === key);
+    if (!control) {
+      return;
+    }
+
+    onChange(
+      normalizeLayoutTypography({
+        ...value,
+        [key]: snapLayoutTypographyValue(nextValue, control),
+      }),
+    );
+  };
+
+  return (
+    <section className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs text-slate-400">
+          Layout-wide text sizing for every module in this layout.
+        </p>
+        <button
+          type="button"
+          onClick={onReset}
+          className="rounded border border-slate-600 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:border-slate-400"
+        >
+          Reset
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(520px,0.95fr)] xl:items-start">
+        <div
+          style={buildLayoutTypographyStyle(value)}
+          className="rounded-xl border border-slate-700 bg-slate-950/75 p-4"
+        >
+          <p className="module-text-small font-display uppercase tracking-[0.18em] text-cyan-200">Small text</p>
+          <p className="module-text-body mt-3 text-slate-200">Body copy preview.</p>
+          <p className="module-text-title mt-4 text-slate-100">Title</p>
+          <div className="mt-4">
+            <span className="module-text-display text-slate-100">25°C</span>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {LAYOUT_TYPOGRAPHY_CONTROLS.map((control) => (
+            <label
+              key={control.key}
+              className="block rounded-xl border border-slate-700 bg-slate-950/60 p-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="block text-sm font-semibold text-slate-100">
+                    {control.label}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-slate-400">
+                    {control.description}
+                  </span>
+                </div>
+                <span className="w-[6.25rem] rounded border border-slate-700 bg-slate-900/80 px-2 py-1 text-right text-xs tabular-nums text-slate-300">
+                  {formatLayoutTypographyValue(value[control.key])}
+                </span>
+              </div>
+
+              <div className="mt-3 space-y-3">
+                <input
+                  type="range"
+                  min={control.min}
+                  max={control.max}
+                  step={control.step}
+                  value={value[control.key]}
+                  onChange={(event) => updateValue(control.key, Number(event.target.value))}
+                  className="w-full accent-cyan-500"
+                />
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
 
 export const AdminLayoutEditorPage = () => {
   const navigate = useNavigate();
@@ -618,6 +723,59 @@ export const AdminLayoutEditorPage = () => {
     [resolvedPreviewAspectRatio],
   );
 
+  const layoutTypography = useMemo(
+    () => normalizeLayoutTypography(layout?.config.typography),
+    [layout?.config.typography],
+  );
+  const [draftTypography, setDraftTypography] = useState<LayoutTypography>(
+    DEFAULT_LAYOUT_TYPOGRAPHY,
+  );
+  const isDraftTypographySynced =
+    draftTypography.smallRem === layoutTypography.smallRem &&
+    draftTypography.bodyRem === layoutTypography.bodyRem &&
+    draftTypography.titleRem === layoutTypography.titleRem &&
+    draftTypography.displayRem === layoutTypography.displayRem;
+
+  useEffect(() => {
+    setDraftTypography(layoutTypography);
+  }, [
+    layoutTypography.bodyRem,
+    layoutTypography.displayRem,
+    layoutTypography.smallRem,
+    layoutTypography.titleRem,
+  ]);
+
+  useEffect(() => {
+    if (!layout || isDraftTypographySynced) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      applyLayoutPatch((current) => ({
+        ...current,
+        config: {
+          ...current.config,
+          typography: draftTypography,
+        },
+      }));
+    }, 180);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [
+    applyLayoutPatch,
+    draftTypography,
+    isDraftTypographySynced,
+    layout,
+  ]);
+
+  const hasSelectedModuleSettings =
+    Boolean(selectedInstance) &&
+    Boolean(selectedModuleDefinition) &&
+    Boolean(selectedModuleConfig);
+  const inspectorTitle = hasSelectedModuleSettings ? "Module settings" : "Layout settings";
+
   if (!layout) {
     return (
       <main className="flex min-h-screen items-center justify-center text-slate-200">
@@ -820,12 +978,13 @@ export const AdminLayoutEditorPage = () => {
                   </g>
                 </svg>
                 <div
-                  style={{
-                    width: `${previewGridCanvasSize.width}px`,
-                    height: `${previewGridCanvasSize.height}px`,
-                    transform: `scale(${previewScale})`,
-                    transformOrigin: "top left",
-                  }}
+                    style={{
+                      width: `${previewGridCanvasSize.width}px`,
+                      height: `${previewGridCanvasSize.height}px`,
+                      transform: `scale(${previewScale})`,
+                      transformOrigin: "top left",
+                      ...buildLayoutTypographyStyle(draftTypography),
+                    }}
                   className="relative z-10"
                 >
                   <GridLayout
@@ -991,16 +1150,36 @@ export const AdminLayoutEditorPage = () => {
               <p className="text-sm text-slate-400">Preparing preview canvas...</p>
             )}
           </div>
+
+          <div className="mt-3 shrink-0">
+            <LayoutTypographyPanel
+              value={draftTypography}
+              onChange={(nextTypography) => {
+                setDraftTypography(nextTypography);
+              }}
+              onReset={() => {
+                setDraftTypography(DEFAULT_LAYOUT_TYPOGRAPHY);
+              }}
+            />
+          </div>
         </div>
 
         <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900/80 p-4">
-          <h2 className="font-display text-lg font-semibold text-slate-100">Settings</h2>
-          {!selectedInstance || !selectedModuleDefinition || !selectedModuleConfig ? (
-            <p className="mt-2 text-sm text-slate-400">
-              Select a tile to edit module settings.
+          <h2 className="font-display text-lg font-semibold text-slate-100">{inspectorTitle}</h2>
+          {hasSelectedModuleSettings ? (
+            <p className="mt-1 text-xs text-slate-400">
+              {selectedModuleDefinition?.displayName}
             </p>
-          ) : (
-            <div className="mt-3 min-h-0 space-y-4 overflow-y-auto pr-1">
+          ) : null}
+          <div className="mt-3 min-h-0 space-y-4 overflow-y-auto pr-1">
+            {!selectedInstance || !selectedModuleDefinition || !selectedModuleConfig ? (
+              <div className="rounded-lg border border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-300">
+                <p>Select a tile to edit its module settings.</p>
+                <p className="mt-2 text-xs text-slate-400">
+                  Layout-wide typography now lives below the preview canvas.
+                </p>
+              </div>
+            ) : (
               <selectedModuleDefinition.SettingsPanel
                 config={selectedModuleConfig}
                 onChange={(nextConfig) => {
@@ -1023,8 +1202,8 @@ export const AdminLayoutEditorPage = () => {
                   });
                 }}
               />
-            </div>
-          )}
+            )}
+          </div>
         </aside>
       </section>
     </main>

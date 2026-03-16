@@ -1,77 +1,12 @@
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import type { ModuleDefinition } from "@hearth/shared";
-import {
-  MODULE_PRESENTATION_SCALE_MAX,
-  MODULE_PRESENTATION_SCALE_MIN,
-  MODULE_PRESENTATION_SCALE_STEP,
-  clampModulePresentationScale,
-  withModulePresentation,
-  type ModulePresentationSettings,
-} from "@hearth/shared";
 
-const scaleFieldMeta = [
-  {
-    key: "headingScale",
-    label: "Heading size",
-  },
-  {
-    key: "primaryScale",
-    label: "Primary size",
-  },
-  {
-    key: "supportingScale",
-    label: "Supporting size",
-  },
-] as const satisfies ReadonlyArray<{
-  key: keyof ModulePresentationSettings;
-  label: string;
-}>;
-
-const formatScaleLabel = (value: number): string => `${Math.round(value * 100)}%`;
-
-const scaleRoleRem = (baseRem: number, scale: number): string =>
-  `${(baseRem * clampModulePresentationScale(scale, 1)).toFixed(3).replace(/\.?0+$/, "")}rem`;
-
-const baseClockConfigSchema = withModulePresentation(
-  z.object({
-    use24Hour: z.boolean().default(true),
-    showSeconds: z.boolean().default(true),
-    showDate: z.boolean().default(false),
-  }),
-);
-
-const migrateLegacyClockFontSizes = (config: unknown): unknown => {
-  if (!config || typeof config !== "object" || Array.isArray(config)) {
-    return config;
-  }
-
-  const rawConfig = config as Record<string, unknown>;
-  const nextConfig: Record<string, unknown> = { ...rawConfig };
-  const rawPresentation =
-    rawConfig.presentation && typeof rawConfig.presentation === "object"
-      ? (rawConfig.presentation as Record<string, unknown>)
-      : {};
-  const nextPresentation: Record<string, unknown> = { ...rawPresentation };
-  const timeFontSizeRem =
-    typeof rawConfig.timeFontSizeRem === "number" ? rawConfig.timeFontSizeRem : null;
-  const dateFontSizeRem =
-    typeof rawConfig.dateFontSizeRem === "number" ? rawConfig.dateFontSizeRem : null;
-
-  if (timeFontSizeRem !== null && typeof nextPresentation.primaryScale !== "number") {
-    nextPresentation.primaryScale = clampModulePresentationScale(timeFontSizeRem / 2.25);
-  }
-  if (dateFontSizeRem !== null && typeof nextPresentation.supportingScale !== "number") {
-    nextPresentation.supportingScale = clampModulePresentationScale(dateFontSizeRem / 1);
-  }
-  if (Object.keys(nextPresentation).length > 0) {
-    nextConfig.presentation = nextPresentation;
-  }
-
-  return nextConfig;
-};
-
-const clockConfigSchema = z.preprocess(migrateLegacyClockFontSizes, baseClockConfigSchema);
+const clockConfigSchema = z.object({
+  use24Hour: z.boolean().default(true),
+  showSeconds: z.boolean().default(true),
+  showDate: z.boolean().default(false),
+});
 
 type ClockConfig = z.infer<typeof clockConfigSchema>;
 const DEFAULT_CONFIG = clockConfigSchema.parse({});
@@ -114,17 +49,11 @@ export const clockModule: ModuleDefinition<ClockConfig> = {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center rounded-xl bg-slate-800 text-cyan-300">
         {normalizedConfig.showDate ? (
-          <p
-            className="mb-2 font-medium text-cyan-200"
-            style={{ fontSize: scaleRoleRem(1, normalizedConfig.presentation.supportingScale) }}
-          >
+          <p className="mb-2 font-medium text-cyan-200" style={{ fontSize: "1rem" }}>
             {dateFormatter.format(now)}
           </p>
         ) : null}
-        <p
-          className="font-semibold"
-          style={{ fontSize: scaleRoleRem(2.25, normalizedConfig.presentation.primaryScale) }}
-        >
+        <p className="font-semibold" style={{ fontSize: "2.25rem" }}>
           {timeFormatter.format(now)}
         </p>
       </div>
@@ -175,47 +104,6 @@ export const clockModule: ModuleDefinition<ClockConfig> = {
             }
           />
         </label>
-        <div className="space-y-3 rounded border border-slate-700/80 bg-slate-950/40 p-3">
-          <div>
-            <p className="font-medium text-slate-100">Role sizing</p>
-            <p className="text-xs text-slate-400">
-              100% keeps the current default sizing for text, icons, emoji, and small visuals.
-            </p>
-          </div>
-          {scaleFieldMeta.map((field) => (
-            <label key={field.key} className="block space-y-1.5">
-              <div className="flex items-center justify-between gap-3">
-                <span>{field.label}</span>
-                <span className="text-xs text-slate-400">
-                  {formatScaleLabel(normalizedConfig.presentation[field.key])}
-                </span>
-              </div>
-              <input
-                className="w-full accent-cyan-400"
-                type="range"
-                min={MODULE_PRESENTATION_SCALE_MIN}
-                max={MODULE_PRESENTATION_SCALE_MAX}
-                step={MODULE_PRESENTATION_SCALE_STEP}
-                value={normalizedConfig.presentation[field.key]}
-                onChange={(event) =>
-                  onChange({
-                    ...normalizedConfig,
-                    presentation: {
-                      ...normalizedConfig.presentation,
-                      [field.key]: clampModulePresentationScale(
-                        Number.parseFloat(event.target.value),
-                        normalizedConfig.presentation[field.key],
-                      ),
-                    },
-                  })
-                }
-              />
-            </label>
-          ))}
-          <p className="text-xs text-slate-500">
-            Roles stay the same across modules, but each module only maps the elements it uses.
-          </p>
-        </div>
       </div>
     );
   },

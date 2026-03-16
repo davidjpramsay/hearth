@@ -227,6 +227,28 @@ const formatForecastDayLabel = (isoDate: string, index: number): string => {
   }).format(parsed);
 };
 
+const WeatherSettingsToggle = ({
+  label,
+  checked,
+  onChange,
+  disabled = false,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+}) => (
+  <label className={`flex items-center justify-between gap-3 ${disabled ? "opacity-60" : ""}`}>
+    <span>{label}</span>
+    <input
+      type="checkbox"
+      checked={checked}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.checked)}
+    />
+  </label>
+);
+
 export const weatherModule: ModuleDefinition<WeatherModuleConfig> = {
   id: "weather",
   displayName: "Weather",
@@ -254,9 +276,13 @@ export const weatherModule: ModuleDefinition<WeatherModuleConfig> = {
     const showForecast = forecastDays.length > 0;
     const showDayNight = density !== "xs";
     const showTopCondition = density !== "xs";
-    const showTopMeta = density !== "xs";
-    const showForecastWind = density === "lg";
-    const showForecastPrecipitation = density !== "xs";
+    const showTopMeta =
+      density !== "xs" &&
+      (normalizedConfig.showTodayWind || normalizedConfig.showTodayHumidity);
+    const showForecastWind = normalizedConfig.showForecastWind && density !== "xs";
+    const showForecastPrecipitation =
+      normalizedConfig.showForecastPrecipitation && density !== "xs";
+    const showForecastTemperature = normalizedConfig.showForecastTemperature;
     const temperatureClass =
       density === "xs" ? "text-3xl" : density === "sm" ? "text-4xl" : "text-5xl";
     const locationLabel = formatLocationLabel(payload.locationLabel, density);
@@ -375,12 +401,12 @@ export const weatherModule: ModuleDefinition<WeatherModuleConfig> = {
 
             {showTopMeta ? (
               <div className="mt-3 space-y-1 text-xs text-slate-300">
-                {normalizedConfig.showWind ? (
+                {normalizedConfig.showTodayWind ? (
                   <p>
                     Wind: {formatWind(payload.windSpeed, normalizedConfig.windSpeedUnit)}
                   </p>
                 ) : null}
-                {normalizedConfig.showHumidity ? (
+                {normalizedConfig.showTodayHumidity ? (
                   <p>
                     Humidity:{" "}
                     {payload.humidityPercent === null ? "--" : `${payload.humidityPercent}%`}
@@ -413,16 +439,18 @@ export const weatherModule: ModuleDefinition<WeatherModuleConfig> = {
                       <p className="mt-0.5 text-lg" aria-hidden>
                         {weatherSymbolForCode(day.conditionCode, true)}
                       </p>
-                      <p className="mt-0.5 text-[11px] font-semibold text-slate-100">
-                        {day.tempMax === null ? "--" : `${Math.round(day.tempMax)}°`}
-                        <span className="text-slate-400"> / </span>
-                        <span className="text-slate-300">
-                          {day.tempMin === null ? "--" : `${Math.round(day.tempMin)}°`}
-                        </span>
-                      </p>
+                      {showForecastTemperature ? (
+                        <p className="mt-0.5 text-[11px] font-semibold text-slate-100">
+                          {day.tempMax === null ? "--" : `${Math.round(day.tempMax)}°`}
+                          <span className="text-slate-400"> / </span>
+                          <span className="text-slate-300">
+                            {day.tempMin === null ? "--" : `${Math.round(day.tempMin)}°`}
+                          </span>
+                        </p>
+                      ) : null}
                       {showForecastWind ? (
                         <p className="mt-0.5 text-[10px] text-slate-300">
-                          💨 {day.windMax === null ? "--" : Math.round(day.windMax)}
+                          💨 {formatWind(day.windMax, normalizedConfig.windSpeedUnit)}
                         </p>
                       ) : null}
                       {showForecastPrecipitation ? (
@@ -697,32 +725,64 @@ export const weatherModule: ModuleDefinition<WeatherModuleConfig> = {
           />
         </label>
 
-        <label className="flex items-center justify-between">
-          <span>Show forecast</span>
-          <input
-            type="checkbox"
-            checked={normalizedConfig.showForecast}
-            onChange={(event) => applyPatch({ showForecast: event.target.checked })}
-          />
-        </label>
+        <div className="space-y-3 rounded border border-slate-700 bg-slate-950/60 p-3">
+          <div>
+            <p className="font-semibold text-slate-100">Today</p>
+            <p className="mt-1 text-xs text-slate-400">
+              Controls the current conditions area at the top of the tile.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <WeatherSettingsToggle
+              label="Show wind"
+              checked={normalizedConfig.showTodayWind}
+              onChange={(showTodayWind) => applyPatch({ showTodayWind })}
+            />
+            <WeatherSettingsToggle
+              label="Show humidity"
+              checked={normalizedConfig.showTodayHumidity}
+              onChange={(showTodayHumidity) => applyPatch({ showTodayHumidity })}
+            />
+          </div>
+        </div>
 
-        <label className="flex items-center justify-between">
-          <span>Show wind</span>
-          <input
-            type="checkbox"
-            checked={normalizedConfig.showWind}
-            onChange={(event) => applyPatch({ showWind: event.target.checked })}
-          />
-        </label>
-
-        <label className="flex items-center justify-between">
-          <span>Show humidity</span>
-          <input
-            type="checkbox"
-            checked={normalizedConfig.showHumidity}
-            onChange={(event) => applyPatch({ showHumidity: event.target.checked })}
-          />
-        </label>
+        <div className="space-y-3 rounded border border-slate-700 bg-slate-950/60 p-3">
+          <div>
+            <p className="font-semibold text-slate-100">Forecast</p>
+            <p className="mt-1 text-xs text-slate-400">
+              Controls the cards in the week forecast section.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <WeatherSettingsToggle
+              label="Show forecast"
+              checked={normalizedConfig.showForecast}
+              onChange={(showForecast) => applyPatch({ showForecast })}
+            />
+            <WeatherSettingsToggle
+              label="Show temperatures"
+              checked={normalizedConfig.showForecastTemperature}
+              disabled={!normalizedConfig.showForecast}
+              onChange={(showForecastTemperature) =>
+                applyPatch({ showForecastTemperature })
+              }
+            />
+            <WeatherSettingsToggle
+              label="Show rain chance"
+              checked={normalizedConfig.showForecastPrecipitation}
+              disabled={!normalizedConfig.showForecast}
+              onChange={(showForecastPrecipitation) =>
+                applyPatch({ showForecastPrecipitation })
+              }
+            />
+            <WeatherSettingsToggle
+              label="Show wind"
+              checked={normalizedConfig.showForecastWind}
+              disabled={!normalizedConfig.showForecast}
+              onChange={(showForecastWind) => applyPatch({ showForecastWind })}
+            />
+          </div>
+        </div>
       </div>
     );
   },

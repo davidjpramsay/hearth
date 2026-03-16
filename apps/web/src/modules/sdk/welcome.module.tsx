@@ -1,10 +1,7 @@
 import { z } from "zod";
 import { withModulePresentation } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
-import {
-  ModulePresentationControls,
-  scaleRoleRem,
-} from "../ui/ModulePresentationControls";
+import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 
 const settingsSchema = withModulePresentation(
   z.object({
@@ -30,8 +27,7 @@ export const moduleDefinition = defineModule({
   runtime: {
     Component: ({ settings }) => (
       <div
-        className="flex h-full w-full items-center justify-center rounded-xl bg-slate-800 px-4 text-center font-medium text-slate-100"
-        style={{ fontSize: scaleRoleRem(1.25, settings.presentation.primaryScale) }}
+        className="module-text-title flex h-full w-full items-center justify-center rounded-lg bg-slate-800 px-4 text-center text-slate-100"
       >
         {settings.message}
       </div>

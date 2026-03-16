@@ -4,18 +4,49 @@ import { withModulePresentation } from "./presentation.js";
 export const weatherTemperatureUnitSchema = z.enum(["celsius", "fahrenheit"]);
 export const weatherWindSpeedUnitSchema = z.enum(["kmh", "mph", "knots"]);
 
-export const weatherModuleConfigSchema = withModulePresentation(
+const weatherModuleConfigObjectSchema = withModulePresentation(
   z.object({
     locationQuery: z.string().trim().max(120).default("Perth, AU"),
     latitude: z.number().min(-90).max(90).nullable().default(null),
     longitude: z.number().min(-180).max(180).nullable().default(null),
     temperatureUnit: weatherTemperatureUnitSchema.default("celsius"),
-    windSpeedUnit: weatherWindSpeedUnitSchema.default("kmh"),
+    windSpeedUnit: weatherWindSpeedUnitSchema.default("knots"),
     refreshIntervalSeconds: z.number().int().min(60).max(3600).default(600),
     showForecast: z.boolean().default(true),
-    showHumidity: z.boolean().default(true),
-    showWind: z.boolean().default(true),
+    showTodayMinTemperature: z.boolean().default(true),
+    showTodayPrecipitation: z.boolean().default(true),
+    showTodayWind: z.boolean().default(true),
+    showTodayHumidity: z.boolean().default(true),
+    showForecastTemperature: z.boolean().default(true),
+    showForecastPrecipitation: z.boolean().default(true),
+    showForecastWind: z.boolean().default(true),
   }),
+);
+
+export const weatherModuleConfigSchema = z.preprocess(
+  (input) => {
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      return input;
+    }
+
+    const record = input as Record<string, unknown>;
+    return {
+      ...record,
+      showTodayWind:
+        typeof record.showTodayWind === "boolean"
+          ? record.showTodayWind
+          : typeof record.showWind === "boolean"
+            ? record.showWind
+            : undefined,
+      showTodayHumidity:
+        typeof record.showTodayHumidity === "boolean"
+          ? record.showTodayHumidity
+          : typeof record.showHumidity === "boolean"
+            ? record.showHumidity
+            : undefined,
+    };
+  },
+  weatherModuleConfigObjectSchema,
 );
 
 export const weatherModuleCurrentResponseSchema = z.object({

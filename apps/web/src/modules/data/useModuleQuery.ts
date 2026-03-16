@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  resolveModuleConnectivityState,
+  useBrowserOnlineStatus,
+} from "./connection-state";
 
 interface ModuleQueryCacheEntry<TData> {
   data: TData;
@@ -18,6 +22,7 @@ export interface UseModuleQueryResult<TData> {
   loading: boolean;
   error: string | null;
   lastUpdatedMs: number | null;
+  isDisconnected: boolean;
   revalidate: () => Promise<void>;
 }
 
@@ -31,47 +36,73 @@ const readCachedEntry = <TData,>(key: string): ModuleQueryCacheEntry<TData> | nu
 export const useModuleQuery = <TData,>(
   options: UseModuleQueryOptions<TData>,
 ): UseModuleQueryResult<TData> => {
-  const { enabled = true, intervalMs = 30_000, staleMs = 10_000 } = options;
-  const cachedAtStart = useMemo(() => readCachedEntry<TData>(options.key), [options.key]);
+  const { enabled = true, intervalMs = 30_000, key, queryFn, staleMs = 10_000 } = options;
+  const cachedAtStart = useMemo(() => readCachedEntry<TData>(key), [key]);
+  const browserOnline = useBrowserOnlineStatus();
   const [data, setData] = useState<TData | null>(cachedAtStart?.data ?? null);
   const [loading, setLoading] = useState<boolean>(enabled && !cachedAtStart);
-  const [error, setError] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
   const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(
     cachedAtStart?.updatedAtMs ?? null,
   );
+  const dataRef = useRef<TData | null>(cachedAtStart?.data ?? null);
+  const queryFnRef = useRef(queryFn);
+  const connectivityState = useMemo(
+    () =>
+      resolveModuleConnectivityState({
+        error: requestError,
+        hasSnapshot: data !== null,
+        isOnline: browserOnline,
+      }),
+    [browserOnline, data, requestError],
+  );
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  useEffect(() => {
+    queryFnRef.current = queryFn;
+  }, [queryFn]);
 
   const revalidate = useCallback(async () => {
     if (!enabled) {
       return;
     }
 
-    setLoading((current) => (data === null ? true : current));
-    setError(null);
+    const currentData = dataRef.current;
+    setLoading((current) => (currentData === null ? true : current));
+    if (currentData === null) {
+      setRequestError(null);
+    }
 
     try {
-      const next = await options.queryFn();
+      const next = await queryFnRef.current();
       const updatedAtMs = Date.now();
-      queryCache.set(options.key, {
+      queryCache.set(key, {
         data: next,
         updatedAtMs,
       });
       setData(next);
       setLastUpdatedMs(updatedAtMs);
-      setError(null);
+      setRequestError(null);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Failed to load module data");
+      setRequestError(
+        requestError instanceof Error ? requestError.message : "Failed to load module data",
+      );
     } finally {
       setLoading(false);
     }
-  }, [data, enabled, options]);
+  }, [enabled, key]);
 
   useEffect(() => {
     if (!enabled) {
       setLoading(false);
+      setRequestError(null);
       return;
     }
 
-    const cached = readCachedEntry<TData>(options.key);
+    const cached = readCachedEntry<TData>(key);
     const now = Date.now();
     const isFresh = cached ? now - cached.updatedAtMs <= staleMs : false;
 
@@ -92,13 +123,14 @@ export const useModuleQuery = <TData,>(
     return () => {
       window.clearInterval(timer);
     };
-  }, [enabled, intervalMs, options.key, revalidate, staleMs]);
+  }, [enabled, intervalMs, key, revalidate, staleMs]);
 
   return {
     data,
     loading,
-    error,
+    error: connectivityState.blockingError,
     lastUpdatedMs,
+    isDisconnected: connectivityState.showDisconnected,
     revalidate,
   };
 };

@@ -1,5 +1,6 @@
 import {
   layoutConfigSchema,
+  layoutTypographySchema,
   type GridItem,
   type LayoutConfig,
   type ModuleDefinition,
@@ -22,6 +23,7 @@ export const createEmptyLayoutConfig = (): LayoutConfig => ({
   cols: DEFAULT_COLS,
   rows: DEFAULT_ROWS,
   rowHeight: DEFAULT_ROW_HEIGHT,
+  typography: layoutTypographySchema.parse({}),
   items: [],
   modules: [],
 });
@@ -142,6 +144,7 @@ export const synchronizeLayout = (config: LayoutConfig): LayoutConfig => {
     cols: config.cols,
     rows: config.rows,
     rowHeight: config.rowHeight,
+    typography: config.typography,
     items: validItems,
     modules: validModules,
   };

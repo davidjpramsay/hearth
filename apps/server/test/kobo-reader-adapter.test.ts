@@ -243,3 +243,34 @@ test("kobo reader adapter rejects cover paths that escape the library root", asy
     await harness.dispose();
   }
 });
+
+test("kobo reader adapter returns a friendly unavailable message when mounted paths are missing", async () => {
+  const harness = await createHarness();
+  const originalPaths = {
+    appDbPath: config.koboReaderAppDbPath,
+    libraryDbPath: config.koboReaderLibraryDbPath,
+    libraryRoot: config.koboReaderLibraryRoot,
+  };
+
+  try {
+    config.koboReaderAppDbPath = "/tmp/hearth-missing-kobo-share/app.db";
+    config.koboReaderLibraryDbPath = "/tmp/hearth-missing-kobo-share/metadata.db";
+    config.koboReaderLibraryRoot = "/tmp/hearth-missing-kobo-share/library";
+
+    const response = await harness.app.inject({
+      method: "GET",
+      url: "/current?userName=admin",
+    });
+
+    assert.equal(response.statusCode, 503);
+    assert.match(
+      response.json().message,
+      /Kobo Reader data is not available in this environment|Kobo Reader library data is not available in this environment/,
+    );
+  } finally {
+    config.koboReaderAppDbPath = originalPaths.appDbPath;
+    config.koboReaderLibraryDbPath = originalPaths.libraryDbPath;
+    config.koboReaderLibraryRoot = originalPaths.libraryRoot;
+    await harness.dispose();
+  }
+});

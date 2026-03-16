@@ -13,6 +13,7 @@ import { registerChoresRoutes } from "./routes/chores.js";
 import { registerDisplayRoutes } from "./routes/display.js";
 import { registerEventRoutes } from "./routes/events.js";
 import { registerLayoutRoutes } from "./routes/layouts.js";
+import { registerLocalWarningsRoutes } from "./routes/local-warnings.js";
 import { registerModuleAdapterRoutes } from "./routes/module-adapters.js";
 import { registerPhotoRoutes } from "./routes/photos.js";
 import { registerWeatherRoutes } from "./routes/weather.js";
@@ -44,6 +45,7 @@ export const createApp = async (services: AppServices) => {
       registerAuthRoutes(apiApp, services);
       registerLayoutRoutes(apiApp, services);
       registerModuleAdapterRoutes(apiApp, services);
+      registerLocalWarningsRoutes(apiApp, services);
       registerChoresRoutes(apiApp, services);
       registerCalendarRoutes(apiApp, services);
       registerWeatherRoutes(apiApp, services);

@@ -6,6 +6,8 @@ import {
   type LayoutRecord,
   type ModuleInstance,
   type PhotosOrientation,
+  type ReportScreenProfileWarningTicker,
+  isLocalWarningAutoLayoutName,
 } from "@hearth/shared";
 import { reportScreenProfile } from "../api/client";
 import { getOrCreateDeviceId } from "../device/device-id";
@@ -13,6 +15,7 @@ import {
   inferLayoutRows,
   sanitizeGridItems,
 } from "../layout/grid-math";
+import { buildLayoutTypographyStyle } from "../layout/layout-typography";
 import {
   getDashboardDeviceBootstrapStateFromResolution,
   getInitialDashboardDeviceBootstrapState,
@@ -24,6 +27,7 @@ const FALLBACK_VIEWPORT = {
   width: 1920,
   height: 1080,
 };
+const BUILD_ASSET_POLL_MS = 60_000;
 const ORIENTATION_SWITCH_HOLDOFF_MS = 0;
 const DISPLAY_SOURCE_KIND_STORAGE_KEY = "hearth:display-source-kind";
 const DISPLAY_CYCLE_SECONDS_STORAGE_KEY = "hearth:display-cycle-seconds";
@@ -113,6 +117,40 @@ interface DisplayDeviceUpdatedEventDetail {
   deviceId: string;
 }
 
+interface DashboardAssetSignature {
+  scriptSrc: string | null;
+  stylesheetHref: string | null;
+}
+
+const normalizeAssetUrl = (value: string | null): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value, window.location.href);
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return value;
+  }
+};
+
+const readDashboardAssetSignature = (root: ParentNode): DashboardAssetSignature => ({
+  scriptSrc: normalizeAssetUrl(
+    root.querySelector<HTMLScriptElement>('script[type="module"][src]')?.getAttribute("src") ??
+      null,
+  ),
+  stylesheetHref: normalizeAssetUrl(
+    root.querySelector<HTMLLinkElement>('link[rel="stylesheet"][href]')?.getAttribute("href") ??
+      null,
+  ),
+});
+
+const areSameAssetSignature = (
+  left: DashboardAssetSignature,
+  right: DashboardAssetSignature,
+): boolean => left.scriptSrc === right.scriptSrc && left.stylesheetHref === right.stylesheetHref;
+
 const DeviceIdentityCard = (props: {
   device: DisplayDeviceRuntime | null;
   fallbackDeviceId: string;
@@ -160,10 +198,106 @@ const areSameLayoutSnapshot = (
   return left.id === right.id && left.version === right.version;
 };
 
+const normalizeWarningSignal = (...parts: Array<string | null | undefined>): string =>
+  parts
+    .map((part) => (part ?? "").trim().toLowerCase())
+    .filter((part) => part.length > 0)
+    .join(" ");
+
+const getWarningTickerIcon = (
+  warning: ReportScreenProfileWarningTicker["warnings"][number],
+): string => {
+  const signal = normalizeWarningSignal(
+    warning.categoryLabel,
+    warning.eventLabel,
+    warning.alertLevel,
+    warning.headline,
+  );
+
+  if (signal.includes("bushfire") || signal.includes("fire")) {
+    return "🔥";
+  }
+  if (signal.includes("flood") || signal.includes("river")) {
+    return "🌊";
+  }
+  if (signal.includes("storm") || signal.includes("thunderstorm") || signal.includes("cyclone")) {
+    return "⛈️";
+  }
+  if (signal.includes("smoke")) {
+    return "🌫️";
+  }
+  return "⚠️";
+};
+
+const DashboardWarningTicker = ({
+  ticker,
+}: {
+  ticker: ReportScreenProfileWarningTicker;
+}) => {
+  const entries = useMemo(
+    () =>
+      ticker.warnings.map((warning) => ({
+        id: warning.id,
+        icon: getWarningTickerIcon(warning),
+        level: warning.alertLevel ?? warning.categoryLabel ?? "Warning",
+        headline: warning.headline,
+      })),
+    [ticker],
+  );
+
+  const animationDurationSeconds = useMemo(() => {
+    const totalCharacters = entries.reduce(
+      (sum, entry) => sum + entry.level.length + entry.headline.length + 12,
+      0,
+    );
+    return Math.max(20, Math.min(60, totalCharacters * 0.18));
+  }, [entries]);
+
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const renderTickerContent = (duplicate = false) => (
+    <div
+      aria-hidden={duplicate}
+      className="dashboard-warning-ticker__content"
+    >
+      {entries.map((entry) => (
+        <div key={`${duplicate ? "dup" : "base"}:${entry.id}`} className="dashboard-warning-ticker__item">
+          <span className="dashboard-warning-ticker__icon" aria-hidden>
+            {entry.icon}
+          </span>
+          <span className="dashboard-warning-ticker__level">{entry.level}</span>
+          <span className="dashboard-warning-ticker__headline">{entry.headline}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="dashboard-warning-ticker">
+      <div className="dashboard-warning-ticker__shell">
+        <div className="dashboard-warning-ticker__label">Alerts</div>
+        <div className="dashboard-warning-ticker__viewport">
+          <div
+            className="dashboard-warning-ticker__track"
+            style={{ animationDuration: `${animationDurationSeconds}s` }}
+          >
+            {renderTickerContent()}
+            {renderTickerContent(true)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const DashboardPage = () => {
   const [activeLayout, setActiveLayout] = useState<LayoutRecord | null>(null);
   const [deviceIdentity, setDeviceIdentity] = useState<DisplayDeviceRuntime | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warningTicker, setWarningTicker] =
+    useState<ReportScreenProfileWarningTicker | null>(null);
   const [viewportSize, setViewportSize] = useState(getViewportSize);
   const [photoOrientationHint, setPhotoOrientationHint] =
     useState<PhotosOrientation | null>(null);
@@ -216,6 +350,7 @@ export const DashboardPage = () => {
         setDeviceIdentity(resolution.device);
         applyTheme(resolution.device.themeId);
         setNextCycleAtMs(resolution.nextCycleAtMs);
+        setWarningTicker(resolution.warningTicker);
         publishDisplayCycleContext({
           sourceKind: resolution.resolvedTargetSelection.kind,
           cycleSeconds:
@@ -318,6 +453,66 @@ export const DashboardPage = () => {
     window.addEventListener("resize", updateViewport);
     return () => {
       window.removeEventListener("resize", updateViewport);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof DOMParser === "undefined") {
+      return;
+    }
+
+    const activeSignature = readDashboardAssetSignature(document);
+    if (!activeSignature.scriptSrc && !activeSignature.stylesheetHref) {
+      return;
+    }
+
+    let isDisposed = false;
+
+    const checkForUpdatedBuild = async () => {
+      try {
+        const response = await fetch("/", {
+          cache: "no-store",
+          headers: {
+            "x-hearth-build-check": "1",
+          },
+        });
+        if (!response.ok) {
+          return;
+        }
+
+        const html = await response.text();
+        if (isDisposed) {
+          return;
+        }
+
+        const parsedDocument = new DOMParser().parseFromString(html, "text/html");
+        const nextSignature = readDashboardAssetSignature(parsedDocument);
+        const hasComparableAssets = Boolean(nextSignature.scriptSrc || nextSignature.stylesheetHref);
+
+        if (hasComparableAssets && !areSameAssetSignature(activeSignature, nextSignature)) {
+          window.location.reload();
+        }
+      } catch {
+        // Ignore build-check failures and retry on the next interval.
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      void checkForUpdatedBuild();
+    }, BUILD_ASSET_POLL_MS);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void checkForUpdatedBuild();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isDisposed = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
@@ -545,6 +740,7 @@ export const DashboardPage = () => {
               style={{
                 width: `${gridDisplayMetrics.width}px`,
                 height: `${gridDisplayMetrics.height}px`,
+                ...buildLayoutTypographyStyle(activeLayout.config.typography),
               }}
             >
               {renderLayoutLayer({
@@ -555,6 +751,12 @@ export const DashboardPage = () => {
               })}
             </div>
           </div>
+        ) : null}
+
+        {warningTicker &&
+        warningTicker.warnings.length > 0 &&
+        !isLocalWarningAutoLayoutName(activeLayout?.name ?? null) ? (
+          <DashboardWarningTicker ticker={warningTicker} />
         ) : null}
       </main>
     </div>

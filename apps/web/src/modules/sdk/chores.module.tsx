@@ -13,8 +13,12 @@ import {
 import { defineModule } from "@hearth/module-sdk";
 import {
   ModulePresentationControls,
-  scaleRoleRem,
 } from "../ui/ModulePresentationControls";
+import {
+  resolveModuleConnectivityState,
+  useBrowserOnlineStatus,
+} from "../data/connection-state";
+import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 
 const localIsoDate = (date: Date = new Date()): string =>
   toCalendarDateInTimeZone(date, getRuntimeTimeZone());
@@ -115,10 +119,13 @@ export const moduleDefinition = defineModule({
       const [loading, setLoading] = useState(true);
       const [error, setError] = useState<string | null>(null);
       const [savingKeys, setSavingKeys] = useState<string[]>([]);
-      const headingSize = scaleRoleRem(0.875, settings.presentation.headingScale);
-      const primarySize = scaleRoleRem(0.75, settings.presentation.primaryScale);
-      const supportingSize = scaleRoleRem(0.75, settings.presentation.supportingScale);
-      const compactSupportingSize = scaleRoleRem(0.6875, settings.presentation.supportingScale);
+      const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(null);
+      const browserOnline = useBrowserOnlineStatus();
+      const connectivityState = resolveModuleConnectivityState({
+        error,
+        hasSnapshot: lastUpdatedMs !== null,
+        isOnline: browserOnline,
+      });
 
       useEffect(() => {
         if (isEditing) {
@@ -137,6 +144,7 @@ export const moduleDefinition = defineModule({
             }
 
             setBoard(summary);
+            setLastUpdatedMs(Date.now());
             setError(null);
           } catch (loadError) {
             if (!active) {
@@ -171,13 +179,13 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="font-semibold text-slate-100" style={{ fontSize: headingSize }}>
+            <p className="module-text-title text-slate-100">
               Chores preview
             </p>
-            <p className="mt-2 text-slate-300" style={{ fontSize: supportingSize }}>
+            <p className="module-text-small mt-2 text-slate-300">
               Preview days: {settings.previewDays}
             </p>
-            <p className="mt-1 text-slate-400" style={{ fontSize: supportingSize }}>
+            <p className="module-text-small mt-1 text-slate-400">
               Stats: {settings.showStats ? "On" : "Off"} | Money:{" "}
               {settings.enableMoneyTracking ? "On" : "Off"}
             </p>
@@ -220,6 +228,7 @@ export const moduleDefinition = defineModule({
 
       const onToggleCompletion = async (item: ChoreBoardItem, completed: boolean) => {
         const key = itemKey(item);
+        const previousBoard = board;
         setSavingKeys((current) => (current.includes(key) ? current : [...current, key]));
         setError(null);
         setBoard((current) => ({
@@ -248,10 +257,14 @@ export const moduleDefinition = defineModule({
           });
           const summary = await fetchSummary(instanceId);
           setBoard(summary);
+          setLastUpdatedMs(Date.now());
         } catch (toggleError) {
           const summary = await fetchSummary(instanceId).catch(() => null);
           if (summary) {
             setBoard(summary);
+            setLastUpdatedMs(Date.now());
+          } else {
+            setBoard(previousBoard);
           }
           setError(
             toggleError instanceof Error ? toggleError.message : "Failed to update completion",
@@ -262,34 +275,29 @@ export const moduleDefinition = defineModule({
       };
 
       return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 p-2 text-slate-100">
+        <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 p-2 text-slate-100">
+          <ModuleConnectionBadge visible={connectivityState.showDisconnected} />
           <header className="mb-2 flex items-center justify-between rounded border border-slate-700 bg-slate-900/80 px-3 py-2">
-            <p
-              className="font-semibold tracking-wide"
-              style={{ fontSize: headingSize }}
-            >
+            <p className="module-text-body font-semibold tracking-wide">
               Today&apos;s Chores
             </p>
-            <p className="text-slate-300" style={{ fontSize: supportingSize }}>
+            <p className="module-text-small text-slate-300">
               {`${totalTodayCompleted}/${todayItems.length}`}
             </p>
           </header>
 
           {loading ? (
-            <p className="text-slate-300" style={{ fontSize: supportingSize }}>
+            <p className="module-text-small text-slate-300">
               Loading chores...
             </p>
           ) : null}
-          {!loading && error ? (
-            <p
-              className="rounded border border-rose-500/60 bg-rose-500/10 px-2 py-1 text-rose-200"
-              style={{ fontSize: supportingSize }}
-            >
-              {error}
+          {!loading && connectivityState.blockingError ? (
+            <p className="module-text-small rounded border border-rose-500/60 bg-rose-500/10 px-2 py-1 text-rose-200">
+              {connectivityState.blockingError}
             </p>
           ) : null}
 
-          {!loading && !error ? (
+          {!loading && !connectivityState.blockingError ? (
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
               {memberRows.map((member) => {
                 const memberItems = todayItemsByMember.get(member.memberId) ?? [];
@@ -302,26 +310,20 @@ export const moduleDefinition = defineModule({
                     className="rounded border border-slate-700 bg-slate-900/70"
                   >
                     <header className="flex items-center justify-between border-b border-slate-700 px-2 py-1.5">
-                      <p
-                        className="font-semibold text-slate-100"
-                        style={{ fontSize: headingSize }}
-                      >
+                      <p className="module-text-body font-semibold text-slate-100">
                         {member.memberName}
                       </p>
                       <div
-                        className="flex items-center gap-2 text-slate-300"
-                        style={{ fontSize: compactSupportingSize }}
+                        className="module-text-small flex items-center gap-2 font-display uppercase tracking-[0.18em] text-slate-300"
                       >
                         <span
                           className="rounded border border-cyan-500/40 bg-cyan-500/10 px-1.5 py-0.5 text-cyan-200"
-                          style={{ fontSize: compactSupportingSize }}
                         >
                           Week {completionPercent}%
                         </span>
                         {settings.enableMoneyTracking ? (
                           <span
                             className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200"
-                            style={{ fontSize: compactSupportingSize }}
                           >
                             Pay ${basePayEarned.toFixed(2)} / ${member.baseAllowance.toFixed(2)}
                           </span>
@@ -329,7 +331,6 @@ export const moduleDefinition = defineModule({
                         {settings.enableMoneyTracking && member.bonusPayout > 0 ? (
                           <span
                             className="rounded border border-emerald-500/30 bg-emerald-500/5 px-1.5 py-0.5 text-emerald-100"
-                            style={{ fontSize: compactSupportingSize }}
                           >
                             +${member.bonusPayout.toFixed(2)} bonus
                           </span>
@@ -358,15 +359,13 @@ export const moduleDefinition = defineModule({
                               className="h-4 w-4 accent-cyan-500"
                             />
                             <span
-                              className="min-w-0 flex-1 font-medium text-slate-100"
-                              style={{ fontSize: primarySize }}
+                              className="module-text-small min-w-0 flex-1 font-medium text-slate-100"
                             >
                               {item.choreName}
                             </span>
                             {settings.enableMoneyTracking && item.valueAmount !== null ? (
                               <span
-                                className="text-emerald-200"
-                                style={{ fontSize: compactSupportingSize }}
+                                className="module-text-small font-display uppercase tracking-[0.18em] text-emerald-200"
                               >
                                 ${item.valueAmount.toFixed(2)}
                               </span>
@@ -374,10 +373,7 @@ export const moduleDefinition = defineModule({
                           </label>
                         ))
                       ) : (
-                        <p
-                          className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-slate-300"
-                          style={{ fontSize: compactSupportingSize }}
-                        >
+                        <p className="module-text-small rounded border border-slate-700 bg-slate-900/60 px-2 py-1 font-display uppercase tracking-[0.18em] text-slate-300">
                           No chores today.
                         </p>
                       )}
@@ -386,10 +382,7 @@ export const moduleDefinition = defineModule({
                 );
               })}
               {memberRows.length === 0 ? (
-                <p
-                  className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-slate-300"
-                  style={{ fontSize: supportingSize }}
-                >
+                <p className="module-text-small rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-slate-300">
                   No children configured yet.
                 </p>
               ) : null}

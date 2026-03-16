@@ -31,10 +31,6 @@ test("sanitizeLayoutRecordForPublicDisplay redacts calendar URLs and photo folde
             daysToShow: 14,
             use24Hour: true,
             refreshIntervalSeconds: 300,
-            presentation: {
-              headingScale: 1,
-              supportingScale: 1,
-            },
           },
         },
         {
@@ -47,10 +43,6 @@ test("sanitizeLayoutRecordForPublicDisplay redacts calendar URLs and photo folde
             intervalSeconds: 20,
             shuffle: true,
             layoutOrientation: "landscape",
-            presentation: {
-              headingScale: 1,
-              supportingScale: 1,
-            },
           },
         },
       ],

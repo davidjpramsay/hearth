@@ -12,7 +12,6 @@ import { useModuleQuery } from "../data/useModuleQuery";
 import { ModuleFrame } from "../ui/ModuleFrame";
 import {
   ModulePresentationControls,
-  scaleRoleRem,
 } from "../ui/ModulePresentationControls";
 import { useTileDensity } from "../ui/useTileDensity";
 
@@ -128,23 +127,15 @@ const buildUserOptions = (
 const ReadingStat = ({
   label,
   value,
-  supportingScale,
 }: {
   label: string;
   value: string;
-  supportingScale: number;
 }) => (
-  <div className="module-panel-card flex h-full min-w-0 flex-col justify-center rounded-[26px] px-5 py-3 text-[color:var(--color-text-primary)]">
-    <span
-      className="module-panel-label block truncate"
-      style={{ fontSize: scaleRoleRem(0.65, supportingScale) }}
-    >
+  <div className="module-panel-card flex h-full min-w-0 flex-col justify-center px-5 py-3 text-[color:var(--color-text-primary)]">
+    <span className="module-text-small block truncate font-display uppercase tracking-[0.18em] text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
       {label}
     </span>
-    <span
-      className="mt-1 block truncate font-medium"
-      style={{ fontSize: scaleRoleRem(0.9, supportingScale) }}
-    >
+    <span className="module-text-body mt-1 block truncate font-medium">
       {value}
     </span>
   </div>
@@ -283,7 +274,24 @@ export const moduleDefinition = defineModule({
   settingsSchema: koboReaderModuleConfigSchema,
   dataSchema: koboReaderCurrentResponseSchema,
   runtime: {
-    Component: ({ settings }) => {
+    Component: ({ settings, isEditing }) => {
+      if (isEditing) {
+        return (
+          <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
+            <p className="module-text-title text-slate-100">
+              Kobo Reader preview
+            </p>
+            <p className="module-text-small mt-2 text-slate-300">
+              User: {settings.userName.trim() || "Not selected"}
+            </p>
+            <p className="module-text-small mt-1 text-slate-400">
+              Spent: {settings.showSpentReading ? "Shown" : "Hidden"} | Remaining:{" "}
+              {settings.showRemainingReading ? "Shown" : "Hidden"}
+            </p>
+          </div>
+        );
+      }
+
       const { ref, metrics } = useTileDensity<HTMLDivElement>();
       const bookState = useModuleQuery({
         key: `kobo-reader:${settings.userName}`,
@@ -291,9 +299,20 @@ export const moduleDefinition = defineModule({
         intervalMs: POLL_INTERVAL_MS,
         staleMs: POLL_INTERVAL_MS - 1_000,
       });
+      const [coverLoadFailed, setCoverLoadFailed] = useState(false);
       const compact = metrics.width < 360;
       const hasBook = Boolean(bookState.data?.book);
       const progressPercent = Math.max(0, Math.min(100, bookState.data?.progressPercent ?? 0));
+      const coverColumnWidth = compact
+        ? null
+        : Math.max(
+            152,
+            Math.min(
+              240,
+              Math.round((Math.max(metrics.height - 32, 0) * 2) / 3),
+              Math.round(metrics.width * 0.36),
+            ),
+          );
       const spentLabel = formatMinutes(bookState.data?.spentReadingMinutes ?? null);
       const remainingLabel = formatMinutes(bookState.data?.remainingReadingMinutes ?? null);
       const readingStats = [
@@ -305,29 +324,49 @@ export const moduleDefinition = defineModule({
           : null,
       ].filter((entry): entry is { key: string; label: string; value: string } => Boolean(entry));
 
+      useEffect(() => {
+        setCoverLoadFailed(false);
+      }, [bookState.data?.book?.coverImageUrl]);
+
       return (
         <ModuleFrame
           title=""
           hideHeader
           loading={bookState.loading}
           error={bookState.error}
+          disconnected={bookState.isDisconnected}
           empty={!hasBook && !bookState.loading && !bookState.error}
           emptyMessage={bookState.data?.warning ?? "No Kobo reading activity found."}
         >
           {bookState.data?.book ? (
             <div
               ref={ref}
-              className="module-panel-shell relative z-10 flex h-full flex-col justify-between gap-4 rounded-[24px] p-4 text-[color:var(--color-text-primary)]"
+              className="module-panel-shell relative z-10 flex h-full flex-col gap-3 p-4 text-[color:var(--color-text-primary)]"
             >
-              <div
-                className={`grid gap-4 ${compact ? "grid-cols-1" : "grid-cols-[minmax(9.5rem,11rem)_minmax(0,1fr)]"}`}
-              >
-                <div className="module-panel-card self-start overflow-hidden rounded-2xl shadow-[0_20px_50px_rgba(15,23,42,0.22)]">
-                  {bookState.data.book.coverImageUrl ? (
+            <div
+              className={`grid h-full items-start gap-4 ${compact ? "grid-cols-1" : ""}`}
+              style={
+                compact || coverColumnWidth === null
+                  ? undefined
+                  : {
+                      gridTemplateColumns: `${coverColumnWidth}px minmax(0, 1fr)`,
+                    }
+              }
+            >
+                <div
+                  className="module-panel-card self-start overflow-hidden"
+                  style={{
+                    boxShadow: "0 20px 50px rgb(var(--tone-slate-950-rgb) / 0.22)",
+                  }}
+                >
+                  {bookState.data.book.coverImageUrl && !coverLoadFailed ? (
                     <img
                       src={bookState.data.book.coverImageUrl}
                       alt={`${bookState.data.book.title} cover`}
                       className="block h-auto w-full"
+                      onError={() => {
+                        setCoverLoadFailed(true);
+                      }}
                     />
                   ) : (
                     <div
@@ -338,13 +377,9 @@ export const moduleDefinition = defineModule({
                       }}
                     >
                       <span
-                        className="font-semibold text-[color:var(--color-text-primary)]"
-                        style={{
-                          fontSize: scaleRoleRem(
-                            compact ? 0.95 : 1.05,
-                            settings.presentation.primaryScale,
-                          ),
-                        }}
+                        className={`font-semibold text-[color:var(--color-text-primary)] ${
+                          "module-text-title"
+                        }`}
                       >
                         {bookState.data.book.title}
                       </span>
@@ -352,35 +387,18 @@ export const moduleDefinition = defineModule({
                   )}
                 </div>
 
-                <div className="flex min-w-0 flex-col justify-between gap-3">
+                <div className="flex min-w-0 flex-col gap-4">
                   <div className="space-y-2">
-                    <p
-                      className="module-panel-label"
-                      style={{
-                        fontSize: scaleRoleRem(0.68, settings.presentation.supportingScale),
-                      }}
-                    >
+                    <p className="module-text-small font-display uppercase tracking-[0.18em] text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
                       Most recently read
                     </p>
                     <h3
-                      className="line-clamp-3 font-semibold text-balance"
-                      style={{
-                        fontSize: scaleRoleRem(
-                          compact ? 1.05 : 1.2,
-                          settings.presentation.headingScale,
-                        ),
-                      }}
+                      className="module-text-title line-clamp-3 text-balance font-semibold"
                     >
                       {bookState.data.book.title}
                     </h3>
                     <p
-                      className="text-[color:var(--color-text-secondary)]"
-                      style={{
-                        fontSize: scaleRoleRem(
-                          compact ? 0.9 : 1,
-                          settings.presentation.primaryScale,
-                        ),
-                      }}
+                      className="module-text-body font-medium text-[color:var(--color-text-secondary)]"
                     >
                       {bookState.data.book.authorLabel}
                     </p>
@@ -398,38 +416,27 @@ export const moduleDefinition = defineModule({
                           key={stat.key}
                           label={stat.label}
                           value={stat.value}
-                          supportingScale={settings.presentation.supportingScale}
                         />
                       ))}
                     </div>
                   ) : null}
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <span
-                    className="text-[color:var(--color-text-secondary)]"
-                    style={{
-                      fontSize: scaleRoleRem(0.8, settings.presentation.supportingScale),
-                    }}
-                  >
-                    Reading progress
-                  </span>
-                  <span
-                    className="font-semibold text-[color:var(--color-text-accent)]"
-                    style={{
-                      fontSize: scaleRoleRem(0.92, settings.presentation.primaryScale),
-                    }}
-                  >
-                    {Math.round(progressPercent)}%
-                  </span>
-                </div>
-                <div className="module-panel-progress h-2.5">
-                  <div
-                    className="module-panel-progress__bar"
-                    style={{ width: `${progressPercent}%` }}
-                  />
+                  <div className={compact ? "space-y-2" : "space-y-2 pt-1"}>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="module-text-small text-[color:var(--color-text-secondary)]">
+                        Reading progress
+                      </span>
+                      <span className="module-text-body font-semibold text-[color:var(--color-text-accent)]">
+                        {Math.round(progressPercent)}%
+                      </span>
+                    </div>
+                    <div className="module-panel-progress h-2.5">
+                      <div
+                        className="module-panel-progress__bar"
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -286,8 +286,8 @@ const DEFAULT_LAYOUT_SEEDS: DefaultLayoutSeed[] = [
             windSpeedUnit: "knots",
             refreshIntervalSeconds: 600,
             showForecast: false,
-            showHumidity: false,
-            showWind: false,
+            showTodayHumidity: false,
+            showTodayWind: false,
           },
         },
         {
@@ -361,10 +361,6 @@ const DEFAULT_LAYOUT_SEEDS: DefaultLayoutSeed[] = [
             use24Hour: true,
             showSeconds: true,
             showDate: true,
-            presentation: {
-              primaryScale: 1.1,
-              supportingScale: 1.25,
-            },
           },
         },
         {
@@ -378,8 +374,8 @@ const DEFAULT_LAYOUT_SEEDS: DefaultLayoutSeed[] = [
             windSpeedUnit: "knots",
             refreshIntervalSeconds: 600,
             showForecast: true,
-            showHumidity: false,
-            showWind: true,
+            showTodayHumidity: false,
+            showTodayWind: true,
           },
         },
         {

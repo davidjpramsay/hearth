@@ -8,8 +8,12 @@ import {
 import { defineModule } from "@hearth/module-sdk";
 import {
   ModulePresentationControls,
-  scaleRoleRem,
 } from "../ui/ModulePresentationControls";
+import {
+  resolveModuleConnectivityState,
+  useBrowserOnlineStatus,
+} from "../data/connection-state";
+import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 
 const emptyPayload = (): BibleVerseModuleResponse =>
   bibleVerseModuleResponseSchema.parse({
@@ -72,11 +76,13 @@ export const moduleDefinition = defineModule({
       const verseContentRef = useRef<HTMLDivElement | null>(null);
       const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
       const [maxScrollOffset, setMaxScrollOffset] = useState(0);
-      const headingSize = scaleRoleRem(0.75, settings.presentation.headingScale);
-      const primarySize = scaleRoleRem(0.875, settings.presentation.primaryScale);
-      const supportingSize = scaleRoleRem(0.75, settings.presentation.supportingScale);
-      const compactSupportingSize = scaleRoleRem(0.6875, settings.presentation.supportingScale);
-      const sourceSize = scaleRoleRem(0.625, settings.presentation.supportingScale);
+      const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(null);
+      const browserOnline = useBrowserOnlineStatus();
+      const connectivityState = resolveModuleConnectivityState({
+        error,
+        hasSnapshot: lastUpdatedMs !== null,
+        isOnline: browserOnline,
+      });
 
       useEffect(() => {
         if (isEditing) {
@@ -99,6 +105,7 @@ export const moduleDefinition = defineModule({
             }
 
             setPayload(next);
+            setLastUpdatedMs(Date.now());
             setError(null);
           } catch (loadError) {
             if (!active || (loadError instanceof Error && loadError.name === "AbortError")) {
@@ -131,7 +138,13 @@ export const moduleDefinition = defineModule({
       useEffect(() => {
         const viewport = verseViewportRef.current;
         const content = verseContentRef.current;
-        if (!viewport || !content || loading || Boolean(error) || !payload.verse) {
+        if (
+          !viewport ||
+          !content ||
+          loading ||
+          Boolean(connectivityState.blockingError) ||
+          !payload.verse
+        ) {
           setShouldAutoScroll(false);
           setMaxScrollOffset(0);
           return;
@@ -163,14 +176,19 @@ export const moduleDefinition = defineModule({
       }, [
         payload.verse,
         loading,
-        error,
+        connectivityState.blockingError,
         settings.showReference,
         settings.showSource,
         payload.warning,
       ]);
 
       useEffect(() => {
-        if (!shouldAutoScroll || maxScrollOffset <= 0 || loading || Boolean(error)) {
+        if (
+          !shouldAutoScroll ||
+          maxScrollOffset <= 0 ||
+          loading ||
+          Boolean(connectivityState.blockingError)
+        ) {
           return;
         }
 
@@ -232,18 +250,18 @@ export const moduleDefinition = defineModule({
         return () => {
           window.cancelAnimationFrame(animationFrame);
         };
-      }, [shouldAutoScroll, maxScrollOffset, loading, error]);
+      }, [connectivityState.blockingError, shouldAutoScroll, maxScrollOffset, loading]);
 
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="font-semibold text-slate-100" style={{ fontSize: headingSize }}>
+            <p className="module-text-title text-slate-100">
               Bible verse preview
             </p>
-            <p className="mt-2 text-slate-300" style={{ fontSize: supportingSize }}>
+            <p className="module-text-small mt-2 text-slate-300">
               Refresh every {settings.refreshIntervalSeconds}s
             </p>
-            <p className="mt-1 text-slate-400" style={{ fontSize: supportingSize }}>
+            <p className="module-text-small mt-1 text-slate-400">
               Reference: {settings.showReference ? "Shown" : "Hidden"}
             </p>
           </div>
@@ -251,33 +269,25 @@ export const moduleDefinition = defineModule({
       }
 
       return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-700 bg-gradient-to-b from-slate-900 to-slate-950 p-3 text-slate-100">
-          <p
-            className="font-semibold uppercase tracking-wide text-cyan-200"
-            style={{ fontSize: headingSize }}
-          >
+        <div className="module-panel-shell relative flex h-full min-h-0 flex-col overflow-hidden p-3 text-slate-100">
+          <ModuleConnectionBadge visible={connectivityState.showDisconnected} />
+          <p className="module-text-small font-display uppercase tracking-[0.18em] text-cyan-200">
             Verse of the day
           </p>
 
           {loading ? (
-            <div
-              className="flex min-h-0 flex-1 items-center justify-center text-slate-300"
-              style={{ fontSize: supportingSize }}
-            >
+            <div className="module-text-small flex min-h-0 flex-1 items-center justify-center text-slate-300">
               Loading verse...
             </div>
           ) : null}
 
-          {!loading && error ? (
-            <div
-              className="mt-2 flex min-h-0 flex-1 items-center justify-center rounded-md border border-rose-500/60 bg-rose-500/10 px-3 text-center text-rose-200"
-              style={{ fontSize: supportingSize }}
-            >
-              {error}
+          {!loading && connectivityState.blockingError ? (
+            <div className="module-text-small mt-2 flex min-h-0 flex-1 items-center justify-center rounded border border-rose-500/60 bg-rose-500/10 px-3 text-center text-rose-200">
+              {connectivityState.blockingError}
             </div>
           ) : null}
 
-          {!loading && !error ? (
+          {!loading && !connectivityState.blockingError ? (
             <div className="mt-2 flex min-h-0 flex-1 flex-col">
               <div
                 ref={verseViewportRef}
@@ -287,17 +297,11 @@ export const moduleDefinition = defineModule({
               >
                 <div ref={verseContentRef} className="w-full">
                   {payload.verse ? (
-                    <p
-                      className="text-center leading-relaxed text-slate-100"
-                      style={{ fontSize: primarySize }}
-                    >
+                    <p className="module-text-body text-center leading-relaxed text-slate-100">
                       {payload.verse}
                     </p>
                   ) : (
-                    <p
-                      className="text-center text-slate-300"
-                      style={{ fontSize: supportingSize }}
-                    >
+                    <p className="module-text-small text-center text-slate-300">
                       No verse available.
                     </p>
                   )}
@@ -307,28 +311,19 @@ export const moduleDefinition = defineModule({
 
               <div className="mt-2 space-y-1 border-t border-slate-800/80 pt-2 text-center">
                 {settings.showReference && payload.reference ? (
-                  <p
-                    className="font-semibold uppercase tracking-wide text-cyan-200"
-                    style={{ fontSize: supportingSize }}
-                  >
+                  <p className="module-text-small font-display font-semibold uppercase tracking-wide text-cyan-200">
                     {payload.reference}
                   </p>
                 ) : null}
 
                 {payload.warning ? (
-                  <p
-                    className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-amber-200"
-                    style={{ fontSize: compactSupportingSize }}
-                  >
+                  <p className="module-text-small rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 font-display uppercase tracking-[0.18em] text-amber-200">
                     {payload.warning}
                   </p>
                 ) : null}
 
                 {settings.showSource ? (
-                  <p
-                    className="uppercase tracking-wide text-slate-400"
-                    style={{ fontSize: sourceSize }}
-                  >
+                  <p className="module-text-small font-display uppercase tracking-[0.18em] text-slate-400">
                     Source: {payload.sourceLabel}
                   </p>
                 ) : null}

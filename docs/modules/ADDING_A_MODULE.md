@@ -34,10 +34,10 @@ No manual registry edits needed for web modules.
 ## Manual path
 
 1. Create SDK module file under `apps/web/src/modules/sdk`.
-2. Wrap settings in `withModulePresentation(...)` so the module gets the shared `presentation` block.
+2. Define `settingsSchema` with the smallest plain `z.object(...)` that matches the module's real configuration.
 3. Export default `defineModule({...})`.
-4. Add `admin.SettingsPanel` if configurable. Reuse `apps/web/src/modules/ui/ModulePresentationControls.tsx` when the module should expose role sizing.
-5. Map visible module elements to `heading`, `primary`, or `supporting` instead of adding one-off font-size fields.
+4. Add `admin.SettingsPanel` if configurable.
+5. Keep typography/layout choices inside the module unless there is a specific, defensible reason to expose a setting.
 6. If server-backed, add adapter in `apps/server/src/modules/adapters`.
 7. Register adapter in `apps/server/src/modules/adapters/index.ts`.
 8. Run `pnpm -r build`.

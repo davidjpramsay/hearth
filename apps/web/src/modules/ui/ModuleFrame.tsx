@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ModuleConnectionBadge } from "./ModuleConnectionBadge";
 
 interface ModuleFrameProps {
   title: string;
@@ -10,6 +11,7 @@ interface ModuleFrameProps {
   emptyMessage?: string;
   statusLabel?: string;
   lastUpdatedMs?: number | null;
+  disconnected?: boolean;
   onRemove?: () => void;
   onSelect?: () => void;
   children: ReactNode;
@@ -39,6 +41,7 @@ export const ModuleFrame = ({
   emptyMessage = "No data available",
   statusLabel,
   lastUpdatedMs,
+  disconnected = false,
   onRemove,
   onSelect,
   children,
@@ -58,6 +61,7 @@ export const ModuleFrame = ({
       onTouchStartCapture={() => onSelect?.()}
       className="module-frame"
     >
+      {hideHeader ? <ModuleConnectionBadge visible={disconnected} /> : null}
       {hideHeader ? <div className="module-drag-handle module-frame__drag-strip" /> : null}
       {!hideHeader ? (
         <div className="module-drag-handle module-frame__header">
@@ -66,6 +70,7 @@ export const ModuleFrame = ({
             {subtitle ? <p className="module-frame__subtitle">{subtitle}</p> : null}
           </div>
           <div className="flex items-center gap-2">
+            <ModuleConnectionBadge visible={disconnected} variant="inline" />
             {showStatusMeta ? (
               <div className="module-frame__meta">
                 {statusLabel ? <span className="text-accent">{statusLabel}</span> : null}
