@@ -31,7 +31,9 @@ const layoutRepository = new LayoutRepository(database, {
 const choresRepository = new ChoresRepository(database);
 const deviceRepository = new DeviceRepository(database);
 const moduleStateRepository = new ModuleStateRepository(database);
-const settingsRepository = new SettingsRepository(database);
+const settingsRepository = new SettingsRepository(database, {
+  defaultSiteTimeZone: config.defaultSiteTimeZone,
+});
 if (!settingsRepository.getAdminPasswordHash()) {
   if (config.adminBootstrapPassword) {
     settingsRepository.setAdminPasswordHash(hashSync(config.adminBootstrapPassword, 12));

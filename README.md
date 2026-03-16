@@ -279,6 +279,7 @@ Current admin control:
 - `BACKUP_DIR` (default: `DATA_DIR/backups`)
 - `BACKUP_INTERVAL_MINUTES` (default: `360`)
 - `BACKUP_RETENTION_DAYS` (default: `30`)
+- `DEFAULT_SITE_TIMEZONE` (optional IANA timezone fallback, e.g. `Australia/Perth`, used when the database has not stored a household timezone yet)
 - `JWT_SECRET` (optional override; if omitted, generated and stored in `DATA_DIR/.jwt-secret`)
 - `CALENDAR_ENCRYPTION_KEY` (optional override; if omitted, generated and stored in `DATA_DIR/.calendar-key`)
 - `ADMIN_PASSWORD` (required on first startup until an admin password hash has been initialized)
@@ -309,6 +310,8 @@ Local env loading for `pnpm dev` / `pnpm start`:
 cat > .env <<'EOF'
 ADMIN_PASSWORD=change-me
 ESV_API_KEY=your_api_key_here
+# Optional but recommended for containers before the admin UI has saved a household timezone.
+DEFAULT_SITE_TIMEZONE=Your/Timezone
 EOF
 docker compose pull
 docker compose up -d

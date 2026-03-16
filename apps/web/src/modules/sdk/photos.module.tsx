@@ -237,10 +237,7 @@ export const moduleDefinition = defineModule({
   dataSchema: photosModuleNextResponseSchema,
   runtime: {
     Component: ({ instanceId, settings, isEditing }) => {
-      const imageFitClass =
-        settings.layoutOrientation === "landscape"
-          ? "object-cover"
-          : "object-contain";
+      const imageFitClass = "object-cover";
       const [setCycleIntervalSeconds, setSetCycleIntervalSeconds] = useState<number | null>(
         () => getSetCycleIntervalFromStorage(),
       );

@@ -76,3 +76,49 @@ test("site time config is shared across chores settings", () => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("site time config can use a deployment fallback when legacy chores settings omit timezone", () => {
+  const directory = mkdtempSync(join(tmpdir(), "hearth-site-time-settings-"));
+  const filePath = join(directory, "hearth.sqlite");
+  const rawDb = new Database(filePath);
+
+  try {
+    rawDb.exec(`
+      CREATE TABLE settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    rawDb
+      .prepare(
+        `
+        INSERT INTO settings (key, value)
+        VALUES (?, ?)
+        `,
+      )
+      .run(
+        "chores_payout_config",
+        JSON.stringify({
+          mode: "all-or-nothing",
+          oneOffBonusEnabled: true,
+          paydayDayOfWeek: 6,
+        }),
+      );
+  } finally {
+    rawDb.close();
+  }
+
+  const db = new Database(filePath);
+  const repository = new SettingsRepository(db, {
+    defaultSiteTimeZone: "Australia/Perth",
+  });
+
+  try {
+    assert.equal(repository.getSiteTimeConfig().siteTimezone, "Australia/Perth");
+    assert.equal(repository.getChoresPayoutConfig().siteTimezone, "Australia/Perth");
+  } finally {
+    db.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

@@ -77,7 +77,22 @@ const toRule = (
 });
 
 export class SettingsRepository {
-  constructor(private readonly db: Database.Database) {}
+  constructor(
+    private readonly db: Database.Database,
+    private readonly options: { defaultSiteTimeZone?: string | null } = {},
+  ) {}
+
+  private getDefaultSiteTimeZone(): string {
+    const configuredTimeZone = this.options.defaultSiteTimeZone?.trim() ?? "";
+    const parsedConfiguredTimeZone = siteTimeConfigSchema.shape.siteTimezone.safeParse(
+      configuredTimeZone,
+    );
+    if (parsedConfiguredTimeZone.success) {
+      return parsedConfiguredTimeZone.data;
+    }
+
+    return getRuntimeTimeZone();
+  }
 
   private toNeutralSetId(
     setId: string,
@@ -311,9 +326,13 @@ export class SettingsRepository {
 
     try {
       const parsedValue = JSON.parse(rawValue);
-      const parsedTimezone = siteTimeConfigSchema.shape.siteTimezone.safeParse(
-        parsedValue?.siteTimezone,
-      );
+      const rawTimezone =
+        typeof parsedValue?.siteTimezone === "string" ? parsedValue.siteTimezone : null;
+      if (!rawTimezone) {
+        return null;
+      }
+
+      const parsedTimezone = siteTimeConfigSchema.shape.siteTimezone.safeParse(rawTimezone);
       return parsedTimezone.success ? parsedTimezone.data : null;
     } catch {
       return null;
@@ -330,7 +349,7 @@ export class SettingsRepository {
 
   getSiteTimeConfig(): SiteTimeConfig {
     const fallbackTimezone =
-      this.getLegacySiteTimezoneFromChoresConfig() ?? getRuntimeTimeZone();
+      this.getLegacySiteTimezoneFromChoresConfig() ?? this.getDefaultSiteTimeZone();
     const rawValue = this.getValue(SITE_TIME_CONFIG_KEY);
     if (!rawValue) {
       return siteTimeConfigSchema.parse({
@@ -360,7 +379,7 @@ export class SettingsRepository {
       JSON.stringify(
         siteTimeConfigSchema.parse({
           ...config,
-          siteTimezone: config.siteTimezone || getRuntimeTimeZone(),
+          siteTimezone: config.siteTimezone || this.getDefaultSiteTimeZone(),
         }),
       ),
     );
@@ -390,7 +409,7 @@ export class SettingsRepository {
 
   setChoresPayoutConfig(config: ChoresPayoutConfig): void {
     const siteTimezone = siteTimeConfigSchema.shape.siteTimezone.parse(
-      config.siteTimezone || getRuntimeTimeZone(),
+      config.siteTimezone || this.getDefaultSiteTimeZone(),
     );
     this.setSiteTimeConfig({
       siteTimezone,

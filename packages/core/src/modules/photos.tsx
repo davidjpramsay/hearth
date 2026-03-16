@@ -65,10 +65,7 @@ export const photosModule: ModuleDefinition<PhotosModuleConfig> = {
   configSchema: photosModuleConfigSchema,
   DashboardTile: ({ instanceId, config, isEditing }) => {
     const normalizedConfig = useMemo(() => normalizeConfig(config), [config]);
-    const imageFitClass =
-      normalizedConfig.layoutOrientation === "landscape"
-        ? "object-cover"
-        : "object-contain";
+    const imageFitClass = "object-cover";
     const isLayoutCrossfading =
       !isEditing &&
       typeof document !== "undefined" &&

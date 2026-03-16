@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isValidIanaTimeZone } from "@hearth/shared";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
@@ -127,6 +128,15 @@ const parseCsv = (value: string | undefined): string[] =>
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
 
+const parseOptionalTimeZone = (value: string | undefined): string | null => {
+  const candidate = (value ?? "").trim();
+  if (candidate.length === 0 || !isValidIanaTimeZone(candidate)) {
+    return null;
+  }
+
+  return candidate;
+};
+
 const readOrCreateSecret = (filePath: string): string => {
   const existing = existsSync(filePath) ? readFileSync(filePath, "utf8").trim() : "";
   if (existing.length >= 32) {
@@ -177,6 +187,9 @@ export const config = {
   backupDir,
   backupIntervalMinutes: parsePositiveNumber(process.env.BACKUP_INTERVAL_MINUTES, 360),
   backupRetentionDays: parsePositiveNumber(process.env.BACKUP_RETENTION_DAYS, 30),
+  defaultSiteTimeZone:
+    parseOptionalTimeZone(process.env.DEFAULT_SITE_TIMEZONE) ??
+    parseOptionalTimeZone(process.env.TZ),
   corsOrigins: parseCsv(process.env.CORS_ORIGINS),
   esvApiKey: (process.env.ESV_API_KEY ?? "").trim(),
   koboReaderAppDbPath: resolveOptionalPath(process.env.KOBO_READER_APP_DB_PATH),
