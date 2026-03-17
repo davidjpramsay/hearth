@@ -414,51 +414,70 @@ export const calendarModule: ModuleDefinition<CalendarModuleConfig> = {
         ) : null}
 
         {!loading && !error && normalizedConfig.viewMode === "list" ? (
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            <div className="space-y-3">
-              {listDays.map((day) => {
-                const dayEvents = parsedEvents
-                  .filter((event) => eventOccursOnDay(event, day))
-                  .slice(0, 8);
+          <div className="min-h-0 flex flex-1 flex-col overflow-hidden">
+            {calendarLegendEntries.length > 0 ? (
+              <div className="mb-2 flex flex-wrap gap-1.5 pr-1">
+                {calendarLegendEntries.map((entry) => (
+                  <span
+                    key={entry.source}
+                    title={entry.label}
+                    className="inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-[10px] text-slate-200"
+                  >
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: entry.color }}
+                    />
+                    <span className="max-w-[120px] truncate">{entry.label}</span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="space-y-3">
+                {listDays.map((day) => {
+                  const dayEvents = parsedEvents
+                    .filter((event) => eventOccursOnDay(event, day))
+                    .slice(0, 8);
 
-                if (dayEvents.length === 0) {
-                  return null;
-                }
+                  if (dayEvents.length === 0) {
+                    return null;
+                  }
 
-                return (
-                  <section key={day.toISOString()} className="rounded-md border border-slate-700/80 bg-slate-900/70 p-2">
-                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-200">
-                      {dayFormatter.format(day)}
-                    </h4>
-                    <div className="space-y-2">
-                      {dayEvents.map((event) => (
-                        <article
-                          key={event.id}
-                          className="rounded border border-slate-700/70 bg-slate-950/70 pl-4 pr-2 py-1.5"
-                          style={eventAccentStyle(event.sourceColor)}
-                        >
-                          <p className="line-clamp-2 text-[13px] font-semibold text-slate-100">
-                            {event.title}
-                          </p>
-                          <p className="mt-0.5 text-[11px] text-cyan-200">
-                            {formatEventTime(event, timeFormatter)}
-                          </p>
-                          {event.location ? (
-                            <p className="mt-0.5 line-clamp-1 text-[11px] text-slate-300">
-                              {event.location}
+                  return (
+                    <section key={day.toISOString()} className="rounded-md border border-slate-700/80 bg-slate-900/70 p-2">
+                      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-200">
+                        {dayFormatter.format(day)}
+                      </h4>
+                      <div className="space-y-2">
+                        {dayEvents.map((event) => (
+                          <article
+                            key={event.id}
+                            className="rounded border border-slate-700/70 bg-slate-950/70 pl-4 pr-2 py-1.5"
+                            style={eventAccentStyle(event.sourceColor)}
+                          >
+                            <p className="line-clamp-2 text-[13px] font-semibold text-slate-100">
+                              {event.title}
                             </p>
-                          ) : null}
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-                );
-              })}
-              {!hasListEvents ? (
-                <p className="rounded-md border border-slate-700 bg-slate-900/60 px-3 py-2 text-xs text-slate-300">
-                  No upcoming events for the configured calendars.
-                </p>
-              ) : null}
+                            <p className="mt-0.5 text-[11px] text-cyan-200">
+                              {formatEventTime(event, timeFormatter)}
+                            </p>
+                            {event.location ? (
+                              <p className="mt-0.5 line-clamp-1 text-[11px] text-slate-300">
+                                {event.location}
+                              </p>
+                            ) : null}
+                          </article>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+                {!hasListEvents ? (
+                  <p className="rounded-md border border-slate-700 bg-slate-900/60 px-3 py-2 text-xs text-slate-300">
+                    No upcoming events for the configured calendars.
+                  </p>
+                ) : null}
+              </div>
             </div>
           </div>
         ) : null}
