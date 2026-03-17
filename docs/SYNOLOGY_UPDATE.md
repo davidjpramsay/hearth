@@ -27,9 +27,9 @@ If SSH is enabled on the Synology, use:
 ```bash
 ssh -t -p <ssh-port> <synology-user>@<synology-ip> '
   cd /volume1/docker/hearth/project &&
-  sudo /usr/local/bin/docker compose pull &&
-  sudo /usr/local/bin/docker compose up -d &&
-  sudo /usr/local/bin/docker compose ps
+  sudo /usr/local/bin/docker compose -f docker-compose.synology.yml pull &&
+  sudo /usr/local/bin/docker compose -f docker-compose.synology.yml up -d &&
+  sudo /usr/local/bin/docker compose -f docker-compose.synology.yml ps
 '
 ```
 
@@ -38,9 +38,9 @@ For a default DSM SSH setup on port `22`, that becomes:
 ```bash
 ssh -t <synology-user>@<synology-ip> '
   cd /volume1/docker/hearth/project &&
-  sudo /usr/local/bin/docker compose pull &&
-  sudo /usr/local/bin/docker compose up -d &&
-  sudo /usr/local/bin/docker compose ps
+  sudo /usr/local/bin/docker compose -f docker-compose.synology.yml pull &&
+  sudo /usr/local/bin/docker compose -f docker-compose.synology.yml up -d &&
+  sudo /usr/local/bin/docker compose -f docker-compose.synology.yml ps
 '
 ```
 
@@ -65,8 +65,12 @@ HEARTH_IMAGE=ghcr.io/davidjpramsay/hearth:v0.1.0
 Then run the same update command:
 
 ```bash
-docker compose pull && docker compose up -d
+docker compose -f docker-compose.synology.yml pull &&
+docker compose -f docker-compose.synology.yml up -d
 ```
+
+If you renamed `docker-compose.synology.yml` to `docker-compose.yml` in the Synology
+project folder, you can omit `-f docker-compose.synology.yml`.
 
 ## What You Do Not Need To Repeat
 
@@ -88,7 +92,9 @@ See:
 
 ## Notes
 
-- `docker compose pull` downloads a new published image without rebuilding from source.
-- `docker compose up -d` recreates the container if the image changed.
+- `docker compose -f docker-compose.synology.yml pull` downloads a new published image
+  without rebuilding from source.
+- `docker compose -f docker-compose.synology.yml up -d` recreates the container if the
+  image changed.
 - Data in `/volume1/docker/hearth/data` is preserved because it is mounted from the NAS filesystem.
 - If you only change runtime configuration, updating `.env` and restarting the project may be enough.

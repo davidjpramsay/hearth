@@ -135,7 +135,9 @@ After the first successful startup:
 
 Update behavior depends on the deployment mode:
 
-- image-based Docker and Synology installs: `docker compose pull && docker compose up -d`
+- image-based Docker installs: `docker compose pull && docker compose up -d`
+- Synology installs that keep `docker-compose.synology.yml` by name:
+  `docker compose -f docker-compose.synology.yml pull && docker compose -f docker-compose.synology.yml up -d`
 - source-build Docker installs: `docker compose -f docker-compose.build.yml up --build -d`
 - native Node installs: pull the new source, rebuild, and restart the process
 

@@ -94,4 +94,12 @@ docker compose pull
 docker compose up -d
 ```
 
+For Synology when the project keeps the file name `docker-compose.synology.yml`,
+use:
+
+```bash
+docker compose -f docker-compose.synology.yml pull
+docker compose -f docker-compose.synology.yml up -d
+```
+
 No NAS-side source build is required.

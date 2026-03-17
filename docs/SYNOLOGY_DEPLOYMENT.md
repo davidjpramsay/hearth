@@ -196,8 +196,11 @@ Use:
 The normal update is now:
 
 1. publish a new image from GitHub
-2. run `docker compose pull`
-3. run `docker compose up -d`
+2. run `docker compose -f docker-compose.synology.yml pull`
+3. run `docker compose -f docker-compose.synology.yml up -d`
+
+If you renamed the compose file to `docker-compose.yml` inside the Synology project
+folder, you can omit `-f docker-compose.synology.yml`.
 
 ## One-Time Migration From An Older Source-Build Install
 

@@ -95,7 +95,8 @@ Optional Kobo Reader mounts:
 Use:
 
 ```bash
-docker compose pull && docker compose up -d
+docker compose -f docker-compose.synology.yml pull &&
+docker compose -f docker-compose.synology.yml up -d
 ```
 
 On Synology with SSH access, that is typically run from:
@@ -103,3 +104,6 @@ On Synology with SSH access, that is typically run from:
 ```text
 /volume1/docker/hearth/project
 ```
+
+If you renamed the file to `docker-compose.yml` in that folder, you can omit
+`-f docker-compose.synology.yml`.
