@@ -55,11 +55,9 @@ export const registerChoresModuleRoutes = (
 
     const parsedConfig = choresModuleConfigSchema.safeParse(moduleInstance.module.config);
     const config = parsedConfig.success ? parsedConfig.data : choresModuleConfigSchema.parse({});
-    const days = Math.max(1, config.previewDays + 1);
-
     const board = services.choresRepository.getBoard({
       startDate,
-      days,
+      days: 1,
       enableMoneyTracking: config.enableMoneyTracking,
       payoutConfig,
       siteTimezone: payoutConfig.siteTimezone,

@@ -32,6 +32,30 @@ test("unified module registry lists sdk modules", () => {
   assert.equal(registry.getModule("sdk-example")?.timeMode, "site-local");
 });
 
+test("unified module registry hides internal sdk modules from the picker by default", () => {
+  const registry = new UnifiedModuleRegistry(new MemoryModuleInstanceStore());
+
+  const internalModule = defineModule({
+    manifest: {
+      id: "internal-warning",
+      name: "Internal warning",
+      version: "1.0.0",
+      defaultSize: { w: 3, h: 2 },
+      placement: "internal",
+    },
+    settingsSchema: z.object({}),
+    runtime: {
+      Component: () => React.createElement("div", null),
+    },
+  });
+
+  registry.registerSdk(internalModule);
+
+  assert.equal(registry.listModules().length, 0);
+  assert.equal(registry.listModules({ includeInternal: true }).length, 1);
+  assert.equal(registry.getModule("internal-warning")?.placement, "internal");
+});
+
 test("duplicate sdk module id throws", () => {
   const registry = new UnifiedModuleRegistry(new MemoryModuleInstanceStore());
 

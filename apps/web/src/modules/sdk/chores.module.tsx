@@ -183,7 +183,7 @@ export const moduleDefinition = defineModule({
               Chores preview
             </p>
             <p className="module-text-small mt-2 text-slate-300">
-              Preview days: {settings.previewDays}
+              Today-only display
             </p>
             <p className="module-text-small mt-1 text-slate-400">
               Stats: {settings.showStats ? "On" : "Off"} | Money:{" "}
@@ -420,22 +420,6 @@ export const moduleDefinition = defineModule({
               type="checkbox"
               checked={settings.showStats}
               onChange={(event) => applyPatch({ showStats: event.target.checked })}
-            />
-          </label>
-
-          <label className="block space-y-2">
-            <span>Preview days</span>
-            <input
-              className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
-              type="number"
-              min={0}
-              max={14}
-              value={settings.previewDays}
-              onChange={(event) =>
-                applyPatch({
-                  previewDays: Math.max(0, Math.min(14, Number(event.target.value) || 0)),
-                })
-              }
             />
           </label>
           <ModulePresentationControls

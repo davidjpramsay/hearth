@@ -35,7 +35,6 @@ export const choresModuleConfigSchema = withModulePresentation(
   z.object({
     enableMoneyTracking: z.boolean().default(true),
     showStats: z.boolean().default(true),
-    previewDays: z.number().int().min(0).max(14).default(7),
   }),
 );
 

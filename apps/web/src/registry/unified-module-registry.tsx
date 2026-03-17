@@ -14,6 +14,7 @@ export interface RegisteredModuleDefinition<TConfig = unknown>
   source: "sdk";
   version: string;
   description?: string;
+  placement: "public" | "internal";
   timeMode?: "device-local" | "site-local" | "source-local";
   categories: string[];
   permissions: string[];
@@ -55,6 +56,7 @@ export const adaptSdkModule = (
     source: "sdk",
     version: definition.manifest.version,
     description: definition.manifest.description,
+    placement: definition.manifest.placement ?? "public",
     timeMode: definition.manifest.timeMode,
     categories: definition.manifest.categories ?? [],
     permissions: definition.manifest.permissions ?? [],
@@ -105,10 +107,11 @@ export class UnifiedModuleRegistry {
     this.modules.set(definition.id, definition);
   }
 
-  listModules(): RegisteredModuleDefinition<any>[] {
-    return [...this.modules.values()].sort((left, right) =>
-      left.displayName.localeCompare(right.displayName),
-    );
+  listModules(options: { includeInternal?: boolean } = {}): RegisteredModuleDefinition<any>[] {
+    const includeInternal = options.includeInternal ?? false;
+    return [...this.modules.values()]
+      .filter((definition) => includeInternal || definition.placement !== "internal")
+      .sort((left, right) => left.displayName.localeCompare(right.displayName));
   }
 
   getModule(id: string): RegisteredModuleDefinition<any> | undefined {

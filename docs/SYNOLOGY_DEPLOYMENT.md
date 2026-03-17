@@ -51,6 +51,7 @@ Start from `.env.synology.example` and set at least:
 
 ```env
 ADMIN_PASSWORD=change-me
+DEFAULT_SITE_TIMEZONE=Australia/Perth
 ```
 
 Optional image pinning:
@@ -60,6 +61,10 @@ HEARTH_IMAGE=ghcr.io/davidjpramsay/hearth:v0.1.0
 ```
 
 Leave `HEARTH_IMAGE` on `latest` if you want the newest published mainline image.
+
+`DEFAULT_SITE_TIMEZONE` is recommended for container installs so site-local modules
+use the correct calendar day before the admin UI has saved a household timezone into
+the database.
 
 Optional Kobo Reader support:
 

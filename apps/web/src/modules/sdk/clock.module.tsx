@@ -155,34 +155,14 @@ export const moduleDefinition = defineModule({
   settingsSchema,
   runtime: {
     Component: ({ settings, isEditing }) => {
-      if (isEditing) {
-        return (
-          <div className="module-panel-shell flex h-full flex-col justify-between px-4 py-4 text-[color:var(--color-text-primary)]">
-            <div>
-              <p className="module-text-small font-display uppercase tracking-[0.18em] text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
-                Local time
-              </p>
-              <p className="module-text-title mt-2 text-[color:var(--color-text-primary)]">
-                Clock preview
-              </p>
-            </div>
-            <div className="module-panel-card w-fit px-3 py-2">
-              <p className="module-text-body text-[color:var(--color-text-primary)]">
-                {settings.use24Hour ? "24-hour" : "12-hour"} format
-              </p>
-              <p className="module-text-small mt-1 text-[color:var(--color-text-secondary)]">
-                Seconds: {settings.showSeconds ? "Shown" : "Hidden"} | Date:{" "}
-                {settings.showDate ? "Shown" : "Hidden"}
-              </p>
-            </div>
-          </div>
-        );
-      }
-
       const { ref, metrics } = useTileDensity<HTMLDivElement>();
       const [now, setNow] = useState(() => new Date());
 
       useEffect(() => {
+        if (isEditing) {
+          return;
+        }
+
         const interval = window.setInterval(() => {
           setNow(new Date());
         }, 1000);
@@ -190,7 +170,7 @@ export const moduleDefinition = defineModule({
         return () => {
           window.clearInterval(interval);
         };
-      }, []);
+      }, [isEditing]);
 
       const dateFormatter = new Intl.DateTimeFormat(undefined, {
         month: "short",
@@ -215,6 +195,30 @@ export const moduleDefinition = defineModule({
           : null;
       const timeRowClass = compact ? "items-end gap-2.5" : "items-end gap-3";
       const timeInlineMetaClass = compact ? "module-text-body" : "module-text-title";
+
+      if (isEditing) {
+        return (
+          <div className="module-panel-shell flex h-full flex-col justify-between px-4 py-4 text-[color:var(--color-text-primary)]">
+            <div>
+              <p className="module-text-small font-display uppercase tracking-[0.18em] text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
+                Local time
+              </p>
+              <p className="module-text-title mt-2 text-[color:var(--color-text-primary)]">
+                Clock preview
+              </p>
+            </div>
+            <div className="module-panel-card w-fit px-3 py-2">
+              <p className="module-text-body text-[color:var(--color-text-primary)]">
+                {settings.use24Hour ? "24-hour" : "12-hour"} format
+              </p>
+              <p className="module-text-small mt-1 text-[color:var(--color-text-secondary)]">
+                Seconds: {settings.showSeconds ? "Shown" : "Hidden"} | Date:{" "}
+                {settings.showDate ? "Shown" : "Hidden"}
+              </p>
+            </div>
+          </div>
+        );
+      }
 
       return (
         <div

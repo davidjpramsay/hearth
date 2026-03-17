@@ -275,29 +275,13 @@ export const moduleDefinition = defineModule({
   dataSchema: koboReaderCurrentResponseSchema,
   runtime: {
     Component: ({ settings, isEditing }) => {
-      if (isEditing) {
-        return (
-          <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-text-title text-slate-100">
-              Kobo Reader preview
-            </p>
-            <p className="module-text-small mt-2 text-slate-300">
-              User: {settings.userName.trim() || "Not selected"}
-            </p>
-            <p className="module-text-small mt-1 text-slate-400">
-              Spent: {settings.showSpentReading ? "Shown" : "Hidden"} | Remaining:{" "}
-              {settings.showRemainingReading ? "Shown" : "Hidden"}
-            </p>
-          </div>
-        );
-      }
-
       const { ref, metrics } = useTileDensity<HTMLDivElement>();
       const bookState = useModuleQuery({
         key: `kobo-reader:${settings.userName}`,
         queryFn: async () => loadCurrentBook(settings.userName),
         intervalMs: POLL_INTERVAL_MS,
         staleMs: POLL_INTERVAL_MS - 1_000,
+        enabled: !isEditing,
       });
       const [coverLoadFailed, setCoverLoadFailed] = useState(false);
       const compact = metrics.width < 360;
@@ -327,6 +311,23 @@ export const moduleDefinition = defineModule({
       useEffect(() => {
         setCoverLoadFailed(false);
       }, [bookState.data?.book?.coverImageUrl]);
+
+      if (isEditing) {
+        return (
+          <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
+            <p className="module-text-title text-slate-100">
+              Kobo Reader preview
+            </p>
+            <p className="module-text-small mt-2 text-slate-300">
+              User: {settings.userName.trim() || "Not selected"}
+            </p>
+            <p className="module-text-small mt-1 text-slate-400">
+              Spent: {settings.showSpentReading ? "Shown" : "Hidden"} | Remaining:{" "}
+              {settings.showRemainingReading ? "Shown" : "Hidden"}
+            </p>
+          </div>
+        );
+      }
 
       return (
         <ModuleFrame

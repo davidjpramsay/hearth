@@ -305,6 +305,11 @@ const WEATHER_ORB_STYLE: CSSProperties = {
   boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
 };
 
+const WEATHER_META_TEXT_CLASS =
+  "font-medium lowercase tracking-[0.02em] text-[color:var(--color-text-primary)]";
+const WEATHER_SECTION_LABEL_CLASS =
+  "module-text-small font-display font-semibold lowercase tracking-[0.18em]";
+
 const WeatherInlineStat = ({
   label,
   value,
@@ -322,7 +327,7 @@ const WeatherInlineStat = ({
     <span aria-hidden className="module-text-body shrink-0 font-medium">
       {icon}
     </span>
-    <span className="module-text-body truncate font-medium text-[color:var(--color-text-primary)]">
+    <span className={`module-text-body truncate ${WEATHER_META_TEXT_CLASS}`}>
       {value}
     </span>
   </div>
@@ -409,6 +414,7 @@ export const moduleDefinition = defineModule({
       const tone = resolveWeatherTone(payload.conditionCode, payload.isDay);
       const moduleAccentStyle = buildModuleAccentStyle(tone.accentRgbVar);
       const todayForecast = payload.forecastDays[0] ?? null;
+      const conditionLabel = normalizeWeatherLabel(payload.conditionLabel);
       const todayStats = [
         settings.showTodayMinTemperature
           ? {
@@ -583,8 +589,8 @@ export const moduleDefinition = defineModule({
 
                       {showTopCondition ? (
                         <div className="pb-2">
-                          <p className="module-text-title font-medium text-[color:var(--color-text-primary)]">
-                            {payload.conditionLabel}
+                          <p className="module-text-title font-medium lowercase text-[color:var(--color-text-primary)]">
+                            {conditionLabel}
                           </p>
                         </div>
                       ) : null}
@@ -640,8 +646,8 @@ export const moduleDefinition = defineModule({
 
                         {showTopCondition ? (
                           <div className="pb-2">
-                            <p className="module-text-title font-medium text-[color:var(--color-text-primary)]">
-                              {payload.conditionLabel}
+                            <p className="module-text-title font-medium lowercase text-[color:var(--color-text-primary)]">
+                              {conditionLabel}
                             </p>
                           </div>
                         ) : null}
@@ -688,7 +694,7 @@ export const moduleDefinition = defineModule({
                 <section className="module-panel-card mt-3 p-3">
                   {showForecastSectionTitle ? (
                     <div className="mb-2">
-                      <p className="module-text-small font-display font-semibold uppercase tracking-[0.18em]">Week ahead</p>
+                      <p className={WEATHER_SECTION_LABEL_CLASS}>week ahead</p>
                     </div>
                   ) : null}
                   <div
@@ -703,7 +709,9 @@ export const moduleDefinition = defineModule({
                         className="module-panel-card p-2.5 text-left"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <p className="module-text-small font-display font-semibold uppercase tracking-[0.18em] text-[color:var(--color-text-secondary)]">
+                          <p
+                            className={`${WEATHER_SECTION_LABEL_CLASS} text-[color:var(--color-text-secondary)]`}
+                          >
                             {formatForecastDayLabel(day.date)}
                           </p>
                           <span aria-hidden className={`${forecastIconClass} shrink-0`}>
@@ -731,7 +739,7 @@ export const moduleDefinition = defineModule({
                         {showForecastPrecipitation ? (
                           <div className="mt-2 flex items-center gap-1.5 text-[color:var(--color-text-secondary)]">
                             <span aria-hidden>🌧️</span>
-                            <span className="module-text-small font-display uppercase tracking-[0.18em]">
+                            <span className={`module-text-small ${WEATHER_META_TEXT_CLASS}`}>
                               {day.precipitationChancePercent === null
                                 ? "--"
                                 : `${day.precipitationChancePercent}%`}
@@ -741,7 +749,7 @@ export const moduleDefinition = defineModule({
                         {showForecastWind ? (
                           <div className="mt-1 flex items-center gap-1.5 text-[color:var(--color-text-muted)]">
                             <span aria-hidden>💨</span>
-                            <span className="module-text-small font-display uppercase tracking-[0.18em]">
+                            <span className={`module-text-small ${WEATHER_META_TEXT_CLASS}`}>
                               {formatWind(day.windMax, settings.windSpeedUnit)}
                             </span>
                           </div>

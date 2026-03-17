@@ -35,6 +35,7 @@ export interface ModuleManifest {
   description?: string;
   icon?: string;
   defaultSize: ModuleSize;
+  placement?: "public" | "internal";
   timeMode?: "device-local" | "site-local" | "source-local";
   categories?: string[];
   permissions?: ModulePermission[];

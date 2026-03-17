@@ -320,7 +320,6 @@ const DEFAULT_LAYOUT_SEEDS: DefaultLayoutSeed[] = [
           config: {
             enableMoneyTracking: true,
             showStats: true,
-            previewDays: 7,
           },
         },
       ],
@@ -397,7 +396,6 @@ const DEFAULT_LAYOUT_SEEDS: DefaultLayoutSeed[] = [
           config: {
             enableMoneyTracking: true,
             showStats: true,
-            previewDays: 7,
           },
         },
         {

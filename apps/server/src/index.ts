@@ -86,6 +86,16 @@ const services = {
 };
 
 const app = await createApp(services);
+if (!config.localWarningDevForceActive) {
+  try {
+    await localWarningService.refreshNow();
+  } catch (error) {
+    console.warn(
+      "[startup] Failed to preload Emergency WA warnings. Falling back to background refresh.",
+      error,
+    );
+  }
+}
 backupService.start();
 localWarningService.start();
 await moduleAdapterService.start();

@@ -108,6 +108,8 @@ Current behavior:
 - Completion records are stored per `(chore_id, completion_date)`.
 - Recurring chores are **not retrospective**:
   - they only appear from their explicit `startsOn` date onward.
+- The dashboard chores tile is single-day:
+  - it renders today's chores only and does not expose a multi-day preview setting.
 - Chores use a configurable household `siteTimezone` for "today", week boundaries, and payout windows.
 - Weekly summaries are computed against a configurable `paydayDayOfWeek` setting:
   - `weekStart = payday + 1`
@@ -122,6 +124,8 @@ Current behavior:
 - `site-local` modules use the shared household `siteTimezone` stored in settings:
   - `chores`
   - `bible-verse`
+- `local-warnings` is an internal SDK module:
+  - it powers the automatic full-screen warning layout and is not shown in the normal module picker
 - `source-local` modules follow the upstream data source timezone semantics:
   - `weather` uses the provider/location timezone
   - `calendar` preserves feed/all-day date semantics from the source
@@ -168,6 +172,7 @@ Notable constraints:
 
 - Default data directory is `~/.hearth` for new installs.
 - If an existing legacy `./data` DB exists, it is reused.
+- `DEFAULT_SITE_TIMEZONE` can provide a deployment-level fallback for site-local modules until the household timezone is saved in settings.
 - Calendar source URLs in layout configs are encrypted before storage.
 - Existing plaintext calendar URLs are migrated to encrypted format on startup.
 - Secrets are generated automatically when not provided:

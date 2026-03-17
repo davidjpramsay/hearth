@@ -19,6 +19,7 @@ Set this before the first boot:
 
 ```env
 ADMIN_PASSWORD=change-me
+DEFAULT_SITE_TIMEZONE=Australia/Perth
 ```
 
 Optional:
@@ -34,6 +35,7 @@ KOBO_READER_LIBRARY_ROOT=/external/books
 Notes:
 
 - `HEARTH_IMAGE` can be pinned to a release tag if you do not want `latest`.
+- `DEFAULT_SITE_TIMEZONE` is recommended for hosted/container installs so `chores` and other site-local modules do not fall back to the container timezone before the household timezone is saved in Admin.
 - `ESV_API_KEY` is only needed if you want the Bible Verse module to load live data.
 - `KOBO_READER_*` is only needed if you want the Kobo Reader module.
 - After the first successful startup, you can remove `ADMIN_PASSWORD` if you do not want it stored in the runtime env.

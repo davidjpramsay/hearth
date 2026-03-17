@@ -270,28 +270,16 @@ export const moduleDefinition = defineModule({
   settingsSchema,
   runtime: {
     Component: ({ instanceId, settings, isEditing }) => {
-      if (isEditing) {
-        return (
-          <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-text-title text-slate-100">
-              Count Down preview
-            </p>
-            <p className="module-text-small mt-2 text-slate-300">
-              {settings.eventName.trim() || "Upcoming Event"}
-            </p>
-            <p className="module-text-small mt-1 text-slate-400">
-              Mode: {settings.mode === "time" ? "Duration" : "Date"}
-            </p>
-          </div>
-        );
-      }
-
       const [nowMs, setNowMs] = useState(() => Date.now());
       const [durationTargetMs, setDurationTargetMs] = useState(() =>
         Date.now() + durationToMs(settings),
       );
 
       useEffect(() => {
+        if (isEditing) {
+          return;
+        }
+
         const timer = window.setInterval(() => {
           setNowMs(Date.now());
         }, SECOND_MS);
@@ -299,9 +287,13 @@ export const moduleDefinition = defineModule({
         return () => {
           window.clearInterval(timer);
         };
-      }, []);
+      }, [isEditing]);
 
       useEffect(() => {
+        if (isEditing) {
+          return;
+        }
+
         if (settings.mode !== "time") {
           return;
         }
@@ -348,6 +340,22 @@ export const moduleDefinition = defineModule({
           : "var(--color-text-accent-rgb)",
         boxShadow: complete ? "0 0 20px rgb(var(--color-status-ok-rgb) / 0.16)" : undefined,
       } as CSSProperties;
+
+      if (isEditing) {
+        return (
+          <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
+            <p className="module-text-title text-slate-100">
+              Count Down preview
+            </p>
+            <p className="module-text-small mt-2 text-slate-300">
+              {settings.eventName.trim() || "Upcoming Event"}
+            </p>
+            <p className="module-text-small mt-1 text-slate-400">
+              Mode: {settings.mode === "time" ? "Duration" : "Date"}
+            </p>
+          </div>
+        );
+      }
 
       return (
         <div

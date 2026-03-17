@@ -1,5 +1,5 @@
 import GridLayout from "react-grid-layout";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   type DisplayDeviceRuntime,
   type GridItem,
@@ -234,6 +234,8 @@ const DashboardWarningTicker = ({
 }: {
   ticker: ReportScreenProfileWarningTicker;
 }) => {
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const entries = useMemo(
     () =>
       ticker.warnings.map((warning) => ({
@@ -245,25 +247,64 @@ const DashboardWarningTicker = ({
     [ticker],
   );
 
+  const [tickerMetrics, setTickerMetrics] = useState({
+    startOffsetPx: FALLBACK_VIEWPORT.width,
+    contentWidthPx: 0,
+  });
   const animationDurationSeconds = useMemo(() => {
-    const totalCharacters = entries.reduce(
-      (sum, entry) => sum + entry.level.length + entry.headline.length + 12,
-      0,
-    );
-    return Math.max(20, Math.min(60, totalCharacters * 0.18));
+    const viewportWidth = tickerMetrics.startOffsetPx;
+    const contentWidth = tickerMetrics.contentWidthPx;
+    const totalDistance = Math.max(viewportWidth + contentWidth, viewportWidth);
+    return Math.max(18, Math.min(70, totalDistance / 90));
+  }, [tickerMetrics.contentWidthPx, tickerMetrics.startOffsetPx]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const content = contentRef.current;
+    if (!viewport || !content) {
+      return;
+    }
+
+    const measure = () => {
+      setTickerMetrics({
+        startOffsetPx: Math.ceil(viewport.clientWidth),
+        contentWidthPx: Math.ceil(content.scrollWidth),
+      });
+    };
+
+    measure();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => {
+        measure();
+      });
+      observer.observe(viewport);
+      observer.observe(content);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+    };
   }, [entries]);
 
   if (entries.length === 0) {
     return null;
   }
 
-  const renderTickerContent = (duplicate = false) => (
+  const tickerTrackStyle: CSSProperties = {
+    animationDuration: `${animationDurationSeconds}s`,
+    ["--dashboard-warning-ticker-start-offset" as string]: `${tickerMetrics.startOffsetPx}px`,
+  };
+
+  const renderTickerContent = () => (
     <div
-      aria-hidden={duplicate}
+      ref={contentRef}
       className="dashboard-warning-ticker__content"
     >
       {entries.map((entry) => (
-        <div key={`${duplicate ? "dup" : "base"}:${entry.id}`} className="dashboard-warning-ticker__item">
+        <div key={entry.id} className="dashboard-warning-ticker__item">
           <span className="dashboard-warning-ticker__icon" aria-hidden>
             {entry.icon}
           </span>
@@ -278,13 +319,12 @@ const DashboardWarningTicker = ({
     <div className="dashboard-warning-ticker">
       <div className="dashboard-warning-ticker__shell">
         <div className="dashboard-warning-ticker__label">Alerts</div>
-        <div className="dashboard-warning-ticker__viewport">
+        <div ref={viewportRef} className="dashboard-warning-ticker__viewport">
           <div
             className="dashboard-warning-ticker__track"
-            style={{ animationDuration: `${animationDurationSeconds}s` }}
+            style={tickerTrackStyle}
           >
             {renderTickerContent()}
-            {renderTickerContent(true)}
           </div>
         </div>
       </div>

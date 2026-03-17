@@ -41,9 +41,9 @@ import {
   type ScreenProfileLayouts,
 } from "@hearth/shared";
 
-const PhotoRouterBlockEditor = lazy(async () => {
-  const module = await import("../components/admin/PhotoRouterBlockEditor");
-  return { default: module.PhotoRouterBlockEditor };
+const SetLogicEditor = lazy(async () => {
+  const module = await import("../components/admin/SetLogicEditor");
+  return { default: module.SetLogicEditor };
 });
 
 const GraphEditorLoading = () => (
@@ -1373,7 +1373,7 @@ export const AdminLayoutsPage = () => {
                 </div>
 
                 <Suspense fallback={<GraphEditorLoading />}>
-                  <PhotoRouterBlockEditor
+                  <SetLogicEditor
                     authoring={setConfig.logicBlocks}
                     layoutOptions={layoutOptions}
                     photoCollectionOptions={photoCollectionOptions}

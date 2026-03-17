@@ -2,8 +2,11 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type DragEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import {
@@ -69,7 +72,7 @@ interface PhotoCollectionOption {
   name: string;
 }
 
-interface PhotoRouterBlockEditorProps {
+interface SetLogicEditorProps {
   authoring: LayoutSetAuthoring;
   layoutOptions: LayoutOption[];
   photoCollectionOptions: PhotoCollectionOption[];
@@ -298,6 +301,14 @@ const LocationSearchFieldEditor = ({
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [geoLoading, setGeoLoading] = useState(false);
+  const stopCanvasEventPropagation = (
+    event: ReactPointerEvent<HTMLDivElement> | ReactMouseEvent<HTMLDivElement>,
+  ) => {
+    event.stopPropagation();
+  };
+  const stopResultButtonMouseDown = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+  };
 
   const locationValue = toParamStringValue(params[field.key]);
   const latitudeKey = field.latitudeKey ?? "latitude";
@@ -388,7 +399,12 @@ const LocationSearchFieldEditor = ({
   };
 
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-3 md:col-span-2">
+      <div
+        className="rounded-xl border border-slate-700 bg-slate-950/50 p-3 md:col-span-2"
+        onPointerDown={stopCanvasEventPropagation}
+        onMouseDown={stopCanvasEventPropagation}
+        onClick={stopCanvasEventPropagation}
+      >
       <label className="block">
         <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
           {field.label}
@@ -474,6 +490,7 @@ const LocationSearchFieldEditor = ({
               key={result.id}
               type="button"
               className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1.5 text-left text-xs text-slate-100 hover:border-cyan-400"
+              onMouseDown={stopResultButtonMouseDown}
               onClick={() => applyLocationResult(result)}
             >
               {result.label}
@@ -1333,27 +1350,43 @@ const buildFlowGraph = (input: {
   return { nodes, edges };
 };
 
-export const PhotoRouterBlockEditor = ({
+export const SetLogicEditor = ({
   authoring,
   layoutOptions,
   photoCollectionOptions,
   runtimeHealth,
   onChange,
-}: PhotoRouterBlockEditorProps) => {
+}: SetLogicEditorProps) => {
   const block = useMemo(() => getPrimaryPhotoRouterBlock(authoring), [authoring]);
+  const latestAuthoringRef = useRef(authoring);
+  const latestBlockRef = useRef(block);
+  const selectedNodeIdRef = useRef<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isCanvasInteractive, setIsCanvasInteractive] = useState(true);
   const [reactFlowInstance, setReactFlowInstance] =
     useState<ReactFlowInstance<Node, Edge> | null>(null);
+
+  useEffect(() => {
+    latestAuthoringRef.current = authoring;
+    latestBlockRef.current = block;
+  }, [authoring, block]);
+
+  useEffect(() => {
+    selectedNodeIdRef.current = selectedNodeId;
+  }, [selectedNodeId]);
+
   const updateBlock = useCallback((updater: (current: PhotoRouterBlock) => PhotoRouterBlock) => {
-    const nextBlock = updater(block);
-    onChange(
-      setPrimaryPhotoRouterBlock({
-        authoring,
-        block: nextBlock,
-      }),
-    );
-  }, [authoring, block, onChange]);
+    const currentAuthoring = latestAuthoringRef.current;
+    const currentBlock = latestBlockRef.current;
+    const nextBlock = updater(currentBlock);
+    const nextAuthoring = setPrimaryPhotoRouterBlock({
+      authoring: currentAuthoring,
+      block: nextBlock,
+    });
+    latestAuthoringRef.current = nextAuthoring;
+    latestBlockRef.current = getPrimaryPhotoRouterBlock(nextAuthoring);
+    onChange(nextAuthoring);
+  }, [onChange]);
 
   const addLayoutNodeAtPosition = useCallback((position: { x: number; y: number }) => {
     const fallbackLayoutName =
@@ -1756,14 +1789,15 @@ export const PhotoRouterBlockEditor = ({
   const updateSelectedLayoutNode = (
     updater: (current: PhotoRouterLayoutNode) => PhotoRouterLayoutNode,
   ) => {
-    if (!selectedLayoutNode) {
+    const targetNodeId = selectedNodeIdRef.current;
+    if (!targetNodeId) {
       return;
     }
 
     updateBlock((current) => ({
       ...current,
       nodes: current.nodes.map((node) =>
-        node.id === selectedLayoutNode.id && isLayoutGraphNode(node)
+        node.id === targetNodeId && isLayoutGraphNode(node)
           ? updater(node)
           : node,
       ),
@@ -1775,14 +1809,15 @@ export const PhotoRouterBlockEditor = ({
       current: PhotoRouterPhotoOrientationNode,
     ) => PhotoRouterPhotoOrientationNode,
   ) => {
-    if (!selectedActionNode) {
+    const targetNodeId = selectedNodeIdRef.current;
+    if (!targetNodeId) {
       return;
     }
 
     updateBlock((current) => ({
       ...current,
       nodes: current.nodes.map((node) =>
-        node.id === selectedActionNode.id && isPhotoOrientationNode(node)
+        node.id === targetNodeId && isPhotoOrientationNode(node)
           ? updater(node)
           : node,
       ),
@@ -1926,10 +1961,16 @@ export const PhotoRouterBlockEditor = ({
                   updateBranch((current) => ({
                     ...current,
                     conditionType: normalizedConditionType,
-                    conditionParams: {
-                      ...conditionParams,
-                      ...patch,
-                    },
+                    conditionParams: parseConditionParamsByType(
+                      normalizedConditionType,
+                      {
+                        ...parseConditionParamsByType(
+                          normalizedConditionType,
+                          current.conditionParams,
+                        ),
+                        ...patch,
+                      },
+                    ),
                   }))
                 }
               />
@@ -2328,4 +2369,4 @@ export const PhotoRouterBlockEditor = ({
   );
 };
 
-export default PhotoRouterBlockEditor;
+export default SetLogicEditor;

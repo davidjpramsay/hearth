@@ -147,9 +147,7 @@ export const choresModule: ModuleDefinition<ChoresModuleConfig> = {
       return (
         <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
           <p className="text-sm font-semibold text-slate-100">Chores preview</p>
-          <p className="mt-2 text-xs text-slate-300">
-            Preview days: {normalizedConfig.previewDays}
-          </p>
+          <p className="mt-2 text-xs text-slate-300">Today-only display</p>
           <p className="mt-1 text-xs text-slate-400">
             Stats: {normalizedConfig.showStats ? "On" : "Off"} | Money:{" "}
             {normalizedConfig.enableMoneyTracking ? "On" : "Off"}
@@ -361,22 +359,6 @@ export const choresModule: ModuleDefinition<ChoresModuleConfig> = {
             type="checkbox"
             checked={normalizedConfig.showStats}
             onChange={(event) => applyPatch({ showStats: event.target.checked })}
-          />
-        </label>
-
-        <label className="block space-y-2">
-          <span>Preview days</span>
-          <input
-            className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
-            type="number"
-            min={0}
-            max={14}
-            value={normalizedConfig.previewDays}
-            onChange={(event) =>
-              applyPatch({
-                previewDays: Math.max(0, Math.min(14, Number(event.target.value) || 0)),
-              })
-            }
           />
         </label>
       </div>

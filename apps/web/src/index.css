@@ -560,20 +560,20 @@ body {
 
 @keyframes dashboard-warning-ticker-scroll {
   from {
-    transform: translate3d(0, 0, 0);
+    transform: translate3d(var(--dashboard-warning-ticker-start-offset, 100%), 0, 0);
   }
 
   to {
-    transform: translate3d(-50%, 0, 0);
+    transform: translate3d(-100%, 0, 0);
   }
 }
 
 @layer utilities {
   .dashboard-warning-ticker {
     position: absolute;
-    right: 1rem;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
-    left: 1rem;
+    right: 0;
+    bottom: 0;
+    left: 0;
     z-index: 40;
     pointer-events: none;
   }
@@ -584,7 +584,10 @@ body {
     gap: 0.875rem;
     overflow: hidden;
     border: 1px solid rgb(var(--color-status-loading-rgb) / 0.28);
-    border-radius: 9999px;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 0;
     background:
       linear-gradient(
         90deg,
@@ -595,11 +598,12 @@ body {
       0 14px 28px rgba(2, 6, 23, 0.34),
       inset 0 1px 0 rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(18px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .dashboard-warning-ticker__label {
     flex-shrink: 0;
-    padding: 0.7rem 0 0.7rem 1rem;
+    padding: 0.7rem 0 0.7rem calc(env(safe-area-inset-left, 0px) + 1rem);
     font-family: var(--font-display);
     font-size: var(--size-module-overline);
     font-weight: 700;
@@ -613,13 +617,12 @@ body {
     min-width: 0;
     flex: 1 1 auto;
     overflow: hidden;
-    padding: 0.55rem 1rem 0.55rem 0;
+    padding: 0.55rem calc(env(safe-area-inset-right, 0px) + 1rem) 0.55rem 0;
   }
 
   .dashboard-warning-ticker__track {
-    display: flex;
+    display: inline-flex;
     width: max-content;
-    min-width: 100%;
     animation-name: dashboard-warning-ticker-scroll;
     animation-timing-function: linear;
     animation-iteration-count: infinite;

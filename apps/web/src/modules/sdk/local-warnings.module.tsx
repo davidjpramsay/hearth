@@ -159,6 +159,7 @@ export const moduleDefinition = defineModule({
     description: "Shows active Emergency WA warnings for a chosen location.",
     icon: "alert-triangle",
     defaultSize: { w: 6, h: 5 },
+    placement: "internal",
     categories: ["alerts", "safety"],
     permissions: ["network"],
     dataSources: [{ id: "local-warnings-rest", kind: "rest", pollMs: 300_000 }],
@@ -167,18 +168,6 @@ export const moduleDefinition = defineModule({
   dataSchema: localWarningsModuleCurrentResponseSchema,
   runtime: {
     Component: ({ settings, isEditing }) => {
-      if (isEditing) {
-        return (
-          <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-text-title text-slate-100">Local warnings preview</p>
-            <p className="module-text-small mt-2 text-slate-300">{settings.locationQuery}</p>
-            <p className="module-text-small mt-1 text-slate-400">
-              Source: Emergency WA CAP-AU
-            </p>
-          </div>
-        );
-      }
-
       const warningState = useModuleQuery({
         key: `local-warnings:${buildWarningQueryString(settings)}`,
         queryFn: async () => {
@@ -197,9 +186,22 @@ export const moduleDefinition = defineModule({
         },
         intervalMs: settings.refreshIntervalSeconds * 1000,
         staleMs: Math.max(1000, settings.refreshIntervalSeconds * 1000 - 1000),
+        enabled: !isEditing,
       });
 
       const payload = warningState.data ?? emptyPayload();
+
+      if (isEditing) {
+        return (
+          <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
+            <p className="module-text-title text-slate-100">Local warnings preview</p>
+            <p className="module-text-small mt-2 text-slate-300">{settings.locationQuery}</p>
+            <p className="module-text-small mt-1 text-slate-400">
+              Source: Emergency WA CAP-AU
+            </p>
+          </div>
+        );
+      }
 
       return (
         <ModuleFrame

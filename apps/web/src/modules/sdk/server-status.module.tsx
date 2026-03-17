@@ -108,22 +108,6 @@ export const moduleDefinition = defineModule({
   dataSchema: statusSchema,
   runtime: {
     Component: ({ settings, isEditing }) => {
-      if (isEditing) {
-        return (
-          <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-text-title text-slate-100">
-              Server status preview
-            </p>
-            <p className="module-text-small mt-2 text-slate-300">
-              Poll every {settings.pollSeconds}s
-            </p>
-            <p className="module-text-small mt-1 text-slate-400">
-              Memory stats: {settings.showMemory ? "Shown" : "Hidden"}
-            </p>
-          </div>
-        );
-      }
-
       const status = useModuleQuery({
         key: `server-status:${settings.pollSeconds}`,
         queryFn: async () => {
@@ -139,7 +123,24 @@ export const moduleDefinition = defineModule({
         },
         intervalMs: settings.pollSeconds * 1000,
         staleMs: Math.max(1000, settings.pollSeconds * 1000 - 1000),
+        enabled: !isEditing,
       });
+
+      if (isEditing) {
+        return (
+          <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
+            <p className="module-text-title text-slate-100">
+              Server status preview
+            </p>
+            <p className="module-text-small mt-2 text-slate-300">
+              Poll every {settings.pollSeconds}s
+            </p>
+            <p className="module-text-small mt-1 text-slate-400">
+              Memory stats: {settings.showMemory ? "Shown" : "Hidden"}
+            </p>
+          </div>
+        );
+      }
 
       return (
         <ModuleFrame

@@ -5,8 +5,9 @@ import { toCalendarDateInTimeZone } from "@hearth/shared";
 import { registerChoresModuleRoutes } from "../src/routes/chores-module.js";
 import type { AppServices } from "../src/types.js";
 
-test("chores summary route honors the requested startDate", async () => {
+test("chores summary route ignores legacy previewDays config and honors the requested startDate", async () => {
   let requestedStartDate: string | null = null;
+  let requestedDays: number | null = null;
 
   const app = Fastify();
   registerChoresModuleRoutes(
@@ -16,8 +17,8 @@ test("chores summary route honors the requested startDate", async () => {
         findModuleInstance: () => ({
           module: {
             config: {
-              previewDays: 0,
               enableMoneyTracking: true,
+              previewDays: 14,
             },
           },
         }),
@@ -30,8 +31,9 @@ test("chores summary route honors the requested startDate", async () => {
         }),
       },
       choresRepository: {
-        getBoard: (input: { startDate: string }) => {
+        getBoard: (input: { startDate: string; days: number }) => {
           requestedStartDate = input.startDate;
+          requestedDays = input.days;
           return {
             generatedAt: new Date().toISOString(),
             startDate: input.startDate,
@@ -65,6 +67,7 @@ test("chores summary route honors the requested startDate", async () => {
     assert.equal(response.statusCode, 200);
     assert.equal(response.headers["cache-control"], "no-store");
     assert.equal(requestedStartDate, "2026-03-09");
+    assert.equal(requestedDays, 1);
 
     const payload = response.json();
     assert.equal(payload.startDate, "2026-03-09");
@@ -76,6 +79,7 @@ test("chores summary route honors the requested startDate", async () => {
 
 test("chores summary route defaults startDate using the household timezone", async () => {
   let requestedStartDate: string | null = null;
+  let requestedDays: number | null = null;
   const fixedNow = new Date("2026-03-09T16:45:00.000Z");
   const RealDate = Date;
 
@@ -99,7 +103,6 @@ test("chores summary route defaults startDate using the household timezone", asy
         findModuleInstance: () => ({
           module: {
             config: {
-              previewDays: 0,
               enableMoneyTracking: true,
             },
           },
@@ -114,8 +117,9 @@ test("chores summary route defaults startDate using the household timezone", asy
         }),
       },
       choresRepository: {
-        getBoard: (input: { startDate: string }) => {
+        getBoard: (input: { startDate: string; days: number }) => {
           requestedStartDate = input.startDate;
+          requestedDays = input.days;
           return {
             generatedAt: new Date().toISOString(),
             startDate: input.startDate,
@@ -150,6 +154,7 @@ test("chores summary route defaults startDate using the household timezone", asy
     const expectedStartDate = toCalendarDateInTimeZone(fixedNow, "Australia/Perth");
     assert.equal(response.statusCode, 200);
     assert.equal(requestedStartDate, expectedStartDate);
+    assert.equal(requestedDays, 1);
 
     const payload = response.json();
     assert.equal(payload.startDate, expectedStartDate);

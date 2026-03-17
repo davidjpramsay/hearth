@@ -2,6 +2,16 @@
 
 This project is now SDK-first.
 
+Current runtime status:
+
+- `apps/web/src/modules/sdk` is the only active module registration path.
+- `packages/core/src/modules/index.ts` is intentionally empty, so legacy modules are not auto-registered at runtime.
+- Remaining `packages/core/src/modules/*.tsx` files are reference/migration material only until they are either deleted or fully retired.
+- Compatibility code still exists in a few non-module areas for old data/layout formats:
+  - settings/layout normalization
+  - legacy photo folder-path handling
+  - older SQLite/database bootstrap paths
+
 ## Legacy module today
 
 Legacy modules live in:
@@ -20,7 +30,8 @@ Migrate one module at a time.
 1. Build SDK equivalent in `apps/web/src/modules/sdk/<name>.module.tsx`.
 2. Keep the same id when replacing a legacy module so stored layouts continue to resolve.
 3. Validate layout/editor/display behaviour.
-4. When ready, retire the legacy export from `packages/core/src/modules/index.ts` or leave it as reference-only code.
+4. Leave `packages/core/src/modules/index.ts` empty so runtime stays SDK-only.
+5. Retire the old legacy file once you no longer need it as migration/reference material.
 
 ## Suggested migration order
 
