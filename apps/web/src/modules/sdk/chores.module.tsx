@@ -310,7 +310,7 @@ export const moduleDefinition = defineModule({
                     className="rounded border border-slate-700 bg-slate-900/70"
                   >
                     <header className="flex items-center justify-between border-b border-slate-700 px-2 py-1.5">
-                      <p className="module-copy-body font-semibold text-slate-100">
+                      <p className="module-copy-title text-slate-100">
                         {member.memberName}
                       </p>
                       <div
@@ -359,7 +359,7 @@ export const moduleDefinition = defineModule({
                               className="h-4 w-4 accent-cyan-500"
                             />
                             <span
-                              className="module-copy-body min-w-0 flex-1 font-medium text-slate-100"
+                              className="module-copy-body min-w-0 flex-1 text-slate-100"
                             >
                               {item.choreName}
                             </span>

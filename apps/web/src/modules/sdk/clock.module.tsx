@@ -191,10 +191,10 @@ export const moduleDefinition = defineModule({
         : timeParts.primary;
       const inlineDayPeriod =
         !settings.use24Hour && timeParts.dayPeriod
-          ? timeParts.dayPeriod.toLowerCase()
+          ? timeParts.dayPeriod
           : null;
       const timeRowClass = compact ? "items-end gap-2.5" : "items-end gap-3";
-      const timeInlineMetaClass = compact ? "module-copy-body" : "module-copy-title";
+      const timeInlineMetaClass = "module-copy-meta";
 
       if (isEditing) {
         return (
@@ -232,11 +232,7 @@ export const moduleDefinition = defineModule({
                   <p className="module-copy-label text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
                     {dayFormatter.format(now)}
                   </p>
-                  <p
-                    className={`mt-1 font-medium text-[color:var(--color-text-primary)] ${
-                      "module-copy-body"
-                    }`}
-                  >
+                  <p className="module-copy-body mt-1 text-[color:var(--color-text-primary)]">
                     {dateFormatter.format(now)}
                   </p>
                 </div>
@@ -245,14 +241,12 @@ export const moduleDefinition = defineModule({
 
             <div className={`flex w-full ${timeRowClass}`}>
               <p
-                className={`font-semibold leading-none text-[color:var(--color-text-accent)] ${
-                  "module-copy-hero"
-                }`}
+                className="module-copy-hero leading-none text-[color:var(--color-text-accent)]"
               >
                 {inlineTime}
                 {inlineDayPeriod ? (
                   <span
-                    className={`${timeInlineMetaClass} ml-2 align-baseline font-medium text-[color:var(--color-text-secondary)]`}
+                    className={`${timeInlineMetaClass} ml-2 align-baseline text-[color:var(--color-text-secondary)]`}
                   >
                     {inlineDayPeriod}
                   </span>

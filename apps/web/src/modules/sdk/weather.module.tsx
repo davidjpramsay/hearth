@@ -305,8 +305,7 @@ const WEATHER_ORB_STYLE: CSSProperties = {
   boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
 };
 
-const WEATHER_META_TEXT_CLASS =
-  "font-medium tracking-[0.02em] text-[color:var(--color-text-primary)]";
+const WEATHER_META_TEXT_CLASS = "text-[color:var(--color-text-primary)]";
 const WEATHER_SECTION_LABEL_CLASS = "module-copy-label";
 
 const WeatherInlineStat = ({
@@ -323,7 +322,7 @@ const WeatherInlineStat = ({
     title={`${label}: ${value}`}
     aria-label={`${label}: ${value}`}
   >
-    <span aria-hidden className="module-copy-body shrink-0 font-medium">
+    <span aria-hidden className="module-copy-body shrink-0">
       {icon}
     </span>
     <span className={`module-copy-body truncate ${WEATHER_META_TEXT_CLASS}`}>
@@ -407,7 +406,7 @@ export const moduleDefinition = defineModule({
       const forecastIconClass = density === "xs" ? "module-copy-body" : "module-copy-title";
       const forecastTemperatureClass = compactForecastCards
         ? "module-copy-body"
-        : "module-copy-meta";
+        : "module-copy-title";
       const heroCompact = density === "xs" || tileMetrics.width < 380;
       const useStructuredHero = !heroCompact;
       const tone = resolveWeatherTone(payload.conditionCode, payload.isDay);
@@ -578,7 +577,7 @@ export const moduleDefinition = defineModule({
                   <div className="flex min-w-0 flex-col gap-4">
                     <div className="flex items-end gap-3">
                       <p
-                        className={`${temperatureTextClass} leading-none tracking-[-0.07em]`}
+                        className={`${temperatureTextClass} leading-none`}
                         style={{
                           color: "rgb(var(--module-accent-rgb, var(--color-text-accent-rgb)))",
                         }}
@@ -588,7 +587,7 @@ export const moduleDefinition = defineModule({
 
                       {showTopCondition ? (
                         <div className="pb-2">
-                          <p className="module-copy-title font-medium text-[color:var(--color-text-primary)]">
+                          <p className="module-copy-title text-[color:var(--color-text-primary)]">
                             {conditionLabel}
                           </p>
                         </div>
@@ -635,7 +634,7 @@ export const moduleDefinition = defineModule({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-end gap-3">
                         <p
-                          className={`${temperatureTextClass} leading-none tracking-[-0.07em]`}
+                          className={`${temperatureTextClass} leading-none`}
                           style={{
                             color: "rgb(var(--module-accent-rgb, var(--color-text-accent-rgb)))",
                           }}
@@ -645,7 +644,7 @@ export const moduleDefinition = defineModule({
 
                         {showTopCondition ? (
                           <div className="pb-2">
-                            <p className="module-copy-title font-medium text-[color:var(--color-text-primary)]">
+                            <p className="module-copy-title text-[color:var(--color-text-primary)]">
                               {conditionLabel}
                             </p>
                           </div>
@@ -719,7 +718,7 @@ export const moduleDefinition = defineModule({
                         </div>
                         {showForecastTemperature ? (
                           <p
-                            className={`${forecastTemperatureClass} mt-3 font-semibold text-[color:var(--color-text-primary)]`}
+                            className={`${forecastTemperatureClass} mt-3 text-[color:var(--color-text-primary)]`}
                           >
                             {day.tempMax === null ? "--" : `${Math.round(day.tempMax)}°`}
                             <span

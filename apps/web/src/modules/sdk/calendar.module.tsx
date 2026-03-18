@@ -534,7 +534,7 @@ export const moduleDefinition = defineModule({
                               className="rounded border border-slate-700/70 bg-slate-950/70 px-2.5 py-1.5 text-left"
                               style={eventStyleForView(event, now)}
                             >
-                              <p className="module-copy-body line-clamp-2 text-left font-semibold text-slate-100">
+                              <p className="module-copy-body line-clamp-2 text-left text-slate-100">
                                 {event.title}
                               </p>
                               <p className="module-copy-meta mt-0.5 text-cyan-200">
@@ -605,7 +605,7 @@ export const moduleDefinition = defineModule({
                             className="rounded border border-slate-700/70 bg-slate-950/80 px-2.5 py-1 text-left"
                             style={eventStyleForView(event, now)}
                           >
-                            <p className="module-copy-meta line-clamp-2 text-left font-medium text-slate-100">
+                            <p className="module-copy-body line-clamp-2 text-left text-slate-100">
                               {event.title}
                             </p>
                             <p className="module-copy-meta mt-0.5 text-cyan-200">
@@ -701,7 +701,7 @@ export const moduleDefinition = defineModule({
                           {dayEvents.map((event) => (
                             <p
                               key={event.id}
-                              className="module-copy-meta line-clamp-2 rounded border border-slate-700/60 bg-slate-950/80 px-2 py-1 text-left leading-snug text-slate-100"
+                              className="module-copy-body line-clamp-2 rounded border border-slate-700/60 bg-slate-950/80 px-2 py-1 text-left leading-snug text-slate-100"
                               style={{
                                 ...eventStyleForView(event, now),
                               }}

@@ -135,7 +135,7 @@ const ReadingStat = ({
     <span className="module-copy-label block truncate text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
       {label}
     </span>
-    <span className="module-copy-body mt-1 block truncate font-medium">
+    <span className="module-copy-title mt-1 block truncate">
       {value}
     </span>
   </div>
@@ -377,11 +377,7 @@ export const moduleDefinition = defineModule({
                           "radial-gradient(circle at top, rgb(var(--color-text-accent-rgb) / 0.22), transparent 55%), linear-gradient(180deg, rgb(var(--tone-slate-800-rgb)), rgb(var(--tone-slate-950-rgb)))",
                       }}
                     >
-                      <span
-                        className={`font-semibold text-[color:var(--color-text-primary)] ${
-                          "module-copy-title"
-                        }`}
-                      >
+                      <span className="module-copy-title text-[color:var(--color-text-primary)]">
                         {bookState.data.book.title}
                       </span>
                     </div>
@@ -393,14 +389,10 @@ export const moduleDefinition = defineModule({
                     <p className="module-copy-label text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
                       Most recently read
                     </p>
-                    <h3
-                      className="module-copy-title line-clamp-3 text-balance font-semibold"
-                    >
+                    <h3 className="module-copy-title line-clamp-3 text-balance">
                       {bookState.data.book.title}
                     </h3>
-                    <p
-                      className="module-copy-body font-medium text-[color:var(--color-text-secondary)]"
-                    >
+                    <p className="module-copy-body text-[color:var(--color-text-secondary)]">
                       {bookState.data.book.authorLabel}
                     </p>
                   </div>
@@ -427,7 +419,7 @@ export const moduleDefinition = defineModule({
                       <span className="module-copy-meta text-[color:var(--color-text-secondary)]">
                         Reading progress
                       </span>
-                      <span className="module-copy-body font-semibold text-[color:var(--color-text-accent)]">
+                      <span className="module-copy-title text-[color:var(--color-text-accent)]">
                         {Math.round(progressPercent)}%
                       </span>
                     </div>

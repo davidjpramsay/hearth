@@ -282,12 +282,14 @@ body {
     font-family: var(--font-body);
     font-size: var(--size-module-meta);
     line-height: 1.35;
+    font-weight: 400;
   }
 
   .module-copy-body {
     font-family: var(--font-body);
     font-size: var(--size-module-body);
     line-height: 1.45;
+    font-weight: 500;
   }
 
   .module-copy-title {
@@ -295,6 +297,7 @@ body {
     font-size: var(--size-module-heading);
     line-height: 1.15;
     font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
   .module-copy-hero {
@@ -302,6 +305,8 @@ body {
     font-size: var(--size-module-display);
     line-height: 0.95;
     font-weight: 600;
+    letter-spacing: -0.06em;
+    font-variant-numeric: lining-nums tabular-nums;
   }
 
   .surface-module {
