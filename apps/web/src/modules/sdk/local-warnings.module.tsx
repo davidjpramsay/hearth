@@ -194,9 +194,9 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-text-title text-slate-100">Local warnings preview</p>
-            <p className="module-text-small mt-2 text-slate-300">{settings.locationQuery}</p>
-            <p className="module-text-small mt-1 text-slate-400">
+            <p className="module-copy-title text-slate-100">Local warnings preview</p>
+            <p className="module-copy-meta mt-2 text-slate-300">{settings.locationQuery}</p>
+            <p className="module-copy-meta mt-1 text-slate-400">
               Source: Emergency WA CAP-AU
             </p>
           </div>
@@ -219,14 +219,14 @@ export const moduleDefinition = defineModule({
           <div className="module-panel-shell flex h-full min-h-0 flex-col gap-3 px-4 py-4 text-[color:var(--color-text-primary)]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="module-text-small font-display uppercase tracking-[0.18em] text-[color:var(--color-text-secondary)]">
+                <p className="module-copy-label text-[color:var(--color-text-secondary)]">
                   Emergency WA warnings
                 </p>
-                <p className="module-text-small mt-1 text-[color:var(--color-text-secondary)]">
+                <p className="module-copy-meta mt-1 text-[color:var(--color-text-secondary)]">
                   {payload.locationLabel}
                 </p>
               </div>
-              <div className="module-panel-chip module-text-small rounded-full px-3 py-1 font-display uppercase tracking-[0.18em] text-[color:var(--color-text-primary)]">
+              <div className="module-panel-chip module-copy-label rounded-full px-3 py-1 text-[color:var(--color-text-primary)]">
                 {payload.warnings.length} active
               </div>
             </div>
@@ -251,7 +251,7 @@ export const moduleDefinition = defineModule({
                         className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[0.7rem] border"
                         style={tone.iconStyle}
                       >
-                        <span aria-hidden className="module-text-title leading-none">
+                        <span aria-hidden className="module-copy-title leading-none">
                           {warningIcon}
                         </span>
                       </div>
@@ -260,35 +260,35 @@ export const moduleDefinition = defineModule({
                         <div className="flex flex-wrap items-center gap-2">
                           {warning.alertLevel ? (
                             <span
-                              className="module-text-small rounded-full border px-2.5 py-1 font-display uppercase tracking-[0.18em] whitespace-nowrap"
+                              className="module-copy-label rounded-full border px-2.5 py-1 whitespace-nowrap"
                               style={tone.levelStyle}
                             >
                               {warning.alertLevel}
                             </span>
                           ) : null}
-                          <span className="module-text-small font-display uppercase tracking-[0.18em] text-[color:rgb(var(--tone-slate-200-rgb)/0.72)]">
+                          <span className="module-copy-label text-[color:rgb(var(--tone-slate-200-rgb)/0.72)]">
                             {warning.categoryLabel ?? warning.serviceLabel}
                           </span>
                           {warning.severity ? (
-                            <span className="module-text-small font-display uppercase tracking-[0.18em] text-[color:var(--color-text-muted)]">
+                            <span className="module-copy-label text-[color:var(--color-text-muted)]">
                               {warning.severity}
                             </span>
                           ) : null}
                         </div>
 
-                        <h3 className="module-text-title mt-3 leading-tight text-[color:var(--color-text-primary)]">
+                        <h3 className="module-copy-title mt-3 leading-tight text-[color:var(--color-text-primary)]">
                           {warning.headline}
                         </h3>
 
                         <div className="mt-3 space-y-1.5">
                           {warning.eventLabel ? (
-                            <p className="module-text-body text-[color:var(--color-text-secondary)]">
+                            <p className="module-copy-body text-[color:var(--color-text-secondary)]">
                               {warning.eventLabel}
                             </p>
                           ) : null}
 
                           {warning.areaLabels.length > 0 ? (
-                            <p className="module-text-small text-[color:var(--color-text-secondary)]">
+                            <p className="module-copy-meta text-[color:var(--color-text-secondary)]">
                               {warning.areaLabels.slice(0, 3).join(", ")}
                             </p>
                           ) : null}
@@ -296,11 +296,11 @@ export const moduleDefinition = defineModule({
 
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           {warning.urgency ? (
-                            <span className="module-panel-chip module-text-small rounded-full px-2.5 py-1 font-display uppercase tracking-[0.18em]">
+                            <span className="module-panel-chip module-copy-label rounded-full px-2.5 py-1">
                               {warning.urgency}
                             </span>
                           ) : null}
-                          <span className="module-panel-chip module-text-small rounded-full px-2.5 py-1 font-display uppercase tracking-[0.18em]">
+                          <span className="module-panel-chip module-copy-label rounded-full px-2.5 py-1">
                             Emergency WA
                           </span>
                           {warning.detailUrl ? (
@@ -308,7 +308,7 @@ export const moduleDefinition = defineModule({
                               href={warning.detailUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="module-panel-chip module-text-small rounded-full px-2.5 py-1 font-display uppercase tracking-[0.18em] text-[color:var(--color-text-primary)] underline decoration-transparent transition hover:decoration-current"
+                              className="module-panel-chip module-copy-label rounded-full px-2.5 py-1 text-[color:var(--color-text-primary)] underline decoration-transparent transition hover:decoration-current"
                             >
                               Open details
                             </a>

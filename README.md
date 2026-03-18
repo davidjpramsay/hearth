@@ -46,7 +46,7 @@ It is built to run on low-power hardware (Raspberry Pi / mini PCs) and provides:
 Hearth runtime is SDK-first.
 
 - Active modules are auto-discovered from `apps/web/src/modules/sdk/*`.
-- Legacy module code in `packages/core/src/modules/*` is retained for migration/reference and is not auto-registered by default.
+- `packages/core` no longer carries legacy module implementations; it stays focused on shared layout/registry helpers.
 - The web registry resolves module listing/rendering locally in the web app.
 - Server integrations are handled by adapters in `apps/server/src/modules/adapters/*`.
 
@@ -67,6 +67,7 @@ pnpm --filter @hearth/module-sdk test
 
 ## Recent Changelog
 
+- March 18, 2026: unified active module typography around shared `module-copy-*` roles (`label`, `meta`, `body`, `title`, `hero`) and removed the retired legacy module sources from `packages/core/src/modules/*`.
 - March 10, 2026: all active SDK modules now share a minimal `presentation` settings block (`heading`, `primary`, `supporting`) for clean per-module sizing, and the old clock-specific time/date font-size controls were removed.
 - March 9, 2026: Layout Sets now use a visual action-node graph with draggable layout nodes and `Photo Orientation` nodes, backed by persisted `logicBlocks` that compile into the runtime `logicGraph`; the old primitive free-form canvas path is removed.
 - March 8, 2026: photo image responses now send long-lived immutable cache headers, allowing cache-capable kiosk browsers to reuse already-loaded images on repeat views instead of refetching them each time.

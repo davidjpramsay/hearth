@@ -27,9 +27,9 @@ export const moduleDefinition = defineModule({
   runtime: {
     Component: ({ settings }) => (
       <div
-        className="module-text-title flex h-full w-full items-center justify-center rounded-lg bg-slate-800 px-4 text-center text-slate-100"
+        className="module-panel-shell flex h-full w-full items-center justify-center px-4 text-center text-slate-100"
       >
-        {settings.message}
+        <p className="module-copy-title text-balance">{settings.message}</p>
       </div>
     ),
   },

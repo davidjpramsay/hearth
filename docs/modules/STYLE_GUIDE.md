@@ -14,16 +14,17 @@ For modules with richer internal layouts, prefer the shared visual primitives in
 - `.module-panel-card` for inset cards and stat blocks
 - `.module-panel-chip` for compact labels
 - `.module-panel-progress` for progress rails
-- `.module-text-small` for compact labels, metadata, and helper text
-- `.module-text-body` for normal readable copy
-- `.module-text-title` for headings and emphasized values
-- `.module-text-display` for hero values like clocks and temperatures
+- `.module-copy-label` for compact uppercase labels and chips
+- `.module-copy-meta` for helper text, timestamps, and supporting metadata
+- `.module-copy-body` for normal readable copy
+- `.module-copy-title` for headings and emphasized values
+- `.module-copy-hero` for standout values like clocks and temperatures
 
-Use utility classes for treatment, not extra text classes:
+Use typography roles for structure, then utility classes only for emphasis and state:
 
-- `font-display uppercase tracking-[0.18em]` for small uppercase labels
-- `font-medium` / `font-semibold` for emphasis
+- `font-medium` / `font-semibold` for emphasis inside a role
 - color utilities for hierarchy and state
+- avoid ad hoc `font-display uppercase tracking-*` stacks in module content
 
 ## Visual philosophy
 
@@ -52,7 +53,8 @@ Use utility classes for treatment, not extra text classes:
 ## Typography
 
 - Use a fixed, intentional hierarchy inside each module instead of exposing generic font controls.
-- Prefer the shared module text classes in `apps/web/src/index.css` over inline `fontSize` styles.
+- Prefer the shared module copy roles in `apps/web/src/index.css` over inline `fontSize` styles.
+- Keep each piece of text in one of five roles: `label`, `meta`, `body`, `title`, or `hero`.
 - If a module needs a user-facing size option, tie it to a specific content need and make the layout impact obvious.
 - Avoid one-off font fields unless the module genuinely needs that exact setting.
 

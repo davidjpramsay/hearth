@@ -129,13 +129,13 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-text-title text-slate-100">
+            <p className="module-copy-title text-slate-100">
               Server status preview
             </p>
-            <p className="module-text-small mt-2 text-slate-300">
+            <p className="module-copy-meta mt-2 text-slate-300">
               Poll every {settings.pollSeconds}s
             </p>
-            <p className="module-text-small mt-1 text-slate-400">
+            <p className="module-copy-meta mt-1 text-slate-400">
               Memory stats: {settings.showMemory ? "Shown" : "Hidden"}
             </p>
           </div>
@@ -155,14 +155,14 @@ export const moduleDefinition = defineModule({
         >
           {status.data ? (
             <div className="space-y-3 rounded border border-slate-700 bg-slate-950/60 p-3 text-slate-100">
-              <div className="module-text-body text-slate-300">
+              <div className="module-copy-body text-slate-300">
                 Service: {status.data.service}
               </div>
-              <div className="module-text-body text-slate-300">
+              <div className="module-copy-body text-slate-300">
                 Uptime: {Math.floor(status.data.uptimeSeconds)}s
               </div>
               {settings.showMemory && status.data.memory ? (
-                <div className="module-text-small text-slate-400">
+                <div className="module-copy-meta text-slate-400">
                   <p>RSS: {formatBytes(status.data.memory.rss)}</p>
                   <p>Heap used: {formatBytes(status.data.memory.heapUsed)}</p>
                   <p>Heap total: {formatBytes(status.data.memory.heapTotal)}</p>

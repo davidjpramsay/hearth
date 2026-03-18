@@ -132,10 +132,10 @@ const ReadingStat = ({
   value: string;
 }) => (
   <div className="module-panel-card flex h-full min-w-0 flex-col justify-center px-5 py-3 text-[color:var(--color-text-primary)]">
-    <span className="module-text-small block truncate font-display uppercase tracking-[0.18em] text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
+    <span className="module-copy-label block truncate text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
       {label}
     </span>
-    <span className="module-text-body mt-1 block truncate font-medium">
+    <span className="module-copy-body mt-1 block truncate font-medium">
       {value}
     </span>
   </div>
@@ -315,13 +315,13 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-text-title text-slate-100">
+            <p className="module-copy-title text-slate-100">
               Kobo Reader preview
             </p>
-            <p className="module-text-small mt-2 text-slate-300">
+            <p className="module-copy-meta mt-2 text-slate-300">
               User: {settings.userName.trim() || "Not selected"}
             </p>
-            <p className="module-text-small mt-1 text-slate-400">
+            <p className="module-copy-meta mt-1 text-slate-400">
               Spent: {settings.showSpentReading ? "Shown" : "Hidden"} | Remaining:{" "}
               {settings.showRemainingReading ? "Shown" : "Hidden"}
             </p>
@@ -379,7 +379,7 @@ export const moduleDefinition = defineModule({
                     >
                       <span
                         className={`font-semibold text-[color:var(--color-text-primary)] ${
-                          "module-text-title"
+                          "module-copy-title"
                         }`}
                       >
                         {bookState.data.book.title}
@@ -390,16 +390,16 @@ export const moduleDefinition = defineModule({
 
                 <div className="flex min-w-0 flex-col gap-4">
                   <div className="space-y-2">
-                    <p className="module-text-small font-display uppercase tracking-[0.18em] text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
+                    <p className="module-copy-label text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
                       Most recently read
                     </p>
                     <h3
-                      className="module-text-title line-clamp-3 text-balance font-semibold"
+                      className="module-copy-title line-clamp-3 text-balance font-semibold"
                     >
                       {bookState.data.book.title}
                     </h3>
                     <p
-                      className="module-text-body font-medium text-[color:var(--color-text-secondary)]"
+                      className="module-copy-body font-medium text-[color:var(--color-text-secondary)]"
                     >
                       {bookState.data.book.authorLabel}
                     </p>
@@ -424,10 +424,10 @@ export const moduleDefinition = defineModule({
 
                   <div className={compact ? "space-y-2" : "space-y-2 pt-1"}>
                     <div className="flex items-center justify-between gap-3">
-                      <span className="module-text-small text-[color:var(--color-text-secondary)]">
+                      <span className="module-copy-meta text-[color:var(--color-text-secondary)]">
                         Reading progress
                       </span>
-                      <span className="module-text-body font-semibold text-[color:var(--color-text-accent)]">
+                      <span className="module-copy-body font-semibold text-[color:var(--color-text-accent)]">
                         {Math.round(progressPercent)}%
                       </span>
                     </div>

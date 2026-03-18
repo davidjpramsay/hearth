@@ -3,7 +3,7 @@
 Hearth runtime is SDK-first:
 
 - SDK modules (`@hearth/module-sdk`) are auto-discovered from `apps/web/src/modules/sdk`.
-- Legacy module code in `packages/core/src/modules` remains as migration/reference code and is not auto-registered in the current runtime.
+- `packages/core` no longer carries legacy module implementations; it only provides shared layout/registry helpers.
 
 ## Current Built-In SDK Modules
 
@@ -78,7 +78,7 @@ Hearth runtime is SDK-first:
 ## Why this design
 
 - SDK-first runtime with typed manifests/schemas
-- Legacy module code remains available as reference during migration work
+- Single source of truth for live module UI
 - Clear server/client boundary for integrations and secrets
 - Shared, theme-driven module surfaces keep the dashboard visually coherent across themes and module types
 - AI-friendly scaffolding and strongly typed contracts

@@ -344,13 +344,13 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-text-title text-slate-100">
+            <p className="module-copy-title text-slate-100">
               Count Down preview
             </p>
-            <p className="module-text-small mt-2 text-slate-300">
+            <p className="module-copy-meta mt-2 text-slate-300">
               {settings.eventName.trim() || "Upcoming Event"}
             </p>
-            <p className="module-text-small mt-1 text-slate-400">
+            <p className="module-copy-meta mt-1 text-slate-400">
               Mode: {settings.mode === "time" ? "Duration" : "Date"}
             </p>
           </div>
@@ -374,12 +374,12 @@ export const moduleDefinition = defineModule({
 
           <div>
             <p
-              className="module-text-small truncate font-display uppercase tracking-wide text-[color:var(--color-text-secondary)]"
+              className="module-copy-label truncate text-[color:var(--color-text-secondary)]"
             >
               Event
             </p>
             <p
-              className={`module-text-title truncate ${complete ? "animate-pulse" : ""}`}
+              className={`module-copy-title truncate ${complete ? "animate-pulse" : ""}`}
               style={{
                 color: complete ? "var(--color-status-ok)" : "var(--color-text-primary)",
                 textShadow: complete
@@ -408,16 +408,14 @@ export const moduleDefinition = defineModule({
                   }
                 >
                   <p
-                    className="module-text-title leading-none"
+                    className="module-copy-title leading-none"
                     style={{
                       color: complete ? "var(--color-status-ok)" : "var(--color-text-accent)",
                     }}
                   >
                     {segment.value}
                   </p>
-                  <p
-                    className="module-text-small mt-2 font-display uppercase tracking-[0.18em] text-slate-300"
-                  >
+                  <p className="module-copy-label mt-2 text-slate-300">
                     {segment.label}
                   </p>
                 </div>

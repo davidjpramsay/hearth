@@ -174,11 +174,11 @@ const LayoutTypographyPanel = ({
           style={buildLayoutTypographyStyle(value)}
           className="rounded-xl border border-slate-700 bg-slate-950/75 p-4"
         >
-          <p className="module-text-small font-display uppercase tracking-[0.18em] text-cyan-200">Small text</p>
-          <p className="module-text-body mt-3 text-slate-200">Body copy preview.</p>
-          <p className="module-text-title mt-4 text-slate-100">Title</p>
+          <p className="module-copy-label text-cyan-200">Label</p>
+          <p className="module-copy-body mt-3 text-slate-200">Body copy preview.</p>
+          <p className="module-copy-title mt-4 text-slate-100">Title</p>
           <div className="mt-4">
-            <span className="module-text-display text-slate-100">25°C</span>
+            <span className="module-copy-hero text-slate-100">25°C</span>
           </div>
         </div>
 

@@ -451,13 +451,13 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-text-title text-slate-100">
+            <p className="module-copy-title text-slate-100">
               Calendar preview
             </p>
-            <p className="module-text-small mt-2 text-slate-300">
+            <p className="module-copy-meta mt-2 text-slate-300">
               Events load from the active layout on the dashboard.
             </p>
-            <p className="module-text-small mt-3 text-slate-400">
+            <p className="module-copy-meta mt-3 text-slate-400">
               View: {settings.viewMode} | Sources: {settings.calendars.length}
             </p>
           </div>
@@ -468,22 +468,22 @@ export const moduleDefinition = defineModule({
         <div className="module-panel-shell relative flex h-full min-h-0 flex-col overflow-hidden p-2 text-slate-100">
           <ModuleConnectionBadge visible={connectivityState.showDisconnected} />
           <header className="mb-2 flex items-center justify-between rounded border border-slate-700/80 bg-slate-900/80 px-3 py-2">
-            <p className="module-text-title tracking-wide text-slate-100">
+            <p className="module-copy-title text-slate-100">
               {headerTitle}
             </p>
-            <p className="module-text-small font-display uppercase tracking-wide text-slate-400">
+            <p className="module-copy-label text-slate-400">
               {headerViewLabel}
             </p>
           </header>
 
           {loading ? (
-            <div className="module-text-body flex min-h-0 flex-1 items-center justify-center text-slate-300">
+            <div className="module-copy-body flex min-h-0 flex-1 items-center justify-center text-slate-300">
               Loading calendar...
             </div>
           ) : null}
 
           {!loading && connectivityState.blockingError ? (
-            <div className="module-text-small flex min-h-0 flex-1 items-center justify-center rounded border border-rose-500/60 bg-rose-500/10 px-3 text-center text-rose-200">
+            <div className="module-copy-meta flex min-h-0 flex-1 items-center justify-center rounded border border-rose-500/60 bg-rose-500/10 px-3 text-center text-rose-200">
               {connectivityState.blockingError}
             </div>
           ) : null}
@@ -496,7 +496,7 @@ export const moduleDefinition = defineModule({
                     <span
                       key={entry.source}
                       title={entry.label}
-                      className="module-text-small inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-slate-200"
+                      className="module-copy-label inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-slate-200"
                     >
                       <span
                         className="rounded-full"
@@ -524,7 +524,7 @@ export const moduleDefinition = defineModule({
 
                     return (
                       <section key={day.toISOString()} className="rounded border border-slate-700/80 bg-slate-900/70 p-2">
-                        <h4 className="module-text-small mb-2 font-display font-semibold uppercase tracking-wide text-cyan-200">
+                        <h4 className="module-copy-label mb-2 text-cyan-200">
                           {dayFormatter.format(day)}
                         </h4>
                         <div className="space-y-2">
@@ -534,14 +534,14 @@ export const moduleDefinition = defineModule({
                               className="rounded border border-slate-700/70 bg-slate-950/70 px-2.5 py-1.5 text-left"
                               style={eventStyleForView(event, now)}
                             >
-                              <p className="module-text-body line-clamp-2 text-left font-semibold text-slate-100">
+                              <p className="module-copy-body line-clamp-2 text-left font-semibold text-slate-100">
                                 {event.title}
                               </p>
-                              <p className="module-text-small mt-0.5 text-cyan-200">
+                              <p className="module-copy-meta mt-0.5 text-cyan-200">
                                 {formatEventTime(event, timeFormatter)}
                               </p>
                               {event.location ? (
-                                <p className="module-text-small mt-0.5 line-clamp-1 text-slate-300">
+                                <p className="module-copy-meta mt-0.5 line-clamp-1 text-slate-300">
                                   {event.location}
                                 </p>
                               ) : null}
@@ -552,7 +552,7 @@ export const moduleDefinition = defineModule({
                     );
                   })}
                   {!hasListEvents ? (
-                    <p className="module-text-small rounded border border-slate-700 bg-slate-900/60 px-3 py-2 text-slate-300">
+                    <p className="module-copy-meta rounded border border-slate-700 bg-slate-900/60 px-3 py-2 text-slate-300">
                       No upcoming events for the configured calendars.
                     </p>
                   ) : null}
@@ -569,7 +569,7 @@ export const moduleDefinition = defineModule({
                     <span
                       key={entry.source}
                       title={entry.label}
-                      className="module-text-small inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-slate-200"
+                      className="module-copy-label inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-slate-200"
                     >
                       <span
                         className="rounded-full"
@@ -595,7 +595,7 @@ export const moduleDefinition = defineModule({
                       key={day.toISOString()}
                       className="rounded border border-slate-700/80 bg-slate-900/70 p-2"
                     >
-                      <h4 className="module-text-small mb-2 text-center font-display font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                      <h4 className="module-copy-label mb-2 text-center text-cyan-200">
                         {dayFormatter.format(day)}
                       </h4>
                       <div className="space-y-1.5">
@@ -605,16 +605,16 @@ export const moduleDefinition = defineModule({
                             className="rounded border border-slate-700/70 bg-slate-950/80 px-2.5 py-1 text-left"
                             style={eventStyleForView(event, now)}
                           >
-                            <p className="module-text-small line-clamp-2 text-left font-medium text-slate-100">
+                            <p className="module-copy-meta line-clamp-2 text-left font-medium text-slate-100">
                               {event.title}
                             </p>
-                            <p className="module-text-small mt-0.5 text-cyan-200">
+                            <p className="module-copy-meta mt-0.5 text-cyan-200">
                               {formatEventTime(event, timeFormatter)}
                             </p>
                           </article>
                         ))}
                         {dayEvents.length === 0 ? (
-                          <p className="module-text-small text-center text-slate-400">
+                          <p className="module-copy-meta text-center text-slate-400">
                             No events
                           </p>
                         ) : null}
@@ -634,7 +634,7 @@ export const moduleDefinition = defineModule({
                     <span
                       key={entry.source}
                       title={entry.label}
-                      className="module-text-small inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 font-display uppercase tracking-[0.18em] text-slate-200"
+                      className="module-copy-label inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-slate-200"
                     >
                       <span
                         className="rounded-full"
@@ -659,7 +659,7 @@ export const moduleDefinition = defineModule({
                   {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayLabel) => (
                     <p
                       key={dayLabel}
-                      className="module-text-small pb-1 text-center font-display font-semibold uppercase tracking-wide text-slate-400"
+                      className="module-copy-label pb-1 text-center text-slate-400"
                     >
                       {dayLabel}
                     </p>
@@ -693,7 +693,7 @@ export const moduleDefinition = defineModule({
                         <p
                           className={`shrink-0 text-right ${
                             inMonth ? "text-slate-200" : "text-slate-500"
-                          } module-text-small`}
+                          } module-copy-meta`}
                         >
                           {monthDayFormatter.format(day)}
                         </p>
@@ -701,7 +701,7 @@ export const moduleDefinition = defineModule({
                           {dayEvents.map((event) => (
                             <p
                               key={event.id}
-                              className="module-text-small line-clamp-2 rounded border border-slate-700/60 bg-slate-950/80 px-2 py-1 text-left leading-snug text-slate-100"
+                              className="module-copy-meta line-clamp-2 rounded border border-slate-700/60 bg-slate-950/80 px-2 py-1 text-left leading-snug text-slate-100"
                               style={{
                                 ...eventStyleForView(event, now),
                               }}
@@ -719,7 +719,7 @@ export const moduleDefinition = defineModule({
           ) : null}
 
           {!loading && !connectivityState.blockingError && payload.warnings.length > 0 ? (
-            <div className="module-text-small mt-2 rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 font-display uppercase tracking-[0.18em] text-amber-100">
+            <div className="module-copy-label mt-2 rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-amber-100">
               {payload.warnings[0]}
             </div>
           ) : null}

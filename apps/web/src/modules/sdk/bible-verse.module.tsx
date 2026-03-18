@@ -255,13 +255,13 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-text-title text-slate-100">
+            <p className="module-copy-title text-slate-100">
               Bible verse preview
             </p>
-            <p className="module-text-small mt-2 text-slate-300">
+            <p className="module-copy-meta mt-2 text-slate-300">
               Refresh every {settings.refreshIntervalSeconds}s
             </p>
-            <p className="module-text-small mt-1 text-slate-400">
+            <p className="module-copy-meta mt-1 text-slate-400">
               Reference: {settings.showReference ? "Shown" : "Hidden"}
             </p>
           </div>
@@ -271,18 +271,18 @@ export const moduleDefinition = defineModule({
       return (
         <div className="module-panel-shell relative flex h-full min-h-0 flex-col overflow-hidden p-3 text-slate-100">
           <ModuleConnectionBadge visible={connectivityState.showDisconnected} />
-          <p className="module-text-small font-display uppercase tracking-[0.18em] text-cyan-200">
+          <p className="module-copy-label text-cyan-200">
             Verse of the day
           </p>
 
           {loading ? (
-            <div className="module-text-small flex min-h-0 flex-1 items-center justify-center text-slate-300">
+            <div className="module-copy-meta flex min-h-0 flex-1 items-center justify-center text-slate-300">
               Loading verse...
             </div>
           ) : null}
 
           {!loading && connectivityState.blockingError ? (
-            <div className="module-text-small mt-2 flex min-h-0 flex-1 items-center justify-center rounded border border-rose-500/60 bg-rose-500/10 px-3 text-center text-rose-200">
+            <div className="module-copy-meta mt-2 flex min-h-0 flex-1 items-center justify-center rounded border border-rose-500/60 bg-rose-500/10 px-3 text-center text-rose-200">
               {connectivityState.blockingError}
             </div>
           ) : null}
@@ -297,11 +297,11 @@ export const moduleDefinition = defineModule({
               >
                 <div ref={verseContentRef} className="w-full">
                   {payload.verse ? (
-                    <p className="module-text-body text-center leading-relaxed text-slate-100">
+                    <p className="module-copy-body text-center leading-relaxed text-slate-100">
                       {payload.verse}
                     </p>
                   ) : (
-                    <p className="module-text-small text-center text-slate-300">
+                    <p className="module-copy-meta text-center text-slate-300">
                       No verse available.
                     </p>
                   )}
@@ -311,19 +311,19 @@ export const moduleDefinition = defineModule({
 
               <div className="mt-2 space-y-1 border-t border-slate-800/80 pt-2 text-center">
                 {settings.showReference && payload.reference ? (
-                  <p className="module-text-small font-display font-semibold uppercase tracking-wide text-cyan-200">
+                  <p className="module-copy-label text-cyan-200">
                     {payload.reference}
                   </p>
                 ) : null}
 
                 {payload.warning ? (
-                  <p className="module-text-small rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 font-display uppercase tracking-[0.18em] text-amber-200">
+                  <p className="module-copy-label rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-amber-200">
                     {payload.warning}
                   </p>
                 ) : null}
 
                 {settings.showSource ? (
-                  <p className="module-text-small font-display uppercase tracking-[0.18em] text-slate-400">
+                  <p className="module-copy-label text-slate-400">
                     Source: {payload.sourceLabel}
                   </p>
                 ) : null}

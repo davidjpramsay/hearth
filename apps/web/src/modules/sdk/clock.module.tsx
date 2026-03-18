@@ -194,24 +194,24 @@ export const moduleDefinition = defineModule({
           ? timeParts.dayPeriod.toLowerCase()
           : null;
       const timeRowClass = compact ? "items-end gap-2.5" : "items-end gap-3";
-      const timeInlineMetaClass = compact ? "module-text-body" : "module-text-title";
+      const timeInlineMetaClass = compact ? "module-copy-body" : "module-copy-title";
 
       if (isEditing) {
         return (
           <div className="module-panel-shell flex h-full flex-col justify-between px-4 py-4 text-[color:var(--color-text-primary)]">
             <div>
-              <p className="module-text-small font-display uppercase tracking-[0.18em] text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
+              <p className="module-copy-label text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
                 Local time
               </p>
-              <p className="module-text-title mt-2 text-[color:var(--color-text-primary)]">
+              <p className="module-copy-title mt-2 text-[color:var(--color-text-primary)]">
                 Clock preview
               </p>
             </div>
             <div className="module-panel-card w-fit px-3 py-2">
-              <p className="module-text-body text-[color:var(--color-text-primary)]">
+              <p className="module-copy-body text-[color:var(--color-text-primary)]">
                 {settings.use24Hour ? "24-hour" : "12-hour"} format
               </p>
-              <p className="module-text-small mt-1 text-[color:var(--color-text-secondary)]">
+              <p className="module-copy-meta mt-1 text-[color:var(--color-text-secondary)]">
                 Seconds: {settings.showSeconds ? "Shown" : "Hidden"} | Date:{" "}
                 {settings.showDate ? "Shown" : "Hidden"}
               </p>
@@ -229,12 +229,12 @@ export const moduleDefinition = defineModule({
             {settings.showDate ? (
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="module-text-small font-display uppercase tracking-[0.18em] text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
+                  <p className="module-copy-label text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
                     {dayFormatter.format(now)}
                   </p>
                   <p
                     className={`mt-1 font-medium text-[color:var(--color-text-primary)] ${
-                      "module-text-body"
+                      "module-copy-body"
                     }`}
                   >
                     {dateFormatter.format(now)}
@@ -246,7 +246,7 @@ export const moduleDefinition = defineModule({
             <div className={`flex w-full ${timeRowClass}`}>
               <p
                 className={`font-semibold leading-none text-[color:var(--color-text-accent)] ${
-                  "module-text-display"
+                  "module-copy-hero"
                 }`}
               >
                 {inlineTime}

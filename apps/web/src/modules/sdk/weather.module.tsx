@@ -171,7 +171,7 @@ const forecastCardsByWidth = (width: number): number => {
 };
 
 const normalizeWeatherLabel = (value: string | null | undefined): string =>
-  (value ?? "").trim().toLowerCase();
+  (value ?? "").trim();
 
 const weatherSymbolForCode = (conditionCode: number | null, isDay: boolean | null): string => {
   if (conditionCode === null) {
@@ -306,9 +306,8 @@ const WEATHER_ORB_STYLE: CSSProperties = {
 };
 
 const WEATHER_META_TEXT_CLASS =
-  "font-medium lowercase tracking-[0.02em] text-[color:var(--color-text-primary)]";
-const WEATHER_SECTION_LABEL_CLASS =
-  "module-text-small font-display font-semibold lowercase tracking-[0.18em]";
+  "font-medium tracking-[0.02em] text-[color:var(--color-text-primary)]";
+const WEATHER_SECTION_LABEL_CLASS = "module-copy-label";
 
 const WeatherInlineStat = ({
   label,
@@ -324,10 +323,10 @@ const WeatherInlineStat = ({
     title={`${label}: ${value}`}
     aria-label={`${label}: ${value}`}
   >
-    <span aria-hidden className="module-text-body shrink-0 font-medium">
+    <span aria-hidden className="module-copy-body shrink-0 font-medium">
       {icon}
     </span>
-    <span className={`module-text-body truncate ${WEATHER_META_TEXT_CLASS}`}>
+    <span className={`module-copy-body truncate ${WEATHER_META_TEXT_CLASS}`}>
       {value}
     </span>
   </div>
@@ -403,12 +402,12 @@ export const moduleDefinition = defineModule({
       const showForecastPrecipitation =
         settings.showForecastPrecipitation && density !== "xs";
       const showForecastTemperature = settings.showForecastTemperature;
-      const temperatureTextClass = "module-text-display";
-      const heroIconClass = "module-text-display";
-      const forecastIconClass = density === "xs" ? "module-text-body" : "module-text-title";
+      const temperatureTextClass = "module-copy-hero";
+      const heroIconClass = "module-copy-hero";
+      const forecastIconClass = density === "xs" ? "module-copy-body" : "module-copy-title";
       const forecastTemperatureClass = compactForecastCards
-        ? "module-text-body"
-        : "module-text-small";
+        ? "module-copy-body"
+        : "module-copy-meta";
       const heroCompact = density === "xs" || tileMetrics.width < 380;
       const useStructuredHero = !heroCompact;
       const tone = resolveWeatherTone(payload.conditionCode, payload.isDay);
@@ -530,18 +529,18 @@ export const moduleDefinition = defineModule({
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="module-text-small font-display uppercase tracking-[0.18em] text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
+                <p className="module-copy-label text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
                   Weather preview
                 </p>
-                <p className="module-text-title mt-2 text-[color:var(--color-text-primary)]">
+                <p className="module-copy-title mt-2 text-[color:var(--color-text-primary)]">
                   {settings.locationQuery}
                 </p>
               </div>
-              <div className="module-panel-chip module-text-small rounded-full px-3 py-1 font-display uppercase tracking-[0.22em]">
+              <div className="module-panel-chip module-copy-label rounded-full px-3 py-1">
                 Preview
               </div>
             </div>
-            <p className="module-text-small text-[color:var(--color-text-secondary)]">
+            <p className="module-copy-meta text-[color:var(--color-text-secondary)]">
               Refreshes every {settings.refreshIntervalSeconds}s in {" "}
               {settings.temperatureUnit === "fahrenheit" ? "Fahrenheit" : "Celsius"}
             </p>
@@ -557,13 +556,13 @@ export const moduleDefinition = defineModule({
         >
           <ModuleConnectionBadge visible={connectivityState.showDisconnected} />
           {loading ? (
-            <div className="module-text-body relative z-10 flex min-h-0 flex-1 items-center justify-center text-[color:var(--color-text-secondary)]">
+            <div className="module-copy-body relative z-10 flex min-h-0 flex-1 items-center justify-center text-[color:var(--color-text-secondary)]">
               Loading weather...
             </div>
           ) : null}
 
           {!loading && connectivityState.blockingError ? (
-            <div className="module-text-small relative z-10 flex min-h-0 flex-1 items-center justify-center rounded border border-rose-300/40 bg-rose-300/10 px-4 text-center text-rose-50">
+            <div className="module-copy-meta relative z-10 flex min-h-0 flex-1 items-center justify-center rounded border border-rose-300/40 bg-rose-300/10 px-4 text-center text-rose-50">
               {connectivityState.blockingError}
             </div>
           ) : null}
@@ -589,7 +588,7 @@ export const moduleDefinition = defineModule({
 
                       {showTopCondition ? (
                         <div className="pb-2">
-                          <p className="module-text-title font-medium lowercase text-[color:var(--color-text-primary)]">
+                          <p className="module-copy-title font-medium text-[color:var(--color-text-primary)]">
                             {conditionLabel}
                           </p>
                         </div>
@@ -646,7 +645,7 @@ export const moduleDefinition = defineModule({
 
                         {showTopCondition ? (
                           <div className="pb-2">
-                            <p className="module-text-title font-medium lowercase text-[color:var(--color-text-primary)]">
+                            <p className="module-copy-title font-medium text-[color:var(--color-text-primary)]">
                               {conditionLabel}
                             </p>
                           </div>
@@ -694,7 +693,7 @@ export const moduleDefinition = defineModule({
                 <section className="module-panel-card mt-3 p-3">
                   {showForecastSectionTitle ? (
                     <div className="mb-2">
-                      <p className={WEATHER_SECTION_LABEL_CLASS}>week ahead</p>
+                      <p className={WEATHER_SECTION_LABEL_CLASS}>Week ahead</p>
                     </div>
                   ) : null}
                   <div
@@ -739,7 +738,7 @@ export const moduleDefinition = defineModule({
                         {showForecastPrecipitation ? (
                           <div className="mt-2 flex items-center gap-1.5 text-[color:var(--color-text-secondary)]">
                             <span aria-hidden>🌧️</span>
-                            <span className={`module-text-small ${WEATHER_META_TEXT_CLASS}`}>
+                            <span className={`module-copy-meta ${WEATHER_META_TEXT_CLASS}`}>
                               {day.precipitationChancePercent === null
                                 ? "--"
                                 : `${day.precipitationChancePercent}%`}
@@ -749,7 +748,7 @@ export const moduleDefinition = defineModule({
                         {showForecastWind ? (
                           <div className="mt-1 flex items-center gap-1.5 text-[color:var(--color-text-muted)]">
                             <span aria-hidden>💨</span>
-                            <span className={`module-text-small ${WEATHER_META_TEXT_CLASS}`}>
+                            <span className={`module-copy-meta ${WEATHER_META_TEXT_CLASS}`}>
                               {formatWind(day.windMax, settings.windSpeedUnit)}
                             </span>
                           </div>
@@ -761,7 +760,7 @@ export const moduleDefinition = defineModule({
               ) : null}
 
               {payload.warning ? (
-                <p className="module-text-small module-panel-card mt-3 px-3 py-2 font-display uppercase tracking-[0.18em] text-[color:var(--color-text-secondary)]">
+                <p className="module-copy-label module-panel-card mt-3 px-3 py-2 text-[color:var(--color-text-secondary)]">
                   {payload.warning}
                 </p>
               ) : null}

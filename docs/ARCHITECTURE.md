@@ -24,11 +24,10 @@ Rule: **schema changes start here first**.
 
 ### `packages/core`
 
-Legacy module definitions and UI tiles retained for migration/reference.
+Shared layout and registry helpers.
 
-- Legacy module components and schemas
 - Shared layout helpers used by web/server
-- Not auto-registered in the current SDK-first runtime
+- No runtime module UI lives here
 
 ### `apps/server`
 
