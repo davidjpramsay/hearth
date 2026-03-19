@@ -18,6 +18,7 @@ import {
 import { buildLayoutTypographyStyle } from "../layout/layout-typography";
 import {
   getDashboardDeviceBootstrapStateFromResolution,
+  getDashboardDeviceBootstrapStateForDeviceRefresh,
   getInitialDashboardDeviceBootstrapState,
 } from "./dashboard-device-bootstrap";
 import { moduleRegistry } from "../registry/module-registry";
@@ -463,6 +464,10 @@ export const DashboardPage = () => {
         return;
       }
 
+      // Reset stale server-managed bootstrap values before the display checks in again.
+      // This lets a deleted device reseed from local defaults instead of reviving
+      // the last managed target selection that was only cached in memory.
+      deviceBootstrapRef.current = getDashboardDeviceBootstrapStateForDeviceRefresh();
       void resolveLayout({ orientation: photoOrientationRef.current });
     };
 

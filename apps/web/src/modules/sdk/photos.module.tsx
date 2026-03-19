@@ -9,6 +9,7 @@ import {
   type PhotosModuleFrame,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import { getPhotoCollections } from "../../api/client";
 import { getAuthToken } from "../../auth/storage";
 import { getDeviceId } from "../../device/device-id";
 import {
@@ -165,24 +166,12 @@ const loadPhotoCollections = async (): Promise<PhotoCollection[]> => {
     return [];
   }
 
-  const response = await fetch("/api/display/photo-collections", {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
+  try {
+    const response = await getPhotoCollections(token);
+    return response.collections;
+  } catch {
     return [];
   }
-
-  const payload = await response.json().catch(() => undefined);
-  const parsed = photoCollectionsConfigSchema.safeParse(payload);
-  if (!parsed.success) {
-    return [];
-  }
-
-  return parsed.data.collections;
 };
 
 const loadNextFrame = async (

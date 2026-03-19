@@ -22,8 +22,8 @@ For modules with richer internal layouts, prefer the shared visual primitives in
 
 Use typography roles for structure, then utility classes only for emphasis and state:
 
-- `font-medium` / `font-semibold` for emphasis inside a role
 - color utilities for hierarchy and state
+- prefer choosing the correct semantic role over stacking font-weight or tracking overrides on top of it
 - avoid ad hoc `font-display uppercase tracking-*` stacks in module content
 
 ## Visual philosophy
@@ -55,6 +55,7 @@ Use typography roles for structure, then utility classes only for emphasis and s
 - Use a fixed, intentional hierarchy inside each module instead of exposing generic font controls.
 - Prefer the shared module copy roles in `apps/web/src/index.css` over inline `fontSize` styles.
 - Keep each piece of text in one of five roles: `label`, `meta`, `body`, `title`, or `hero`.
+- In active runtime modules, avoid per-module `font-medium`, `font-semibold`, `uppercase`, or `tracking-*` overrides on `module-copy-*` classes unless the text is in the wrong role entirely.
 - If a module needs a user-facing size option, tie it to a specific content need and make the layout impact obvious.
 - Avoid one-off font fields unless the module genuinely needs that exact setting.
 
@@ -72,7 +73,7 @@ Use typography roles for structure, then utility classes only for emphasis and s
 
 ## Naming
 
-- Module IDs must be kebab-case (`server-status`, `hello-world`).
+- Module IDs must be kebab-case (`server-status`, `count-down`).
 - Display names should be user-friendly.
 - Keep module versions explicit in `manifest.version`.
 

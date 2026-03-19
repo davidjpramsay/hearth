@@ -3,7 +3,8 @@
 Hearth runtime is SDK-first:
 
 - SDK modules (`@hearth/module-sdk`) are auto-discovered from `apps/web/src/modules/sdk`.
-- `packages/core` no longer carries legacy module implementations; it only provides shared layout/registry helpers.
+- `packages/core` only provides shared layout/registry helpers.
+- No legacy module adapter or discovery shim remains in the runtime registration path.
 
 ## Current Built-In SDK Modules
 
@@ -15,6 +16,9 @@ Hearth runtime is SDK-first:
 - `bible-verse`
 - `welcome`
 - `count-down`
+- `kobo-reader`
+- `server-status`
+- `local-warnings` (internal placement; not shown in the normal picker)
 
 ## Architecture Layers
 
@@ -71,9 +75,9 @@ Hearth runtime is SDK-first:
 - SDK local-data clock: `apps/web/src/modules/sdk/clock.module.tsx`
 - SDK configurable countdown: `apps/web/src/modules/sdk/count-down.module.tsx`
 - SDK REST-backed: `apps/web/src/modules/sdk/server-status.module.tsx`
-- Server adapter demos:
-  - `apps/server/src/modules/adapters/hello-world.ts`
+- Server adapters:
   - `apps/server/src/modules/adapters/server-status.ts`
+  - `apps/server/src/modules/adapters/kobo-reader.ts`
 
 ## Why this design
 

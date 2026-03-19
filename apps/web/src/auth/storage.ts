@@ -1,11 +1,37 @@
 const TOKEN_KEY = "hearth-admin-token";
 
-export const getAuthToken = (): string | null => localStorage.getItem(TOKEN_KEY);
+export const getAuthToken = (): string | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return window.localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+};
 
 export const setAuthToken = (token: string): void => {
-  localStorage.setItem(TOKEN_KEY, token);
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    // Ignore storage write failures.
+  }
 };
 
 export const clearAuthToken = (): void => {
-  localStorage.removeItem(TOKEN_KEY);
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Ignore storage write failures.
+  }
 };

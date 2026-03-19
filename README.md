@@ -19,8 +19,8 @@ It is built to run on low-power hardware (Raspberry Pi / mini PCs) and provides:
 - `apps/server`: Fastify API + SQLite + module backends
 - `apps/web`: React admin + display app
 - `packages/shared`: shared contracts (Zod schemas + TS types)
-- `packages/core`: module definitions + module UI components
-- `packages/module-sdk`: new additive SDK for next-gen modules
+- `packages/core`: shared layout + registry helpers used by web/server
+- `packages/module-sdk`: typed SDK for runtime modules
 
 ## Documentation
 
@@ -36,7 +36,7 @@ It is built to run on low-power hardware (Raspberry Pi / mini PCs) and provides:
 - [Module Contract](docs/modules/MODULE_CONTRACT.md)
 - [Adding a Module](docs/modules/ADDING_A_MODULE.md)
 - [Data Sources](docs/modules/DATA_SOURCES.md)
-- [Migration Guide](docs/modules/MIGRATION_GUIDE.md)
+- [Historical Migration Notes](docs/modules/MIGRATION_GUIDE.md)
 - [Layout Logic Customization](docs/modules/LAYOUT_LOGIC_CUSTOMIZATION.md)
 - [Module Security](docs/modules/SECURITY.md)
 - [Module Style Guide](docs/modules/STYLE_GUIDE.md)
@@ -46,7 +46,7 @@ It is built to run on low-power hardware (Raspberry Pi / mini PCs) and provides:
 Hearth runtime is SDK-first.
 
 - Active modules are auto-discovered from `apps/web/src/modules/sdk/*`.
-- `packages/core` no longer carries legacy module implementations; it stays focused on shared layout/registry helpers.
+- `packages/core` no longer carries runtime module implementations or discovery stubs; it stays focused on shared layout/registry helpers.
 - The web registry resolves module listing/rendering locally in the web app.
 - Server integrations are handled by adapters in `apps/server/src/modules/adapters/*`.
 
@@ -67,6 +67,9 @@ pnpm --filter @hearth/module-sdk test
 
 ## Recent Changelog
 
+- March 19, 2026: hardened admin 401 recovery so expired/invalid stored tokens are cleared and redirected back to `/admin/login`, and reset display bootstrap state on device updates so deleted displays do not resurrect stale routing on re-checkin.
+- March 19, 2026: removed the last dead `@hearth/core` discovery/module stub path and the unused `hello-world` demo adapter; remaining compatibility code is now limited to real data/bootstrap migrations rather than runtime module legacy.
+- March 19, 2026: workspace build scripts now clear `dist/` before recompiling so deleted files do not linger in deploy artifacts.
 - March 18, 2026: unified active module typography around shared `module-copy-*` roles (`label`, `meta`, `body`, `title`, `hero`) and removed the retired legacy module sources from `packages/core/src/modules/*`.
 - March 10, 2026: all active SDK modules now share a minimal `presentation` settings block (`heading`, `primary`, `supporting`) for clean per-module sizing, and the old clock-specific time/date font-size controls were removed.
 - March 9, 2026: Layout Sets now use a visual action-node graph with draggable layout nodes and `Photo Orientation` nodes, backed by persisted `logicBlocks` that compile into the runtime `logicGraph`; the old primitive free-form canvas path is removed.
@@ -76,12 +79,11 @@ pnpm --filter @hearth/module-sdk test
 - March 5, 2026: set-driven display now publishes effective cycle context so Photos modules follow set rule timers in `Layout Set` mode and use module slide interval in `Single Layout` mode.
 - March 5, 2026: calendar module event cards now use stronger full-color fills in list/week/month views, with updated header labeling (`Upcoming` for list/week, current month name for month view).
 - March 2, 2026: Bible Verse module switched to `api.esv.org` (ESV provider) with server-side API key support.
-- March 2, 2026: migrated `clock`, `weather`, `bible-verse`, `welcome`, `calendar`, `photos`, and `chores` to SDK-backed live modules (same IDs) using SDK-over-legacy precedence in the unified registry.
-- March 2, 2026: removed legacy core-module registrations (`packages/core/src/modules/index.ts` now empty), so runtime module discovery is SDK-first only.
+- March 2, 2026: migrated the initial built-in modules to SDK-backed live modules with runtime registration moved fully into the web app.
 - March 2, 2026: added a future-proof module platform with `@hearth/module-sdk`, typed manifests/schemas, lifecycle hooks, and runtime validators.
-- March 2, 2026: introduced a unified web module registry with a legacy compatibility adapter and SDK auto-discovery.
+- March 2, 2026: introduced the unified web module registry and SDK auto-discovery.
 - March 2, 2026: added standard module data hooks (`useModuleQuery`, `useModuleStream`) and reusable SDK `ModuleFrame` UI shell.
-- March 2, 2026: introduced server module adapter layer (`apps/server/src/modules`) with REST + SSE support and demo adapters (`hello-world`, `server-status`).
+- March 2, 2026: introduced server module adapter layer (`apps/server/src/modules`) with REST + SSE support for server-backed modules.
 - March 2, 2026: added module scaffolding generator (`pnpm create-module`) and baseline tests for SDK validation, registry listing, and adapter response validation.
 - March 1, 2026: migrated auto layout rotation to a single shared cycle clock (`autoCycleSeconds`) so all auto targets rotate consistently, including layouts without Photos modules.
 - March 1, 2026: extracted shared grid/quantization logic into `apps/web/src/layout/grid-math.ts` and wired both dashboard + layout editor to it to reduce layout drift regressions.

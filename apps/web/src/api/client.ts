@@ -42,6 +42,7 @@ import {
   type UpdateChoresPayoutConfigRequest,
   type UpdateLayoutRequest,
 } from "@hearth/shared";
+import { handleUnauthorizedAdminResponse } from "../auth/session";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
@@ -61,6 +62,7 @@ const request = async <T>(
   });
 
   if (!response.ok) {
+    handleUnauthorizedAdminResponse(response.status, headers);
     const errorBody = await response.json().catch(() => ({}));
     const message =
       typeof errorBody.message === "string"

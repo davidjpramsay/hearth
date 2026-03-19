@@ -66,6 +66,10 @@ export const getInitialDashboardDeviceBootstrapState =
     reportedThemeId: getStoredThemeId(),
   });
 
+export const getDashboardDeviceBootstrapStateForDeviceRefresh =
+  (): DashboardDeviceBootstrapState =>
+    getInitialDashboardDeviceBootstrapState();
+
 export const getDashboardDeviceBootstrapStateFromResolution = (
   resolution: Pick<ReportScreenProfileResponse, "device">,
 ): DashboardDeviceBootstrapState => ({

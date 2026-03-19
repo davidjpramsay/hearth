@@ -27,7 +27,7 @@ Rule: **schema changes start here first**.
 Shared layout and registry helpers.
 
 - Shared layout helpers used by web/server
-- No runtime module UI lives here
+- No runtime module UI or module discovery lives here
 
 ### `apps/server`
 
@@ -56,15 +56,17 @@ React frontend with two routes:
 5. Browser applies the resolved theme and renders module tiles from registry
 6. Subscribes to `/api/events/layouts` (SSE)
 7. Re-resolves layout on `layout-updated`, `display-device-updated`, resize, photo orientation changes, and auto-cycle ticks
-8. Publishes active display context (`set` vs `layout`) including active cycle seconds and resolved photo collection id
+8. Before handling a `display-device-updated` event for its own device id, the display resets its in-memory bootstrap fallback so a deleted device can reseed cleanly instead of reviving stale server-managed routing
+9. Publishes active display context (`set` vs `layout`) including active cycle seconds and resolved photo collection id
 
 ### Admin
 
 1. Admin auth token from `/api/auth/login`
 2. CRUD layout/module config via `/api/layouts*`
 3. Manage per-device theme/routing via `/api/display/devices*`
-4. On save/activate/update, server publishes SSE updates
-5. Display clients re-render automatically
+4. Auth-bearing web API requests clear invalid stored tokens and return the browser to `/admin/login` on `401`
+5. On save/activate/update, server publishes SSE updates
+6. Display clients re-render automatically
 
 ## Layout Switching
 
@@ -189,7 +191,7 @@ Notable constraints:
 
 ## Build + Release
 
-- `pnpm build` compiles all workspaces
+- `pnpm build` cleans each workspace `dist/` directory and recompiles all workspaces
 - Production server serves `apps/web/dist` when present
 - Container image runs server + bundled web static assets
 
