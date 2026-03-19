@@ -13,7 +13,8 @@ import {
   getScreenProfileLayouts,
   updateDisplayDevice,
 } from "../api/client";
-import { clearAuthToken, getAuthToken } from "../auth/storage";
+import { logoutAdminSession } from "../auth/session";
+import { getAuthToken } from "../auth/storage";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
 import { PageShell } from "../components/PageShell";
 import { THEME_OPTIONS, type ThemeId } from "../theme/theme";
@@ -241,9 +242,8 @@ export const AdminDevicesPage = () => {
   }, [loadData]);
 
   const onLogout = useCallback(() => {
-    clearAuthToken();
-    navigate("/admin/login", { replace: true });
-  }, [navigate]);
+    logoutAdminSession();
+  }, []);
 
   const updateDraft = (deviceId: string, updater: (current: DeviceDraft) => DeviceDraft) => {
     setDrafts((current) => {

@@ -1,12 +1,14 @@
 import { FormEvent, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { login } from "../api/client";
 import { setAuthToken } from "../auth/storage";
+import { getSafeAdminPostLoginPath } from "../auth/session";
 
 export const AdminLoginPage = () => {
-  const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? "/admin/layouts";
+  const from = getSafeAdminPostLoginPath(
+    (location.state as { from?: string } | null)?.from ?? "/admin/layouts",
+  );
 
   const [password, setPassword] = useState("");
   const [statusMessage, setStatusMessage] = useState(
@@ -24,7 +26,9 @@ export const AdminLoginPage = () => {
       const response = await login(password);
       setAuthToken(response.token);
       setStatusMessage("Authentication successful.");
-      navigate(from, { replace: true });
+      if (typeof window !== "undefined") {
+        window.location.replace(from);
+      }
     } catch (submitError) {
       setError(
         submitError instanceof Error ? submitError.message : "Login failed",

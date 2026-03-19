@@ -23,7 +23,8 @@ import {
 } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getLayouts, updateLayout } from "../api/client";
-import { clearAuthToken, getAuthToken } from "../auth/storage";
+import { logoutAdminSession } from "../auth/session";
+import { getAuthToken } from "../auth/storage";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
 import { ModuleFrame } from "../components/ModuleFrame";
 import {
@@ -244,9 +245,8 @@ export const AdminLayoutEditorPage = () => {
   const latestQueuedSaveSeqRef = useRef(0);
   const previewHostRef = useRef<HTMLDivElement | null>(null);
   const onLogout = useCallback(() => {
-    clearAuthToken();
-    navigate("/admin/login", { replace: true });
-  }, [navigate]);
+    logoutAdminSession();
+  }, []);
 
   const loadData = useCallback(async () => {
     if (!token) {
@@ -359,8 +359,7 @@ export const AdminLayoutEditorPage = () => {
             typeof message === "string" &&
             message.toLowerCase().includes("unauthorized")
           ) {
-            clearAuthToken();
-            navigate("/admin/login", { replace: true });
+            logoutAdminSession();
           }
         }
       }, 500);

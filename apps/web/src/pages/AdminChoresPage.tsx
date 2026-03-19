@@ -13,7 +13,8 @@ import {
   updateChoreItem,
   updateChoreMember,
 } from "../api/client";
-import { clearAuthToken, getAuthToken } from "../auth/storage";
+import { logoutAdminSession } from "../auth/session";
+import { getAuthToken } from "../auth/storage";
 import { useNavigate } from "react-router-dom";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
 import { PageShell } from "../components/PageShell";
@@ -282,8 +283,7 @@ export const AdminChoresPage = () => {
   );
 
   const onLogout = () => {
-    clearAuthToken();
-    navigate("/admin/login", { replace: true });
+    logoutAdminSession();
   };
 
   const buildSchedule = (): ChoreSchedule => {

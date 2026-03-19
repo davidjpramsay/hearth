@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { handleUnauthorizedAdminResponse } from "../src/auth/session";
+import {
+  getSafeAdminPostLoginPath,
+  handleUnauthorizedAdminResponse,
+  logoutAdminSession,
+} from "../src/auth/session";
 
 interface MockWindow {
   localStorage: {
@@ -113,4 +117,27 @@ test("handleUnauthorizedAdminResponse avoids redirect loops on the login page", 
   assert.equal(mock.storage.has("hearth-admin-token"), false);
   assert.equal(mock.getReplacedTo(), null);
   restoreWindow();
+});
+
+test("logoutAdminSession clears the admin token and redirects to login", () => {
+  const mock = installMockWindow({
+    pathname: "/admin/layouts",
+    initialStorage: {
+      "hearth-admin-token": "token-1",
+    },
+  });
+
+  const handled = logoutAdminSession();
+
+  assert.equal(handled, true);
+  assert.equal(mock.storage.has("hearth-admin-token"), false);
+  assert.equal(mock.getReplacedTo(), "/admin/login");
+  restoreWindow();
+});
+
+test("getSafeAdminPostLoginPath normalizes invalid and login-only targets", () => {
+  assert.equal(getSafeAdminPostLoginPath(undefined), "/admin/layouts");
+  assert.equal(getSafeAdminPostLoginPath("https://example.com"), "/admin/layouts");
+  assert.equal(getSafeAdminPostLoginPath("/admin/login"), "/admin/layouts");
+  assert.equal(getSafeAdminPostLoginPath("/admin/devices"), "/admin/devices");
 });

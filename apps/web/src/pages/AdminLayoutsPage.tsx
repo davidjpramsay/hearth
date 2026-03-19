@@ -11,7 +11,8 @@ import {
   updateLayout,
   updateScreenProfileLayouts,
 } from "../api/client";
-import { clearAuthToken, getAuthToken } from "../auth/storage";
+import { logoutAdminSession } from "../auth/session";
+import { getAuthToken } from "../auth/storage";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
 import type { LogicBranchTrigger } from "../components/admin/logicNodeRegistry";
 import { PageShell } from "../components/PageShell";
@@ -1017,8 +1018,7 @@ export const AdminLayoutsPage = () => {
   };
 
   const onLogout = () => {
-    clearAuthToken();
-    navigate("/admin/login", { replace: true });
+    logoutAdminSession();
   };
 
   const sortedLayouts = useMemo(
