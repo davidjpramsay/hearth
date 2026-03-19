@@ -6,9 +6,12 @@
     "dev": "pnpm --filter @hearth/shared build && pnpm --filter @hearth/module-sdk build && pnpm --filter @hearth/core build && pnpm -r --parallel --filter @hearth/shared --filter @hearth/module-sdk --filter @hearth/core --filter @hearth/server --filter @hearth/web dev",
     "build": "pnpm -r build",
     "start": "pnpm --filter @hearth/server start",
-    "create-module": "node scripts/create-module.mjs"
+    "create-module": "node scripts/create-module.mjs",
+    "format": "prettier --write . --ignore-unknown",
+    "format:check": "prettier --check . --ignore-unknown"
   },
   "devDependencies": {
+    "prettier": "^3.8.1",
     "typescript": "^5.7.3"
   },
   "pnpm": {
