@@ -25,7 +25,6 @@ const FALLBACK_VIEWPORT = {
   width: 1920,
   height: 1080,
 };
-const BUILD_ASSET_POLL_MS = 60_000;
 const ORIENTATION_SWITCH_HOLDOFF_MS = 0;
 const DISPLAY_SOURCE_KIND_STORAGE_KEY = "hearth:display-source-kind";
 const DISPLAY_CYCLE_SECONDS_STORAGE_KEY = "hearth:display-cycle-seconds";
@@ -113,40 +112,6 @@ interface PhotosOrientationEventDetail {
 interface DisplayDeviceUpdatedEventDetail {
   deviceId: string;
 }
-
-interface DashboardAssetSignature {
-  scriptSrc: string | null;
-  stylesheetHref: string | null;
-}
-
-const normalizeAssetUrl = (value: string | null): string | null => {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    const url = new URL(value, window.location.href);
-    return `${url.pathname}${url.search}`;
-  } catch {
-    return value;
-  }
-};
-
-const readDashboardAssetSignature = (root: ParentNode): DashboardAssetSignature => ({
-  scriptSrc: normalizeAssetUrl(
-    root.querySelector<HTMLScriptElement>('script[type="module"][src]')?.getAttribute("src") ??
-      null,
-  ),
-  stylesheetHref: normalizeAssetUrl(
-    root.querySelector<HTMLLinkElement>('link[rel="stylesheet"][href]')?.getAttribute("href") ??
-      null,
-  ),
-});
-
-const areSameAssetSignature = (
-  left: DashboardAssetSignature,
-  right: DashboardAssetSignature,
-): boolean => left.scriptSrc === right.scriptSrc && left.stylesheetHref === right.stylesheetHref;
 
 const DeviceIdentityCard = (props: {
   device: DisplayDeviceRuntime | null;
@@ -472,68 +437,6 @@ export const DashboardPage = () => {
     window.addEventListener("resize", updateViewport);
     return () => {
       window.removeEventListener("resize", updateViewport);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof DOMParser === "undefined") {
-      return;
-    }
-
-    const activeSignature = readDashboardAssetSignature(document);
-    if (!activeSignature.scriptSrc && !activeSignature.stylesheetHref) {
-      return;
-    }
-
-    let isDisposed = false;
-
-    const checkForUpdatedBuild = async () => {
-      try {
-        const response = await fetch("/", {
-          cache: "no-store",
-          headers: {
-            "x-hearth-build-check": "1",
-          },
-        });
-        if (!response.ok) {
-          return;
-        }
-
-        const html = await response.text();
-        if (isDisposed) {
-          return;
-        }
-
-        const parsedDocument = new DOMParser().parseFromString(html, "text/html");
-        const nextSignature = readDashboardAssetSignature(parsedDocument);
-        const hasComparableAssets = Boolean(
-          nextSignature.scriptSrc || nextSignature.stylesheetHref,
-        );
-
-        if (hasComparableAssets && !areSameAssetSignature(activeSignature, nextSignature)) {
-          window.location.reload();
-        }
-      } catch {
-        // Ignore build-check failures and retry on the next interval.
-      }
-    };
-
-    const interval = window.setInterval(() => {
-      void checkForUpdatedBuild();
-    }, BUILD_ASSET_POLL_MS);
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void checkForUpdatedBuild();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      isDisposed = true;
-      window.clearInterval(interval);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 

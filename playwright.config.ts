@@ -1,0 +1,27 @@
+import { defineConfig } from "@playwright/test";
+
+const port = 4173;
+
+export default defineConfig({
+  testDir: "./e2e",
+  fullyParallel: false,
+  workers: 1,
+  timeout: 30_000,
+  expect: {
+    timeout: 10_000,
+  },
+  use: {
+    baseURL: `http://127.0.0.1:${port}`,
+    browserName: "chromium",
+    headless: true,
+    serviceWorkers: "block",
+    screenshot: "only-on-failure",
+    trace: "retain-on-failure",
+  },
+  webServer: {
+    command: "node ./scripts/start-e2e-server.mjs",
+    url: `http://127.0.0.1:${port}`,
+    reuseExistingServer: false,
+    timeout: 120_000,
+  },
+});

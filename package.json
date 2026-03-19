@@ -8,9 +8,12 @@
     "start": "pnpm --filter @hearth/server start",
     "create-module": "node scripts/create-module.mjs",
     "format": "prettier --write . --ignore-unknown",
-    "format:check": "prettier --check . --ignore-unknown"
+    "format:check": "prettier --check . --ignore-unknown",
+    "test:e2e": "pnpm build && playwright test",
+    "test:e2e:headed": "pnpm build && playwright test --headed"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "prettier": "^3.8.1",
     "typescript": "^5.7.3"
   },

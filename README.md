@@ -63,11 +63,21 @@ pnpm -r build
 pnpm --filter @hearth/web test
 pnpm --filter @hearth/server test
 pnpm --filter @hearth/module-sdk test
+pnpm test:e2e
+```
+
+Browser smoke coverage uses Playwright and boots a clean local Hearth server against a disposable
+`.tmp/e2e-data` directory. On a fresh machine, install the browser once with:
+
+```bash
+pnpm exec playwright install chromium
 ```
 
 ## Recent Changelog
 
 - March 19, 2026: hardened admin 401 recovery so expired/invalid stored tokens are cleared and redirected back to `/admin/login`, and reset display bootstrap state on device updates so deleted displays do not resurrect stale routing on re-checkin.
+- March 19, 2026: added shared build-update detection so admin pages now show a reload prompt when a newer bundle is deployed, while the dashboard display path still auto-reloads itself.
+- March 19, 2026: added Playwright browser smoke coverage for admin login/logout, first-run display registration, and admin layout creation against a clean local test server.
 - March 19, 2026: removed the last dead `@hearth/core` discovery/module stub path and the unused `hello-world` demo adapter; remaining compatibility code is now limited to real data/bootstrap migrations rather than runtime module legacy.
 - March 19, 2026: workspace build scripts now clear `dist/` before recompiling so deleted files do not linger in deploy artifacts.
 - March 18, 2026: unified active module typography around shared `module-copy-*` roles (`label`, `meta`, `body`, `title`, `hero`) and removed the retired legacy module sources from `packages/core/src/modules/*`.
