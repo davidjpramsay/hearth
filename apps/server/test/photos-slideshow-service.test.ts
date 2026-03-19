@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { resolve } from "node:path";
-import {
-  photoCollectionsConfigSchema,
-  photosModuleConfigSchema,
-} from "@hearth/shared";
+import { photoCollectionsConfigSchema, photosModuleConfigSchema } from "@hearth/shared";
 import { config } from "../src/config.js";
 import {
   resolveLegacyPhotoFolderPath,

@@ -6,8 +6,7 @@ import {
 import { getStoredThemeId, type ThemeId } from "../theme/theme";
 
 const DEVICE_LAYOUT_FAMILY_STORAGE_KEY = "hearth:device-layout-family";
-const DEVICE_SCREEN_TARGET_SELECTION_STORAGE_KEY =
-  "hearth:device-screen-target-selection";
+const DEVICE_SCREEN_TARGET_SELECTION_STORAGE_KEY = "hearth:device-screen-target-selection";
 
 const DEFAULT_TARGET_SELECTION = reportScreenTargetSelectionSchema.parse({
   kind: "set",
@@ -60,15 +59,13 @@ const getLegacyDeviceTargetSelection = (): ReportScreenTargetSelection => {
   };
 };
 
-export const getInitialDashboardDeviceBootstrapState =
-  (): DashboardDeviceBootstrapState => ({
-    targetSelection: getLegacyDeviceTargetSelection(),
-    reportedThemeId: getStoredThemeId(),
-  });
+export const getInitialDashboardDeviceBootstrapState = (): DashboardDeviceBootstrapState => ({
+  targetSelection: getLegacyDeviceTargetSelection(),
+  reportedThemeId: getStoredThemeId(),
+});
 
-export const getDashboardDeviceBootstrapStateForDeviceRefresh =
-  (): DashboardDeviceBootstrapState =>
-    getInitialDashboardDeviceBootstrapState();
+export const getDashboardDeviceBootstrapStateForDeviceRefresh = (): DashboardDeviceBootstrapState =>
+  getInitialDashboardDeviceBootstrapState();
 
 export const getDashboardDeviceBootstrapStateFromResolution = (
   resolution: Pick<ReportScreenProfileResponse, "device">,

@@ -5,10 +5,7 @@ import {
   LOCAL_WARNING_CANVAS_ACTION_TYPE,
 } from "./layout-logic-warnings.js";
 import { localWarningItemSchema } from "./modules/local-warnings.js";
-import {
-  photoCollectionIdSchema,
-  photosOrientationSchema,
-} from "./modules/photos.js";
+import { photoCollectionIdSchema, photosOrientationSchema } from "./modules/photos.js";
 
 const DEFAULT_TARGET_CYCLE_SECONDS = 20;
 const DEFAULT_ACTION_TYPE = "layout.display";
@@ -35,12 +32,10 @@ export const layoutLogicParamsSchema = z
   .record(z.string().trim().min(1).max(64), z.unknown())
   .default({});
 
-export const isLocalWarningAutoLayoutName = (
-  value: string | null | undefined,
-): boolean => (value?.trim() ?? "") === LOCAL_WARNING_AUTO_LAYOUT_NAME;
+export const isLocalWarningAutoLayoutName = (value: string | null | undefined): boolean =>
+  (value?.trim() ?? "") === LOCAL_WARNING_AUTO_LAYOUT_NAME;
 
-const clampCycleSeconds = (value: number): number =>
-  Math.max(3, Math.min(3600, Math.round(value)));
+const clampCycleSeconds = (value: number): number => Math.max(3, Math.min(3600, Math.round(value)));
 
 export const autoLayoutTargetTriggerSchema = z.enum([
   "always",
@@ -202,9 +197,7 @@ export const photoRouterBlockSchema = z.object({
   }),
 });
 
-export const layoutSetLogicBlockSchema = z.discriminatedUnion("type", [
-  photoRouterBlockSchema,
-]);
+export const layoutSetLogicBlockSchema = z.discriminatedUnion("type", [photoRouterBlockSchema]);
 
 export const layoutSetAuthoringSchema = z.object({
   version: z.literal(1).default(1),
@@ -245,19 +238,13 @@ export type LayoutSetLogicGraph = z.infer<typeof layoutSetLogicGraphSchema>;
 export type LayoutSetLogicNode = z.infer<typeof layoutSetLogicNodeSchema>;
 export type LayoutSetLogicEdge = z.infer<typeof layoutSetLogicEdgeSchema>;
 export type LayoutSetLogicNodePosition = z.infer<typeof layoutSetLogicNodePositionSchema>;
-export type LayoutSetLogicEdgeOverride = z.infer<
-  typeof layoutSetLogicEdgeOverrideSchema
->;
+export type LayoutSetLogicEdgeOverride = z.infer<typeof layoutSetLogicEdgeOverrideSchema>;
 export type PhotoRouterStep = z.infer<typeof photoRouterStepSchema>;
 export type PhotoRouterFallbackBranch = z.infer<typeof photoRouterFallbackBranchSchema>;
-export type PhotoRouterConditionalBranch = z.infer<
-  typeof photoRouterConditionalBranchSchema
->;
+export type PhotoRouterConditionalBranch = z.infer<typeof photoRouterConditionalBranchSchema>;
 export type PhotoRouterActionRoute = z.infer<typeof photoRouterActionRouteSchema>;
 export type PhotoRouterLayoutNode = z.infer<typeof photoRouterLayoutNodeSchema>;
-export type PhotoRouterPhotoOrientationNode = z.infer<
-  typeof photoRouterPhotoOrientationNodeSchema
->;
+export type PhotoRouterPhotoOrientationNode = z.infer<typeof photoRouterPhotoOrientationNodeSchema>;
 export type PhotoRouterGraphNode = z.infer<typeof photoRouterGraphNodeSchema>;
 export type PhotoRouterConnection = z.infer<typeof photoRouterConnectionSchema>;
 export type PhotoRouterBlock = z.infer<typeof photoRouterBlockSchema>;
@@ -286,8 +273,7 @@ const normalizePhotoRouterConditionalBranch = (input: {
 }): PhotoRouterConditionalBranch =>
   photoRouterConditionalBranchSchema.parse({
     enabled: input.branch.enabled,
-    conditionType:
-      input.branch.conditionType?.trim() || input.defaultConditionType,
+    conditionType: input.branch.conditionType?.trim() || input.defaultConditionType,
     conditionParams: toLogicParams(input.branch.conditionParams),
     steps: input.branch.steps.map(normalizePhotoRouterStep),
   });
@@ -296,7 +282,7 @@ const normalizePhotoRouterFallbackBranch = (
   input: PhotoRouterFallbackBranch,
 ): PhotoRouterFallbackBranch =>
   photoRouterFallbackBranchSchema.parse({
-  steps: input.steps.map(normalizePhotoRouterStep),
+    steps: input.steps.map(normalizePhotoRouterStep),
   });
 
 const PHOTO_ROUTER_BRANCH_KEYS = ["fallback", "portrait", "landscape"] as const;
@@ -309,9 +295,7 @@ const toPhotoRouterConnectionId = (input: {
   sourceHandle?: string | null;
   target: string;
 }): string =>
-  [input.source.trim(), input.sourceHandle?.trim() || "default", input.target.trim()].join(
-    "::",
-  );
+  [input.source.trim(), input.sourceHandle?.trim() || "default", input.target.trim()].join("::");
 
 const isPhotoRouterBranchKey = (value: string | null | undefined): value is PhotoRouterBranchKey =>
   value === "fallback" || value === "portrait" || value === "landscape";
@@ -350,9 +334,7 @@ const buildPhotoRouterConnectionsFromBranchSteps = (input: {
 
   const appendBranch = (
     branchKey: PhotoRouterBranchKey,
-    steps:
-      | PhotoRouterFallbackBranch["steps"]
-      | PhotoRouterConditionalBranch["steps"],
+    steps: PhotoRouterFallbackBranch["steps"] | PhotoRouterConditionalBranch["steps"],
   ) => {
     if (steps.length === 0) {
       return;
@@ -456,7 +438,11 @@ const sanitizePhotoRouterConnections = (input: {
       continue;
     }
 
-    if (!input.knownStepIds.has(source) || usedStepOutgoing.has(source) || usedIncoming.has(target)) {
+    if (
+      !input.knownStepIds.has(source) ||
+      usedStepOutgoing.has(source) ||
+      usedIncoming.has(target)
+    ) {
       continue;
     }
 
@@ -566,9 +552,7 @@ export const getDefaultLayoutSetAuthoring = (input?: {
 }): LayoutSetAuthoring => {
   return layoutSetAuthoringSchema.parse({
     version: 1,
-    blocks: [
-      createDefaultPhotoRouterGraphBlock(input),
-    ],
+    blocks: [createDefaultPhotoRouterGraphBlock(input)],
   });
 };
 
@@ -618,9 +602,7 @@ export const normalizeLayoutSetAuthoring = (input: {
   knownLayoutNames?: Iterable<string>;
 }): LayoutSetAuthoring => {
   const parsed = layoutSetAuthoringSchema.parse(input.authoring);
-  const knownLayoutNames = input.knownLayoutNames
-    ? new Set(input.knownLayoutNames)
-    : null;
+  const knownLayoutNames = input.knownLayoutNames ? new Set(input.knownLayoutNames) : null;
   const photoRouterBlock = normalizePhotoRouterBlock({
     block: getPrimaryPhotoRouterBlock(parsed),
     knownLayoutNames,
@@ -632,9 +614,7 @@ export const normalizeLayoutSetAuthoring = (input: {
   });
 };
 
-function isPhotoRouterLayoutGraphNode(
-  node: PhotoRouterGraphNode,
-): node is PhotoRouterLayoutNode {
+function isPhotoRouterLayoutGraphNode(node: PhotoRouterGraphNode): node is PhotoRouterLayoutNode {
   return node.nodeType === "layout";
 }
 
@@ -655,9 +635,7 @@ function normalizePhotoRouterActionRoute(input: {
   });
 }
 
-function normalizePhotoRouterLayoutGraphNode(
-  input: PhotoRouterLayoutNode,
-): PhotoRouterLayoutNode {
+function normalizePhotoRouterLayoutGraphNode(input: PhotoRouterLayoutNode): PhotoRouterLayoutNode {
   return photoRouterLayoutNodeSchema.parse({
     ...input,
     id: input.id.trim(),
@@ -691,9 +669,7 @@ function normalizePhotoRouterPhotoOrientationGraphNode(
   });
 }
 
-function normalizePhotoRouterGraphNode(
-  input: PhotoRouterGraphNode,
-): PhotoRouterGraphNode {
+function normalizePhotoRouterGraphNode(input: PhotoRouterGraphNode): PhotoRouterGraphNode {
   return isPhotoRouterLayoutGraphNode(input)
     ? normalizePhotoRouterLayoutGraphNode(input)
     : normalizePhotoRouterPhotoOrientationGraphNode(input);
@@ -710,9 +686,7 @@ function toPhotoRouterLayoutGraphNode(input: PhotoRouterStep): PhotoRouterLayout
   });
 }
 
-function toPhotoRouterStepFromLayoutGraphNode(
-  input: PhotoRouterLayoutNode,
-): PhotoRouterStep {
+function toPhotoRouterStepFromLayoutGraphNode(input: PhotoRouterLayoutNode): PhotoRouterStep {
   return photoRouterStepSchema.parse({
     id: input.id,
     layoutName: input.layoutName,
@@ -767,10 +741,11 @@ function normalizePhotoRouterGraphNodePositions(input: {
 }) {
   return layoutSetLogicNodePositionsSchema.parse(
     Object.fromEntries(
-      Object.entries(input.nodePositions).filter(([nodeId]) =>
-        nodeId === PHOTO_ROUTER_START_NODE_ID ||
-        nodeId === PHOTO_ROUTER_END_NODE_ID ||
-        input.knownNodeIds.has(nodeId),
+      Object.entries(input.nodePositions).filter(
+        ([nodeId]) =>
+          nodeId === PHOTO_ROUTER_START_NODE_ID ||
+          nodeId === PHOTO_ROUTER_END_NODE_ID ||
+          input.knownNodeIds.has(nodeId),
       ),
     ),
   );
@@ -781,10 +756,7 @@ function wouldCreatePhotoRouterGraphCycle(input: {
   source: string;
   target: string;
 }): boolean {
-  if (
-    input.source === PHOTO_ROUTER_START_NODE_ID ||
-    input.target === PHOTO_ROUTER_END_NODE_ID
-  ) {
+  if (input.source === PHOTO_ROUTER_START_NODE_ID || input.target === PHOTO_ROUTER_END_NODE_ID) {
     return false;
   }
 
@@ -1010,8 +982,7 @@ function buildLegacyPhotoRouterGraphState(input: {
   const actionNode = createPhotoOrientationActionNode({
     id: input.routerId,
     title: input.block.title?.trim() || DEFAULT_PHOTO_ROUTER_BLOCK_TITLE,
-    photoActionType:
-      input.block.photoActionType?.trim() || DEFAULT_PHOTO_ACTION_TYPE,
+    photoActionType: input.block.photoActionType?.trim() || DEFAULT_PHOTO_ACTION_TYPE,
     photoActionCollectionId: input.block.photoActionCollectionId ?? null,
     portrait: input.portrait,
     landscape: input.landscape,
@@ -1084,8 +1055,7 @@ function deriveLegacyBranchesFromPrimaryAction(input: {
       }
       result.push(toPhotoRouterStepFromLayoutGraphNode(currentNode));
       visited.add(currentId);
-      currentId =
-        nextBySourceHandle.get(`${currentId}::${PHOTO_ROUTER_NEXT_HANDLE}`) ?? null;
+      currentId = nextBySourceHandle.get(`${currentId}::${PHOTO_ROUTER_NEXT_HANDLE}`) ?? null;
     }
 
     return result;
@@ -1095,30 +1065,21 @@ function deriveLegacyBranchesFromPrimaryAction(input: {
     fallback: photoRouterFallbackBranchSchema.parse({
       steps:
         readBranch(
-          input.actionNode
-            ? nextBySourceHandle.get(`${input.actionNode.id}::fallback`)
-            : null,
+          input.actionNode ? nextBySourceHandle.get(`${input.actionNode.id}::fallback`) : null,
         ).length > 0
           ? readBranch(
-              input.actionNode
-                ? nextBySourceHandle.get(`${input.actionNode.id}::fallback`)
-                : null,
+              input.actionNode ? nextBySourceHandle.get(`${input.actionNode.id}::fallback`) : null,
             )
           : readBranch(
-              input.actionNode
-                ? nextBySourceHandle.get(`${input.actionNode.id}::landscape`)
-                : null,
+              input.actionNode ? nextBySourceHandle.get(`${input.actionNode.id}::landscape`) : null,
             ),
     }),
     portrait: photoRouterConditionalBranchSchema.parse({
       enabled: input.actionNode ? true : false,
-      conditionType:
-        input.actionNode?.portrait.conditionType?.trim() || PORTRAIT_CONDITION_TYPE,
+      conditionType: input.actionNode?.portrait.conditionType?.trim() || PORTRAIT_CONDITION_TYPE,
       conditionParams: toLogicParams(input.actionNode?.portrait.conditionParams),
       steps: readBranch(
-        input.actionNode
-          ? nextBySourceHandle.get(`${input.actionNode.id}::portrait`)
-          : null,
+        input.actionNode ? nextBySourceHandle.get(`${input.actionNode.id}::portrait`) : null,
       ),
     }),
     landscape: photoRouterConditionalBranchSchema.parse({
@@ -1151,8 +1112,7 @@ function buildNormalizedPhotoRouterGraph(input: {
     landscape.steps.length === 0;
   const hasNoExplicitConnections = input.block.connections.length === 0;
   const hasOnlyBoundaryPositions = Object.keys(input.block.nodePositions).every(
-    (nodeId) =>
-      nodeId === PHOTO_ROUTER_START_NODE_ID || nodeId === PHOTO_ROUTER_END_NODE_ID,
+    (nodeId) => nodeId === PHOTO_ROUTER_START_NODE_ID || nodeId === PHOTO_ROUTER_END_NODE_ID,
   );
   const isExplicitEmptyGraphState =
     input.block.nodes.length === 0 &&
@@ -1193,11 +1153,9 @@ function buildNormalizedPhotoRouterGraph(input: {
     input.block.layoutNodes.every((step) => explicitNodeIds.has(step.id)) &&
     input.block.connections.every((connection) => {
       const sourceValid =
-        connection.source === PHOTO_ROUTER_START_NODE_ID ||
-        explicitNodeIds.has(connection.source);
+        connection.source === PHOTO_ROUTER_START_NODE_ID || explicitNodeIds.has(connection.source);
       const targetValid =
-        connection.target === PHOTO_ROUTER_END_NODE_ID ||
-        explicitNodeIds.has(connection.target);
+        connection.target === PHOTO_ROUTER_END_NODE_ID || explicitNodeIds.has(connection.target);
       return sourceValid && targetValid;
     });
 
@@ -1392,9 +1350,7 @@ const toAutoTargetFromPhotoRouterStep = (input: {
     input.trigger === "always"
       ? null
       : input.conditionType?.trim() ||
-        (input.trigger === "portrait-photo"
-          ? PORTRAIT_CONDITION_TYPE
-          : LANDSCAPE_CONDITION_TYPE),
+        (input.trigger === "portrait-photo" ? PORTRAIT_CONDITION_TYPE : LANDSCAPE_CONDITION_TYPE),
   conditionParams: input.trigger === "always" ? {} : toLogicParams(input.conditionParams),
 });
 
@@ -1410,9 +1366,7 @@ function getPhotoCollectionIdFromLogicParams(
   if (!params || typeof params !== "object") {
     return null;
   }
-  const parsed = photoCollectionIdSchema.safeParse(
-    params[PHOTO_COLLECTION_ACTION_PARAM_KEY],
-  );
+  const parsed = photoCollectionIdSchema.safeParse(params[PHOTO_COLLECTION_ACTION_PARAM_KEY]);
   return parsed.success ? parsed.data : null;
 }
 
@@ -1548,8 +1502,7 @@ function compilePhotoRouterGraphToLogicGraph(input: PhotoRouterBlock): LayoutSet
       (graphNode.photoActionType?.trim() ?? "") === LOCAL_WARNING_CANVAS_ACTION_TYPE;
 
     const conditionTrigger =
-      resolveConditionTrigger("if-portrait", graphNode.portrait.conditionType) ??
-      "portrait-photo";
+      resolveConditionTrigger("if-portrait", graphNode.portrait.conditionType) ?? "portrait-photo";
     const conditionNodeType =
       conditionTrigger === "landscape-photo" ? "if-landscape" : "if-portrait";
     const conditionNodeId = `${conditionNodeType}:${graphNode.id}`;
@@ -1652,8 +1605,7 @@ export const compilePhotoRouterBlockToLogicGraph = (
 
 export const compileLayoutSetAuthoringToLogicGraph = (
   input: LayoutSetAuthoring | null | undefined,
-): LayoutSetLogicGraph =>
-  compilePhotoRouterBlockToLogicGraph(getPrimaryPhotoRouterBlock(input));
+): LayoutSetLogicGraph => compilePhotoRouterBlockToLogicGraph(getPrimaryPhotoRouterBlock(input));
 
 export const deriveLayoutSetAuthoringFromLogicGraph = (input: {
   logicGraph: LayoutSetLogicGraph;
@@ -1662,9 +1614,7 @@ export const deriveLayoutSetAuthoringFromLogicGraph = (input: {
 }): LayoutSetAuthoring => {
   const branches = getLayoutSetLogicBranches(input.logicGraph);
   const defaultRules =
-    branches.alwaysRules.length > 0
-      ? branches.alwaysRules
-      : branches.landscapeRules;
+    branches.alwaysRules.length > 0 ? branches.alwaysRules : branches.landscapeRules;
 
   const toStep = (
     step: AutoLayoutTarget,
@@ -1692,19 +1642,14 @@ export const deriveLayoutSetAuthoringFromLogicGraph = (input: {
           photoActionCollectionId: input.photoActionCollectionId ?? null,
           layoutNodes: buildPhotoRouterLayoutNodesFromBranches({
             fallback: {
-              steps: defaultRules.map((rule, index) =>
-                toStep(rule, "fallback", index),
-              ),
+              steps: defaultRules.map((rule, index) => toStep(rule, "fallback", index)),
             },
             portrait: {
               enabled: branches.portraitRules.length > 0,
               conditionType:
-                branches.portraitRules[0]?.conditionType?.trim() ||
-                PORTRAIT_CONDITION_TYPE,
+                branches.portraitRules[0]?.conditionType?.trim() || PORTRAIT_CONDITION_TYPE,
               conditionParams: toLogicParams(branches.portraitRules[0]?.conditionParams),
-              steps: branches.portraitRules.map((rule, index) =>
-                toStep(rule, "portrait", index),
-              ),
+              steps: branches.portraitRules.map((rule, index) => toStep(rule, "portrait", index)),
             },
             landscape: {
               enabled: false,
@@ -1716,19 +1661,14 @@ export const deriveLayoutSetAuthoringFromLogicGraph = (input: {
           connections: buildPhotoRouterConnectionsFromBranchSteps({
             routerId: DEFAULT_PHOTO_ROUTER_BLOCK_ID,
             fallback: {
-              steps: defaultRules.map((rule, index) =>
-                toStep(rule, "fallback", index),
-              ),
+              steps: defaultRules.map((rule, index) => toStep(rule, "fallback", index)),
             },
             portrait: {
               enabled: branches.portraitRules.length > 0,
               conditionType:
-                branches.portraitRules[0]?.conditionType?.trim() ||
-                PORTRAIT_CONDITION_TYPE,
+                branches.portraitRules[0]?.conditionType?.trim() || PORTRAIT_CONDITION_TYPE,
               conditionParams: toLogicParams(branches.portraitRules[0]?.conditionParams),
-              steps: branches.portraitRules.map((rule, index) =>
-                toStep(rule, "portrait", index),
-              ),
+              steps: branches.portraitRules.map((rule, index) => toStep(rule, "portrait", index)),
             },
             landscape: {
               enabled: false,
@@ -1739,19 +1679,14 @@ export const deriveLayoutSetAuthoringFromLogicGraph = (input: {
           }),
           nodePositions: {},
           fallback: {
-            steps: defaultRules.map((rule, index) =>
-              toStep(rule, "fallback", index),
-            ),
+            steps: defaultRules.map((rule, index) => toStep(rule, "fallback", index)),
           },
           portrait: {
             enabled: branches.portraitRules.length > 0,
             conditionType:
-              branches.portraitRules[0]?.conditionType?.trim() ||
-              PORTRAIT_CONDITION_TYPE,
+              branches.portraitRules[0]?.conditionType?.trim() || PORTRAIT_CONDITION_TYPE,
             conditionParams: toLogicParams(branches.portraitRules[0]?.conditionParams),
-            steps: branches.portraitRules.map((rule, index) =>
-              toStep(rule, "portrait", index),
-            ),
+            steps: branches.portraitRules.map((rule, index) => toStep(rule, "portrait", index)),
           },
           landscape: {
             enabled: false,
@@ -1766,9 +1701,7 @@ export const deriveLayoutSetAuthoringFromLogicGraph = (input: {
   });
 };
 
-export const isDefaultLayoutSetLogicGraph = (
-  input: LayoutSetLogicGraph,
-): boolean => {
+export const isDefaultLayoutSetLogicGraph = (input: LayoutSetLogicGraph): boolean => {
   const graph = layoutSetLogicGraphSchema.parse(input);
   if (graph.entryNodeId !== "start") {
     return false;
@@ -1824,17 +1757,15 @@ const toCanonicalRule = (
   return {
     layoutName,
     trigger: expectedTrigger,
-    cycleSeconds: clampCycleSeconds(
-      input.cycleSeconds ?? DEFAULT_TARGET_CYCLE_SECONDS,
-    ),
+    cycleSeconds: clampCycleSeconds(input.cycleSeconds ?? DEFAULT_TARGET_CYCLE_SECONDS),
     actionType: actionType.length > 0 ? actionType : DEFAULT_ACTION_TYPE,
     actionParams,
     conditionType:
       expectedTrigger === "always"
         ? null
-        : (explicitConditionType && explicitConditionType.length > 0
-            ? explicitConditionType
-            : defaultConditionType),
+        : explicitConditionType && explicitConditionType.length > 0
+          ? explicitConditionType
+          : defaultConditionType,
     conditionParams: expectedTrigger === "always" ? {} : conditionParams,
   };
 };
@@ -1866,33 +1797,24 @@ const extractRulesFromPrefix = (
 ): AutoLayoutTarget[] => {
   return [...graph.nodes]
     .filter((node) => node.type === "display" && node.id.startsWith(prefix))
-    .sort(
-      (left, right) =>
-        parseNodeIndex(left.id, prefix) - parseNodeIndex(right.id, prefix),
-    )
+    .sort((left, right) => parseNodeIndex(left.id, prefix) - parseNodeIndex(right.id, prefix))
     .map((node) => ({
       layoutName: node.layoutName?.trim() ?? "",
       trigger,
-      cycleSeconds: clampCycleSeconds(
-        node.cycleSeconds ?? DEFAULT_TARGET_CYCLE_SECONDS,
-      ),
+      cycleSeconds: clampCycleSeconds(node.cycleSeconds ?? DEFAULT_TARGET_CYCLE_SECONDS),
       actionType: node.actionType?.trim() || DEFAULT_ACTION_TYPE,
       actionParams: toLogicParams(node.actionParams),
       conditionType:
         trigger === "always"
           ? null
           : node.conditionType?.trim() ||
-            (trigger === "portrait-photo"
-              ? PORTRAIT_CONDITION_TYPE
-              : LANDSCAPE_CONDITION_TYPE),
+            (trigger === "portrait-photo" ? PORTRAIT_CONDITION_TYPE : LANDSCAPE_CONDITION_TYPE),
       conditionParams: trigger === "always" ? {} : toLogicParams(node.conditionParams),
     }))
     .filter((rule) => rule.layoutName.length > 0);
 };
 
-export const getLayoutSetLogicBranches = (
-  input: LayoutSetLogicGraph,
-): LayoutSetLogicBranches => {
+export const getLayoutSetLogicBranches = (input: LayoutSetLogicGraph): LayoutSetLogicBranches => {
   const graph = layoutSetLogicGraphSchema.parse(input);
   const toTriggeredRules = (
     sequence: AutoLayoutTarget[],
@@ -1966,14 +1888,8 @@ export const createLayoutSetLogicGraphFromBranches = (
   input: LayoutSetLogicBranches,
 ): LayoutSetLogicGraph => {
   const alwaysRules = normalizeBranchRules(input.alwaysRules, "always");
-  const portraitRules = normalizeBranchRules(
-    input.portraitRules,
-    "portrait-photo",
-  );
-  const landscapeRules = normalizeBranchRules(
-    input.landscapeRules,
-    "landscape-photo",
-  );
+  const portraitRules = normalizeBranchRules(input.portraitRules, "portrait-photo");
+  const landscapeRules = normalizeBranchRules(input.landscapeRules, "landscape-photo");
 
   const hasPortrait = portraitRules.length > 0;
   const hasLandscape = landscapeRules.length > 0;
@@ -2005,8 +1921,7 @@ export const createLayoutSetLogicGraphFromBranches = (
     nodes.push({
       id: "if-portrait",
       type: "if-portrait",
-      conditionType:
-        portraitRules[0]?.conditionType ?? PORTRAIT_CONDITION_TYPE,
+      conditionType: portraitRules[0]?.conditionType ?? PORTRAIT_CONDITION_TYPE,
       conditionParams: portraitRules[0]?.conditionParams ?? {},
     });
   }
@@ -2015,8 +1930,7 @@ export const createLayoutSetLogicGraphFromBranches = (
     nodes.push({
       id: "if-landscape",
       type: "if-landscape",
-      conditionType:
-        landscapeRules[0]?.conditionType ?? LANDSCAPE_CONDITION_TYPE,
+      conditionType: landscapeRules[0]?.conditionType ?? LANDSCAPE_CONDITION_TYPE,
       conditionParams: landscapeRules[0]?.conditionParams ?? {},
     });
   }
@@ -2028,10 +1942,7 @@ export const createLayoutSetLogicGraphFromBranches = (
     });
   }
 
-  const addRuleNodes = (branchInput: {
-    prefix: string;
-    rules: AutoLayoutTarget[];
-  }): string[] => {
+  const addRuleNodes = (branchInput: { prefix: string; rules: AutoLayoutTarget[] }): string[] => {
     const ids: string[] = [];
     for (let index = 0; index < branchInput.rules.length; index += 1) {
       const rule = branchInput.rules[index];
@@ -2209,15 +2120,12 @@ export const createLayoutSetLogicGraphFromTargets = (
 export const toAutoLayoutTargetsFromLogicGraph = (
   input: LayoutSetLogicGraph,
 ): AutoLayoutTarget[] => {
-  const { alwaysRules, portraitRules, landscapeRules } =
-    getLayoutSetLogicBranches(input);
+  const { alwaysRules, portraitRules, landscapeRules } = getLayoutSetLogicBranches(input);
 
   return [...alwaysRules, ...portraitRules, ...landscapeRules];
 };
 
-const getOutgoingEdges = (
-  graph: LayoutSetLogicGraph,
-): Map<string, LayoutSetLogicEdge[]> => {
+const getOutgoingEdges = (graph: LayoutSetLogicGraph): Map<string, LayoutSetLogicEdge[]> => {
   const grouped = new Map<string, LayoutSetLogicEdge[]>();
   for (const edge of graph.edges) {
     const current = grouped.get(edge.from);
@@ -2360,9 +2268,7 @@ const chooseNextEdge = (input: {
   node: LayoutSetLogicNode;
   outgoing: LayoutSetLogicEdge[];
   orientation: "portrait" | "landscape" | null;
-  evaluateCondition?: (
-    input: LayoutLogicConditionEvaluationInput,
-  ) => boolean | null | undefined;
+  evaluateCondition?: (input: LayoutLogicConditionEvaluationInput) => boolean | null | undefined;
 }): LayoutSetLogicEdge | null => {
   if (input.outgoing.length === 0) {
     return null;
@@ -2375,14 +2281,11 @@ const chooseNextEdge = (input: {
         ? input.orientation === "landscape"
         : input.orientation === "portrait";
     const defaultConditionType =
-      trigger === "landscape-photo"
-        ? LANDSCAPE_CONDITION_TYPE
-        : PORTRAIT_CONDITION_TYPE;
+      trigger === "landscape-photo" ? LANDSCAPE_CONDITION_TYPE : PORTRAIT_CONDITION_TYPE;
     const evaluated =
       trigger && input.evaluateCondition
         ? input.evaluateCondition({
-            conditionType:
-              input.node.conditionType?.trim() || defaultConditionType,
+            conditionType: input.node.conditionType?.trim() || defaultConditionType,
             conditionParams: toLogicParams(input.node.conditionParams),
             trigger,
             orientation: input.orientation,
@@ -2398,22 +2301,16 @@ const chooseNextEdge = (input: {
     );
   }
 
-  return (
-    input.outgoing.find((edge) => edge.when === "always") ??
-    input.outgoing[0] ??
-    null
-  );
+  return input.outgoing.find((edge) => edge.when === "always") ?? input.outgoing[0] ?? null;
 };
 
 const normalizeResolvedTarget = (
   input: LayoutLogicResolvedTarget,
-):
-  | {
-      layoutName: string;
-      cycleSeconds: number;
-      actionParams: Record<string, unknown>;
-    }
-  | null => {
+): {
+  layoutName: string;
+  cycleSeconds: number;
+  actionParams: Record<string, unknown>;
+} | null => {
   const layoutName = input.layoutName.trim();
   if (layoutName.length === 0) {
     return null;
@@ -2430,9 +2327,7 @@ export const resolveDisplaySequenceFromLogicGraph = (input: {
   graph: LayoutSetLogicGraph;
   orientation: "portrait" | "landscape" | null;
   includeActivePhotoCollectionInActionParams?: boolean;
-  evaluateCondition?: (
-    input: LayoutLogicConditionEvaluationInput,
-  ) => boolean | null | undefined;
+  evaluateCondition?: (input: LayoutLogicConditionEvaluationInput) => boolean | null | undefined;
   resolveAction?: (
     input: LayoutLogicActionResolutionInput,
   ) => LayoutLogicResolvedTarget | LayoutLogicResolvedTarget[] | null | undefined;
@@ -2466,8 +2361,7 @@ export const resolveDisplaySequenceFromLogicGraph = (input: {
     if (currentNode.type === "display") {
       const layoutName = currentNode.layoutName?.trim() ?? "";
       if (layoutName.length > 0) {
-        const actionType =
-          currentNode.actionType?.trim() || DEFAULT_ACTION_TYPE;
+        const actionType = currentNode.actionType?.trim() || DEFAULT_ACTION_TYPE;
         const baseActionParams = toLogicParams(currentNode.actionParams);
         const actionParams =
           input.includeActivePhotoCollectionInActionParams &&
@@ -2548,14 +2442,12 @@ export const normalizeLayoutSetLogicGraph = (input: {
       : true,
   );
   const nodeIds = new Set(nodes.map((node) => node.id));
-  const edges = parsed.edges.filter(
-    (edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to),
-  );
+  const edges = parsed.edges.filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to));
   const entryNodeId = nodeIds.has(parsed.entryNodeId)
     ? parsed.entryNodeId
     : nodeIds.has("start")
       ? "start"
-      : nodes[0]?.id ?? "start";
+      : (nodes[0]?.id ?? "start");
 
   return layoutSetLogicGraphSchema.parse({
     ...parsed,
@@ -2608,12 +2500,7 @@ export const reportScreenTargetSelectionSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 
-export const displayThemeIdSchema = z.enum([
-  "default",
-  "nord",
-  "solarized",
-  "monokai",
-]);
+export const displayThemeIdSchema = z.enum(["default", "nord", "solarized", "monokai"]);
 
 export const displayDeviceIdSchema = z.string().trim().min(1).max(128);
 export const displayDeviceNameSchema = z.string().trim().min(1).max(80);

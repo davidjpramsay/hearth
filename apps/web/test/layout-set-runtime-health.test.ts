@@ -10,10 +10,7 @@ import {
 } from "@hearth/shared";
 import { analyzeSetRuntimeHealth } from "../src/pages/layout-set-runtime-health";
 
-const toRule = (
-  layoutName: string,
-  trigger: AutoLayoutTarget["trigger"],
-): AutoLayoutTarget => ({
+const toRule = (layoutName: string, trigger: AutoLayoutTarget["trigger"]): AutoLayoutTarget => ({
   layoutName,
   trigger,
   cycleSeconds: 20,
@@ -60,9 +57,7 @@ test("flags broken graph edges as runtime errors", () => {
       { id: "start", type: "start" },
       { id: "return", type: "return" },
     ],
-    edges: [
-      { id: "edge-start-missing", from: "start", to: "missing", when: "always" },
-    ],
+    edges: [{ id: "edge-start-missing", from: "start", to: "missing", when: "always" }],
   } satisfies LayoutSetLogicGraph;
 
   const health = analyzeSetRuntimeHealth({

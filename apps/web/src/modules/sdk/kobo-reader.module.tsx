@@ -10,9 +10,7 @@ import {
 import { defineModule } from "@hearth/module-sdk";
 import { useModuleQuery } from "../data/useModuleQuery";
 import { ModuleFrame } from "../ui/ModuleFrame";
-import {
-  ModulePresentationControls,
-} from "../ui/ModulePresentationControls";
+import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { useTileDensity } from "../ui/useTileDensity";
 
 const POLL_INTERVAL_MS = 60_000;
@@ -124,20 +122,12 @@ const buildUserOptions = (
   return [...map.entries()].map(([value, label]) => ({ value, label }));
 };
 
-const ReadingStat = ({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) => (
+const ReadingStat = ({ label, value }: { label: string; value: string }) => (
   <div className="module-panel-card flex h-full min-w-0 flex-col justify-center px-5 py-3 text-[color:var(--color-text-primary)]">
     <span className="module-copy-label block truncate text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
       {label}
     </span>
-    <span className="module-copy-title mt-1 block truncate">
-      {value}
-    </span>
+    <span className="module-copy-title mt-1 block truncate">{value}</span>
   </div>
 );
 
@@ -315,9 +305,7 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-copy-title text-slate-100">
-              Kobo Reader preview
-            </p>
+            <p className="module-copy-title text-slate-100">Kobo Reader preview</p>
             <p className="module-copy-meta mt-2 text-slate-300">
               User: {settings.userName.trim() || "Not selected"}
             </p>
@@ -344,16 +332,16 @@ export const moduleDefinition = defineModule({
               ref={ref}
               className="module-panel-shell relative z-10 flex h-full flex-col gap-3 p-4 text-[color:var(--color-text-primary)]"
             >
-            <div
-              className={`grid h-full items-start gap-4 ${compact ? "grid-cols-1" : ""}`}
-              style={
-                compact || coverColumnWidth === null
-                  ? undefined
-                  : {
-                      gridTemplateColumns: `${coverColumnWidth}px minmax(0, 1fr)`,
-                    }
-              }
-            >
+              <div
+                className={`grid h-full items-start gap-4 ${compact ? "grid-cols-1" : ""}`}
+                style={
+                  compact || coverColumnWidth === null
+                    ? undefined
+                    : {
+                        gridTemplateColumns: `${coverColumnWidth}px minmax(0, 1fr)`,
+                      }
+                }
+              >
                 <div
                   className="module-panel-card self-start overflow-hidden"
                   style={{
@@ -405,11 +393,7 @@ export const moduleDefinition = defineModule({
                       }}
                     >
                       {readingStats.map((stat) => (
-                        <ReadingStat
-                          key={stat.key}
-                          label={stat.label}
-                          value={stat.value}
-                        />
+                        <ReadingStat key={stat.key} label={stat.label} value={stat.value} />
                       ))}
                     </div>
                   ) : null}

@@ -98,10 +98,7 @@ export interface ModuleDefinition<
   >;
 }
 
-export type ModuleInstance<
-  TSettings = Record<string, unknown>,
-  TData = Record<string, unknown>,
-> = {
+export type ModuleInstance<TSettings = Record<string, unknown>, TData = Record<string, unknown>> = {
   id: string;
   moduleId: string;
   settings: ModuleSettings<TSettings>;

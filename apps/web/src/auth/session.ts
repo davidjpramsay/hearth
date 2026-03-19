@@ -30,10 +30,7 @@ export const logoutAdminSession = (): boolean => {
   return redirectToAdminLogin();
 };
 
-export const handleUnauthorizedAdminResponse = (
-  status: number,
-  headers: Headers,
-): boolean => {
+export const handleUnauthorizedAdminResponse = (status: number, headers: Headers): boolean => {
   if (status !== 401 || !headers.has("Authorization") || typeof window === "undefined") {
     return false;
   }

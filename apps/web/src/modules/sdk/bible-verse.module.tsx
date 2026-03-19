@@ -6,13 +6,8 @@ import {
   type BibleVerseModuleResponse,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
-import {
-  ModulePresentationControls,
-} from "../ui/ModulePresentationControls";
-import {
-  resolveModuleConnectivityState,
-  useBrowserOnlineStatus,
-} from "../data/connection-state";
+import { ModulePresentationControls } from "../ui/ModulePresentationControls";
+import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 
 const emptyPayload = (): BibleVerseModuleResponse =>
@@ -31,14 +26,11 @@ const loadVerse = async (
   instanceId: string,
   signal: AbortSignal,
 ): Promise<BibleVerseModuleResponse> => {
-  const response = await fetch(
-    `/api/modules/bible-verse/${encodeURIComponent(instanceId)}/today`,
-    {
-      method: "GET",
-      signal,
-      cache: "no-store",
-    },
-  );
+  const response = await fetch(`/api/modules/bible-verse/${encodeURIComponent(instanceId)}/today`, {
+    method: "GET",
+    signal,
+    cache: "no-store",
+  });
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
@@ -255,9 +247,7 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-copy-title text-slate-100">
-              Bible verse preview
-            </p>
+            <p className="module-copy-title text-slate-100">Bible verse preview</p>
             <p className="module-copy-meta mt-2 text-slate-300">
               Refresh every {settings.refreshIntervalSeconds}s
             </p>
@@ -271,9 +261,7 @@ export const moduleDefinition = defineModule({
       return (
         <div className="module-panel-shell relative flex h-full min-h-0 flex-col overflow-hidden p-3 text-slate-100">
           <ModuleConnectionBadge visible={connectivityState.showDisconnected} />
-          <p className="module-copy-label text-cyan-200">
-            Verse of the day
-          </p>
+          <p className="module-copy-label text-cyan-200">Verse of the day</p>
 
           {loading ? (
             <div className="module-copy-meta flex min-h-0 flex-1 items-center justify-center text-slate-300">
@@ -305,15 +293,15 @@ export const moduleDefinition = defineModule({
                       No verse available.
                     </p>
                   )}
-                  {shouldAutoScroll ? <div aria-hidden style={{ height: `${AUTO_SCROLL_GAP_PX}px` }} /> : null}
+                  {shouldAutoScroll ? (
+                    <div aria-hidden style={{ height: `${AUTO_SCROLL_GAP_PX}px` }} />
+                  ) : null}
                 </div>
               </div>
 
               <div className="mt-2 space-y-1 border-t border-slate-800/80 pt-2 text-center">
                 {settings.showReference && payload.reference ? (
-                  <p className="module-copy-label text-cyan-200">
-                    {payload.reference}
-                  </p>
+                  <p className="module-copy-label text-cyan-200">{payload.reference}</p>
                 ) : null}
 
                 {payload.warning ? (
@@ -323,9 +311,7 @@ export const moduleDefinition = defineModule({
                 ) : null}
 
                 {settings.showSource ? (
-                  <p className="module-copy-label text-slate-400">
-                    Source: {payload.sourceLabel}
-                  </p>
+                  <p className="module-copy-label text-slate-400">Source: {payload.sourceLabel}</p>
                 ) : null}
               </div>
             </div>

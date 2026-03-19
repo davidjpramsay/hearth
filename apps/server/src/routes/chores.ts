@@ -27,10 +27,7 @@ const publishChoreEvent = (
   services.layoutEventBus.publish(payload);
 };
 
-export const registerChoresRoutes = (
-  app: FastifyInstance,
-  services: AppServices,
-): void => {
+export const registerChoresRoutes = (app: FastifyInstance, services: AppServices): void => {
   app.get("/chores/board", async (request, reply) => {
     await app.authenticate(request, reply);
     if (reply.sent) {
@@ -44,8 +41,7 @@ export const registerChoresRoutes = (
 
     const payoutConfig = services.settingsRepository.getChoresPayoutConfig();
     const startDate =
-      query.data.startDate ??
-      toCalendarDateInTimeZone(new Date(), payoutConfig.siteTimezone);
+      query.data.startDate ?? toCalendarDateInTimeZone(new Date(), payoutConfig.siteTimezone);
     const board = services.choresRepository.getBoard({
       startDate,
       days: query.data.days,

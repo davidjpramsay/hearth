@@ -28,7 +28,7 @@ const parseEnvEntry = (line: string): { key: string; value: string } | null => {
 
   let value = body.slice(separatorIndex + 1).trim();
   const isSingleQuoted = value.startsWith("'") && value.endsWith("'");
-  const isDoubleQuoted = value.startsWith("\"") && value.endsWith("\"");
+  const isDoubleQuoted = value.startsWith('"') && value.endsWith('"');
   if (isSingleQuoted || isDoubleQuoted) {
     value = value.slice(1, -1);
   } else {
@@ -167,7 +167,8 @@ const defaultDbPath =
     ? legacyDbPath
     : join(dataDir, "hearth.db");
 
-const jwtSecret = (process.env.JWT_SECRET ?? "").trim() || readOrCreateSecret(join(dataDir, ".jwt-secret"));
+const jwtSecret =
+  (process.env.JWT_SECRET ?? "").trim() || readOrCreateSecret(join(dataDir, ".jwt-secret"));
 const calendarEncryptionSecret =
   (process.env.CALENDAR_ENCRYPTION_KEY ?? "").trim() ||
   readOrCreateSecret(join(dataDir, ".calendar-key"));

@@ -7,12 +7,7 @@ interface PageShellProps {
   children: ReactNode;
 }
 
-export const PageShell = ({
-  title,
-  subtitle,
-  rightActions,
-  children,
-}: PageShellProps) => (
+export const PageShell = ({ title, subtitle, rightActions, children }: PageShellProps) => (
   <main
     className="mx-auto min-h-screen w-full max-w-7xl sm:px-6 lg:px-8"
     style={{

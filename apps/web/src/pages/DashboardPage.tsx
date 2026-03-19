@@ -11,10 +11,7 @@ import {
 } from "@hearth/shared";
 import { reportScreenProfile } from "../api/client";
 import { getOrCreateDeviceId } from "../device/device-id";
-import {
-  inferLayoutRows,
-  sanitizeGridItems,
-} from "../layout/grid-math";
+import { inferLayoutRows, sanitizeGridItems } from "../layout/grid-math";
 import { buildLayoutTypographyStyle } from "../layout/layout-typography";
 import {
   getDashboardDeviceBootstrapStateFromResolution,
@@ -86,7 +83,6 @@ const publishDisplayCycleContext = (detail: DisplayCycleContextEventDetail): voi
     }),
   );
 };
-
 
 const getViewportSize = (): { width: number; height: number } => {
   if (typeof window === "undefined") {
@@ -184,10 +180,7 @@ const parseEventSourcePayload = <T,>(event: Event): T | null => {
   }
 };
 
-const areSameLayoutSnapshot = (
-  left: LayoutRecord | null,
-  right: LayoutRecord | null,
-): boolean => {
+const areSameLayoutSnapshot = (left: LayoutRecord | null, right: LayoutRecord | null): boolean => {
   if (left === null && right === null) {
     return true;
   }
@@ -230,11 +223,7 @@ const getWarningTickerIcon = (
   return "⚠️";
 };
 
-const DashboardWarningTicker = ({
-  ticker,
-}: {
-  ticker: ReportScreenProfileWarningTicker;
-}) => {
+const DashboardWarningTicker = ({ ticker }: { ticker: ReportScreenProfileWarningTicker }) => {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const entries = useMemo(
@@ -300,10 +289,7 @@ const DashboardWarningTicker = ({
   };
 
   const renderTickerContent = () => (
-    <div
-      ref={contentRef}
-      className="dashboard-warning-ticker__content"
-    >
+    <div ref={contentRef} className="dashboard-warning-ticker__content">
       {entries.map((entry) => (
         <div key={entry.id} className="dashboard-warning-ticker__item">
           <span className="dashboard-warning-ticker__icon" aria-hidden>
@@ -321,10 +307,7 @@ const DashboardWarningTicker = ({
       <div className="dashboard-warning-ticker__shell">
         <div className="dashboard-warning-ticker__label">Alerts</div>
         <div ref={viewportRef} className="dashboard-warning-ticker__viewport">
-          <div
-            className="dashboard-warning-ticker__track"
-            style={tickerTrackStyle}
-          >
+          <div className="dashboard-warning-ticker__track" style={tickerTrackStyle}>
             {renderTickerContent()}
           </div>
         </div>
@@ -337,11 +320,9 @@ export const DashboardPage = () => {
   const [activeLayout, setActiveLayout] = useState<LayoutRecord | null>(null);
   const [deviceIdentity, setDeviceIdentity] = useState<DisplayDeviceRuntime | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [warningTicker, setWarningTicker] =
-    useState<ReportScreenProfileWarningTicker | null>(null);
+  const [warningTicker, setWarningTicker] = useState<ReportScreenProfileWarningTicker | null>(null);
   const [viewportSize, setViewportSize] = useState(getViewportSize);
-  const [photoOrientationHint, setPhotoOrientationHint] =
-    useState<PhotosOrientation | null>(null);
+  const [photoOrientationHint, setPhotoOrientationHint] = useState<PhotosOrientation | null>(null);
   const [nextCycleAtMs, setNextCycleAtMs] = useState<number | null>(null);
   const activeLayoutRef = useRef<LayoutRecord | null>(null);
   const photoOrientationRef = useRef<PhotosOrientation | null>(null);
@@ -352,8 +333,7 @@ export const DashboardPage = () => {
   const lastOrientationSwitchAtRef = useRef(0);
   const primaryPhotosInstanceId = useMemo(
     () =>
-      activeLayout?.config.modules.find((instance) => instance.moduleId === "photos")?.id ??
-      null,
+      activeLayout?.config.modules.find((instance) => instance.moduleId === "photos")?.id ?? null,
     [activeLayout],
   );
 
@@ -365,64 +345,58 @@ export const DashboardPage = () => {
     photoOrientationRef.current = photoOrientationHint;
   }, [photoOrientationHint]);
 
-  const resolveLayout = useCallback(
-    async (input?: { orientation?: PhotosOrientation | null }) => {
-      const requestId = latestResolveRequestIdRef.current + 1;
-      latestResolveRequestIdRef.current = requestId;
-      const orientation = input?.orientation ?? photoOrientationRef.current;
-      const bootstrapState = deviceBootstrapRef.current;
+  const resolveLayout = useCallback(async (input?: { orientation?: PhotosOrientation | null }) => {
+    const requestId = latestResolveRequestIdRef.current + 1;
+    latestResolveRequestIdRef.current = requestId;
+    const orientation = input?.orientation ?? photoOrientationRef.current;
+    const bootstrapState = deviceBootstrapRef.current;
 
-      try {
-        const resolution = await reportScreenProfile({
-          targetSelection: bootstrapState.targetSelection,
-          selectedFamily:
-            bootstrapState.targetSelection.kind === "set"
-              ? bootstrapState.targetSelection.setId
-              : null,
-          photoOrientation: orientation,
-          reportedThemeId: bootstrapState.reportedThemeId,
-          screenSessionId: deviceIdRef.current,
-        });
-        if (requestId !== latestResolveRequestIdRef.current) {
-          return;
-        }
-        deviceBootstrapRef.current =
-          getDashboardDeviceBootstrapStateFromResolution(resolution);
-        setDeviceIdentity(resolution.device);
-        applyTheme(resolution.device.themeId);
-        setNextCycleAtMs(resolution.nextCycleAtMs);
-        setWarningTicker(resolution.warningTicker);
-        publishDisplayCycleContext({
-          sourceKind: resolution.resolvedTargetSelection.kind,
-          cycleSeconds:
-            resolution.resolvedTargetSelection.kind === "set"
-              ? resolution.autoCycleSeconds
-              : null,
-          photoCollectionId:
-            resolution.resolvedTargetSelection.kind === "set"
-              ? resolution.selectedPhotoCollectionId
-              : null,
-        });
-        const nextLayout = resolution.layout;
-        const currentLayout = activeLayoutRef.current;
-
-        if (areSameLayoutSnapshot(currentLayout, nextLayout)) {
-          setError(null);
-          return;
-        }
-
-        setActiveLayout(nextLayout);
-
-        setError(null);
-      } catch (loadError) {
-        if (requestId !== latestResolveRequestIdRef.current) {
-          return;
-        }
-        setError(loadError instanceof Error ? loadError.message : "Failed to load");
+    try {
+      const resolution = await reportScreenProfile({
+        targetSelection: bootstrapState.targetSelection,
+        selectedFamily:
+          bootstrapState.targetSelection.kind === "set"
+            ? bootstrapState.targetSelection.setId
+            : null,
+        photoOrientation: orientation,
+        reportedThemeId: bootstrapState.reportedThemeId,
+        screenSessionId: deviceIdRef.current,
+      });
+      if (requestId !== latestResolveRequestIdRef.current) {
+        return;
       }
-    },
-    [],
-  );
+      deviceBootstrapRef.current = getDashboardDeviceBootstrapStateFromResolution(resolution);
+      setDeviceIdentity(resolution.device);
+      applyTheme(resolution.device.themeId);
+      setNextCycleAtMs(resolution.nextCycleAtMs);
+      setWarningTicker(resolution.warningTicker);
+      publishDisplayCycleContext({
+        sourceKind: resolution.resolvedTargetSelection.kind,
+        cycleSeconds:
+          resolution.resolvedTargetSelection.kind === "set" ? resolution.autoCycleSeconds : null,
+        photoCollectionId:
+          resolution.resolvedTargetSelection.kind === "set"
+            ? resolution.selectedPhotoCollectionId
+            : null,
+      });
+      const nextLayout = resolution.layout;
+      const currentLayout = activeLayoutRef.current;
+
+      if (areSameLayoutSnapshot(currentLayout, nextLayout)) {
+        setError(null);
+        return;
+      }
+
+      setActiveLayout(nextLayout);
+
+      setError(null);
+    } catch (loadError) {
+      if (requestId !== latestResolveRequestIdRef.current) {
+        return;
+      }
+      setError(loadError instanceof Error ? loadError.message : "Failed to load");
+    }
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -532,7 +506,9 @@ export const DashboardPage = () => {
 
         const parsedDocument = new DOMParser().parseFromString(html, "text/html");
         const nextSignature = readDashboardAssetSignature(parsedDocument);
-        const hasComparableAssets = Boolean(nextSignature.scriptSrc || nextSignature.stylesheetHref);
+        const hasComparableAssets = Boolean(
+          nextSignature.scriptSrc || nextSignature.stylesheetHref,
+        );
 
         if (hasComparableAssets && !areSameAssetSignature(activeSignature, nextSignature)) {
           window.location.reload();
@@ -572,10 +548,9 @@ export const DashboardPage = () => {
         return;
       }
 
-      const eventKey = [
-        detail.eventToken ?? detail.frameId ?? "unknown",
-        detail.orientation,
-      ].join(":");
+      const eventKey = [detail.eventToken ?? detail.frameId ?? "unknown", detail.orientation].join(
+        ":",
+      );
       if (lastPhotoEventKeyRef.current === eventKey) {
         return;
       }
@@ -622,23 +597,20 @@ export const DashboardPage = () => {
     }));
   }, []);
 
-  const mapTranslatedLayoutItems = useCallback(
-    (layout: LayoutRecord | null) => {
-      if (!layout) {
-        return [] as GridItem[];
-      }
+  const mapTranslatedLayoutItems = useCallback((layout: LayoutRecord | null) => {
+    if (!layout) {
+      return [] as GridItem[];
+    }
 
-      return sanitizeGridItems({
-        items: layout.config.items,
-        modules: layout.config.modules,
-        sourceCols: layout.config.cols,
-        sourceRows: inferLayoutRows(layout.config),
-        targetCols: layout.config.cols,
-        targetRows: inferLayoutRows(layout.config),
-      });
-    },
-    [],
-  );
+    return sanitizeGridItems({
+      items: layout.config.items,
+      modules: layout.config.modules,
+      sourceCols: layout.config.cols,
+      sourceRows: inferLayoutRows(layout.config),
+      targetCols: layout.config.cols,
+      targetRows: inferLayoutRows(layout.config),
+    });
+  }, []);
 
   const activeRenderedModules = useMemo(
     () => mapRenderedModules(activeLayout),
@@ -665,10 +637,7 @@ export const DashboardPage = () => {
     );
     const baseWidth = Math.max(1, cols * storedRowHeight);
     const baseHeight = Math.max(1, rows * storedRowHeight);
-    const scale = Math.min(
-      viewportSize.width / baseWidth,
-      viewportSize.height / baseHeight,
-    );
+    const scale = Math.min(viewportSize.width / baseWidth, viewportSize.height / baseHeight);
     const rowHeight = Math.max(1, storedRowHeight * scale);
     const width = Math.max(1, cols * rowHeight);
     const height = Math.max(1, rows * rowHeight);
@@ -709,16 +678,10 @@ export const DashboardPage = () => {
         useCSSTransforms
       >
         {input.renderedModules.map(({ instance, moduleDefinition }) => (
-          <div
-            key={instance.id}
-            className="h-full w-full min-h-0"
-          >
+          <div key={instance.id} className="h-full w-full min-h-0">
             {moduleDefinition ? (
               <div className="h-full w-full min-h-0 overflow-hidden rounded-lg">
-                <moduleDefinition.DashboardTile
-                  instanceId={instance.id}
-                  config={instance.config}
-                />
+                <moduleDefinition.DashboardTile instanceId={instance.id} config={instance.config} />
               </div>
             ) : (
               <div className="flex h-full items-center justify-center rounded bg-slate-800 text-sm text-rose-200">

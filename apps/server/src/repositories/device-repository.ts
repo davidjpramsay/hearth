@@ -30,9 +30,7 @@ interface DeviceRow {
 const DEFAULT_THEME_ID = displayThemeIdSchema.parse("default");
 const MAX_DEVICE_IP_LENGTH = 255;
 
-const parseTargetSelection = (
-  rawValue: string | null,
-): ReportScreenTargetSelection | null => {
+const parseTargetSelection = (rawValue: string | null): ReportScreenTargetSelection | null => {
   if (!rawValue) {
     return null;
   }
@@ -79,9 +77,7 @@ export class DeviceRepository {
           .all();
 
     return new Set(
-      rows
-        .map((row) => normalizeDeviceName(row.name))
-        .filter((name) => name.length > 0),
+      rows.map((row) => normalizeDeviceName(row.name)).filter((name) => name.length > 0),
     );
   }
 
@@ -98,10 +94,7 @@ export class DeviceRepository {
   }
 
   private buildUniqueDefaultName(deviceId: string): string {
-    return toUniqueDeviceName(
-      buildDefaultDeviceName(deviceId),
-      this.listUsedDeviceNames(),
-    );
+    return toUniqueDeviceName(buildDefaultDeviceName(deviceId), this.listUsedDeviceNames());
   }
 
   private mapRow(row: DeviceRow): DisplayDevice {
@@ -110,9 +103,7 @@ export class DeviceRepository {
     return displayDeviceSchema.parse({
       id: row.id,
       name:
-        row.name.trim().length > 0
-          ? row.name.trim().slice(0, 80)
-          : buildDefaultDeviceName(row.id),
+        row.name.trim().length > 0 ? row.name.trim().slice(0, 80) : buildDefaultDeviceName(row.id),
       themeId: parsedTheme.success ? parsedTheme.data : DEFAULT_THEME_ID,
       targetSelection: parseTargetSelection(row.target_selection_json),
       createdAt: row.created_at,

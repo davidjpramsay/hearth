@@ -51,9 +51,7 @@ const listPhotoLibraryFolders = async (): Promise<string[]> => {
   const seen = new Set<string>();
 
   const walk = async (directory: string): Promise<void> => {
-    const entries = await readdir(directory, { withFileTypes: true }).catch(
-      () => null,
-    );
+    const entries = await readdir(directory, { withFileTypes: true }).catch(() => null);
     if (!entries) {
       return;
     }
@@ -83,10 +81,7 @@ const listPhotoLibraryFolders = async (): Promise<string[]> => {
   return folders;
 };
 
-export const registerDisplayRoutes = (
-  app: FastifyInstance,
-  services: AppServices,
-): void => {
+export const registerDisplayRoutes = (app: FastifyInstance, services: AppServices): void => {
   app.get("/display/devices", async (request, reply) => {
     await app.authenticate(request, reply);
 
@@ -133,13 +128,10 @@ export const registerDisplayRoutes = (
 
     let updatedDevice;
     try {
-      updatedDevice = services.deviceRepository.updateDevice(
-        parsedParams.data.id,
-        {
-          ...parsedBody.data,
-          targetSelection: validatedTargetSelection.targetSelection,
-        },
-      );
+      updatedDevice = services.deviceRepository.updateDevice(parsedParams.data.id, {
+        ...parsedBody.data,
+        targetSelection: validatedTargetSelection.targetSelection,
+      });
     } catch (error) {
       if (error instanceof DuplicateDeviceNameError) {
         return reply.code(409).send({ message: error.message });
@@ -210,9 +202,7 @@ export const registerDisplayRoutes = (
 
     services.settingsRepository.setScreenProfileLayouts(parsedBody.data);
     return reply.send(
-      screenProfileLayoutsSchema.parse(
-        services.settingsRepository.getScreenProfileLayouts(),
-      ),
+      screenProfileLayoutsSchema.parse(services.settingsRepository.getScreenProfileLayouts()),
     );
   });
 
@@ -241,9 +231,7 @@ export const registerDisplayRoutes = (
 
     services.settingsRepository.setPhotoCollections(parsedBody.data);
     return reply.send(
-      photoCollectionsConfigSchema.parse(
-        services.settingsRepository.getPhotoCollections(),
-      ),
+      photoCollectionsConfigSchema.parse(services.settingsRepository.getPhotoCollections()),
     );
   });
 

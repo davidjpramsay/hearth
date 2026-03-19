@@ -93,10 +93,7 @@ export const login = async (password: string): Promise<LoginResponse> =>
     (payload) => loginResponseSchema.parse(payload),
   );
 
-export const getLayouts = async (
-  activeOnly = false,
-  token?: string,
-): Promise<LayoutRecord[]> =>
+export const getLayouts = async (activeOnly = false, token?: string): Promise<LayoutRecord[]> =>
   request(
     `/layouts?activeOnly=${activeOnly ? "true" : "false"}`,
     {
@@ -135,10 +132,7 @@ export const updateLayout = async (
     (body) => layoutRecordSchema.parse(body),
   );
 
-export const activateLayout = async (
-  token: string,
-  id: number,
-): Promise<LayoutRecord> =>
+export const activateLayout = async (token: string, id: number): Promise<LayoutRecord> =>
   request(
     `/layouts/${id}/activate`,
     {
@@ -159,9 +153,7 @@ export const deleteLayout = async (token: string, id: number): Promise<void> => 
   );
 };
 
-export const getScreenProfileLayouts = async (
-  token: string,
-): Promise<ScreenProfileLayouts> =>
+export const getScreenProfileLayouts = async (token: string): Promise<ScreenProfileLayouts> =>
   request(
     "/display/screen-profiles",
     {
@@ -185,9 +177,7 @@ export const updateScreenProfileLayouts = async (
     (body) => screenProfileLayoutsSchema.parse(body),
   );
 
-export const getDisplayDevices = async (
-  token: string,
-): Promise<DisplayDevicesResponse> =>
+export const getDisplayDevices = async (token: string): Promise<DisplayDevicesResponse> =>
   request(
     "/display/devices",
     {
@@ -212,10 +202,7 @@ export const updateDisplayDevice = async (
     (body) => displayDeviceSchema.parse(body),
   );
 
-export const deleteDisplayDevice = async (
-  token: string,
-  deviceId: string,
-): Promise<void> => {
+export const deleteDisplayDevice = async (token: string, deviceId: string): Promise<void> => {
   await request(
     `/display/devices/${encodeURIComponent(deviceId)}`,
     {
@@ -226,9 +213,7 @@ export const deleteDisplayDevice = async (
   );
 };
 
-export const getPhotoCollections = async (
-  token: string,
-): Promise<PhotoCollectionsResponse> =>
+export const getPhotoCollections = async (token: string): Promise<PhotoCollectionsResponse> =>
   request(
     "/display/photo-collections",
     {
@@ -252,9 +237,7 @@ export const updatePhotoCollections = async (
     (body) => photoCollectionsResponseSchema.parse(body),
   );
 
-export const getPhotoLibraryFolders = async (
-  token: string,
-): Promise<PhotoLibraryFoldersResponse> =>
+export const getPhotoLibraryFolders = async (token: string): Promise<PhotoLibraryFoldersResponse> =>
   request(
     "/display/photo-library-folders",
     {
@@ -414,9 +397,7 @@ export const setChoreCompletion = async (
   );
 };
 
-export const getChoresPayoutConfig = async (
-  token: string,
-): Promise<ChoresPayoutConfig> =>
+export const getChoresPayoutConfig = async (token: string): Promise<ChoresPayoutConfig> =>
   request(
     "/chores/payout-config",
     {

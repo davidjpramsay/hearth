@@ -12,10 +12,7 @@ interface ThemePickerProps {
   label?: string;
 }
 
-export const ThemePicker = ({
-  className = "min-w-[180px]",
-  label = "Theme",
-}: ThemePickerProps) => {
+export const ThemePicker = ({ className = "min-w-[180px]", label = "Theme" }: ThemePickerProps) => {
   const [activeThemeId, setActiveThemeId] = useState<ThemeId>(() => getActiveThemeId());
 
   useEffect(() => subscribeToThemeChanges(setActiveThemeId), []);

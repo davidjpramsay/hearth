@@ -1,8 +1,5 @@
 import bcrypt from "bcryptjs";
-import {
-  loginRequestSchema,
-  loginResponseSchema,
-} from "@hearth/shared";
+import { loginRequestSchema, loginResponseSchema } from "@hearth/shared";
 import type { FastifyInstance } from "fastify";
 import type { AppServices } from "../types.js";
 
@@ -15,15 +12,10 @@ export const verifyAdminPassword = (input: {
     return "setup-required";
   }
 
-  return input.comparePassword(input.password, input.storedPasswordHash)
-    ? "authorized"
-    : "invalid";
+  return input.comparePassword(input.password, input.storedPasswordHash) ? "authorized" : "invalid";
 };
 
-export const registerAuthRoutes = (
-  app: FastifyInstance,
-  services: AppServices,
-): void => {
+export const registerAuthRoutes = (app: FastifyInstance, services: AppServices): void => {
   const { compareSync } = bcrypt;
 
   app.post("/auth/login", async (request, reply) => {

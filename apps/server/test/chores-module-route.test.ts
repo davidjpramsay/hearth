@@ -10,53 +10,50 @@ test("chores summary route ignores legacy previewDays config and honors the requ
   let requestedDays: number | null = null;
 
   const app = Fastify();
-  registerChoresModuleRoutes(
-    app,
-    {
-      layoutRepository: {
-        findModuleInstance: () => ({
-          module: {
-            config: {
-              enableMoneyTracking: true,
-              previewDays: 14,
-            },
+  registerChoresModuleRoutes(app, {
+    layoutRepository: {
+      findModuleInstance: () => ({
+        module: {
+          config: {
+            enableMoneyTracking: true,
+            previewDays: 14,
           },
-        }),
-      },
-      settingsRepository: {
-        getChoresPayoutConfig: () => ({
-          mode: "all-or-nothing",
-          oneOffBonusEnabled: true,
-          paydayDayOfWeek: 6,
-        }),
-      },
-      choresRepository: {
-        getBoard: (input: { startDate: string; days: number }) => {
-          requestedStartDate = input.startDate;
-          requestedDays = input.days;
-          return {
-            generatedAt: new Date().toISOString(),
-            startDate: input.startDate,
-            days: 1,
-            payoutConfig: {
-              mode: "all-or-nothing",
-              oneOffBonusEnabled: true,
-              paydayDayOfWeek: 6,
-            },
-            members: [],
-            chores: [],
-            board: [{ date: input.startDate, items: [] }],
-            stats: {
-              dailyCompletionRate: 0,
-              weeklyCompletedCount: 0,
-              weeklyTotalValue: 0,
-              weeklyByMember: [],
-            },
-          };
         },
+      }),
+    },
+    settingsRepository: {
+      getChoresPayoutConfig: () => ({
+        mode: "all-or-nothing",
+        oneOffBonusEnabled: true,
+        paydayDayOfWeek: 6,
+      }),
+    },
+    choresRepository: {
+      getBoard: (input: { startDate: string; days: number }) => {
+        requestedStartDate = input.startDate;
+        requestedDays = input.days;
+        return {
+          generatedAt: new Date().toISOString(),
+          startDate: input.startDate,
+          days: 1,
+          payoutConfig: {
+            mode: "all-or-nothing",
+            oneOffBonusEnabled: true,
+            paydayDayOfWeek: 6,
+          },
+          members: [],
+          chores: [],
+          board: [{ date: input.startDate, items: [] }],
+          stats: {
+            dailyCompletionRate: 0,
+            weeklyCompletedCount: 0,
+            weeklyTotalValue: 0,
+            weeklyByMember: [],
+          },
+        };
       },
-    } as unknown as AppServices,
-  );
+    },
+  } as unknown as AppServices);
 
   try {
     const response = await app.inject({
@@ -96,54 +93,51 @@ test("chores summary route defaults startDate using the household timezone", asy
   globalThis.Date = FixedDate as DateConstructor;
 
   const app = Fastify();
-  registerChoresModuleRoutes(
-    app,
-    {
-      layoutRepository: {
-        findModuleInstance: () => ({
-          module: {
-            config: {
-              enableMoneyTracking: true,
-            },
+  registerChoresModuleRoutes(app, {
+    layoutRepository: {
+      findModuleInstance: () => ({
+        module: {
+          config: {
+            enableMoneyTracking: true,
           },
-        }),
-      },
-      settingsRepository: {
-        getChoresPayoutConfig: () => ({
-          mode: "all-or-nothing",
-          oneOffBonusEnabled: true,
-          paydayDayOfWeek: 6,
-          siteTimezone: "Australia/Perth",
-        }),
-      },
-      choresRepository: {
-        getBoard: (input: { startDate: string; days: number }) => {
-          requestedStartDate = input.startDate;
-          requestedDays = input.days;
-          return {
-            generatedAt: new Date().toISOString(),
-            startDate: input.startDate,
-            days: 1,
-            payoutConfig: {
-              mode: "all-or-nothing",
-              oneOffBonusEnabled: true,
-              paydayDayOfWeek: 6,
-              siteTimezone: "Australia/Perth",
-            },
-            members: [],
-            chores: [],
-            board: [{ date: input.startDate, items: [] }],
-            stats: {
-              dailyCompletionRate: 0,
-              weeklyCompletedCount: 0,
-              weeklyTotalValue: 0,
-              weeklyByMember: [],
-            },
-          };
         },
+      }),
+    },
+    settingsRepository: {
+      getChoresPayoutConfig: () => ({
+        mode: "all-or-nothing",
+        oneOffBonusEnabled: true,
+        paydayDayOfWeek: 6,
+        siteTimezone: "Australia/Perth",
+      }),
+    },
+    choresRepository: {
+      getBoard: (input: { startDate: string; days: number }) => {
+        requestedStartDate = input.startDate;
+        requestedDays = input.days;
+        return {
+          generatedAt: new Date().toISOString(),
+          startDate: input.startDate,
+          days: 1,
+          payoutConfig: {
+            mode: "all-or-nothing",
+            oneOffBonusEnabled: true,
+            paydayDayOfWeek: 6,
+            siteTimezone: "Australia/Perth",
+          },
+          members: [],
+          chores: [],
+          board: [{ date: input.startDate, items: [] }],
+          stats: {
+            dailyCompletionRate: 0,
+            weeklyCompletedCount: 0,
+            weeklyTotalValue: 0,
+            weeklyByMember: [],
+          },
+        };
       },
-    } as unknown as AppServices,
-  );
+    },
+  } as unknown as AppServices);
 
   try {
     const response = await app.inject({

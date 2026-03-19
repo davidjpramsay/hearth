@@ -26,15 +26,19 @@ export const moduleDefinition = defineModule({
   settingsSchema,
   runtime: {
     Component: ({ settings }) => (
-      <div
-        className="module-panel-shell flex h-full w-full items-center justify-center px-4 text-center text-slate-100"
-      >
+      <div className="module-panel-shell flex h-full w-full items-center justify-center px-4 text-center text-slate-100">
         <p className="module-copy-title text-balance">{settings.message}</p>
       </div>
     ),
   },
   admin: {
-    SettingsPanel: ({ settings, onChange }: { settings: WelcomeConfig; onChange: (next: WelcomeConfig) => void }) => (
+    SettingsPanel: ({
+      settings,
+      onChange,
+    }: {
+      settings: WelcomeConfig;
+      onChange: (next: WelcomeConfig) => void;
+    }) => (
       <div className="space-y-4 rounded-lg border border-slate-700 bg-slate-900 p-4 text-sm text-slate-200">
         <h3 className="text-base font-semibold">Welcome settings</h3>
         <label className="block space-y-2">

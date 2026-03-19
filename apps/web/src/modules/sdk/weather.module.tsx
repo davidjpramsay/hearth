@@ -8,13 +8,8 @@ import {
   type WeatherModuleCurrentResponse,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
-import {
-  ModulePresentationControls,
-} from "../ui/ModulePresentationControls";
-import {
-  resolveModuleConnectivityState,
-  useBrowserOnlineStatus,
-} from "../data/connection-state";
+import { ModulePresentationControls } from "../ui/ModulePresentationControls";
+import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 import { type TileDensity, useTileDensity } from "../ui/useTileDensity";
 
@@ -36,13 +31,10 @@ const loadWeather = async (
   instanceId: string,
   signal: AbortSignal,
 ): Promise<WeatherModuleCurrentResponse> => {
-  const response = await fetch(
-    `/api/modules/weather/${encodeURIComponent(instanceId)}/current`,
-    {
-      method: "GET",
-      signal,
-    },
-  );
+  const response = await fetch(`/api/modules/weather/${encodeURIComponent(instanceId)}/current`, {
+    method: "GET",
+    signal,
+  });
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
@@ -59,12 +51,9 @@ const loadWeather = async (
 const searchLocations = async (
   query: string,
 ): Promise<ReturnType<typeof weatherLocationSearchResponseSchema.parse>> => {
-  const response = await fetch(
-    `/api/modules/weather/locations?q=${encodeURIComponent(query)}`,
-    {
-      method: "GET",
-    },
-  );
+  const response = await fetch(`/api/modules/weather/locations?q=${encodeURIComponent(query)}`, {
+    method: "GET",
+  });
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
@@ -170,8 +159,7 @@ const forecastCardsByWidth = (width: number): number => {
   return 7;
 };
 
-const normalizeWeatherLabel = (value: string | null | undefined): string =>
-  (value ?? "").trim();
+const normalizeWeatherLabel = (value: string | null | undefined): string => (value ?? "").trim();
 
 const weatherSymbolForCode = (conditionCode: number | null, isDay: boolean | null): string => {
   if (conditionCode === null) {
@@ -268,10 +256,7 @@ const WEATHER_TONE_MAP: Record<string, WeatherTone> = {
   },
 };
 
-const resolveWeatherTone = (
-  conditionCode: number | null,
-  isDay: boolean | null,
-): WeatherTone => {
+const resolveWeatherTone = (conditionCode: number | null, isDay: boolean | null): WeatherTone => {
   if (conditionCode !== null && conditionCode >= 95) {
     return WEATHER_TONE_MAP.storm;
   }
@@ -325,9 +310,7 @@ const WeatherInlineStat = ({
     <span aria-hidden className="module-copy-body shrink-0">
       {icon}
     </span>
-    <span className={`module-copy-body truncate ${WEATHER_META_TEXT_CLASS}`}>
-      {value}
-    </span>
+    <span className={`module-copy-body truncate ${WEATHER_META_TEXT_CLASS}`}>{value}</span>
   </div>
 );
 
@@ -398,8 +381,7 @@ export const moduleDefinition = defineModule({
       const showTopCondition = settings.showTodayConditionLabel && density !== "xs";
       const showHeroIcon = settings.showTodayConditionIcon;
       const showForecastWind = settings.showForecastWind && density !== "xs";
-      const showForecastPrecipitation =
-        settings.showForecastPrecipitation && density !== "xs";
+      const showForecastPrecipitation = settings.showForecastPrecipitation && density !== "xs";
       const showForecastTemperature = settings.showForecastTemperature;
       const temperatureTextClass = "module-copy-hero";
       const heroIconClass = "module-copy-hero";
@@ -449,8 +431,7 @@ export const moduleDefinition = defineModule({
           ? {
               key: "humidity",
               label: "Humidity",
-              value:
-                payload.humidityPercent === null ? "--" : `${payload.humidityPercent}%`,
+              value: payload.humidityPercent === null ? "--" : `${payload.humidityPercent}%`,
               icon: "💧",
             }
           : null,
@@ -540,7 +521,7 @@ export const moduleDefinition = defineModule({
               </div>
             </div>
             <p className="module-copy-meta text-[color:var(--color-text-secondary)]">
-              Refreshes every {settings.refreshIntervalSeconds}s in {" "}
+              Refreshes every {settings.refreshIntervalSeconds}s in{" "}
               {settings.temperatureUnit === "fahrenheit" ? "Fahrenheit" : "Celsius"}
             </p>
           </div>
@@ -618,8 +599,7 @@ export const moduleDefinition = defineModule({
                           aria-hidden
                           className={heroIconClass}
                           style={{
-                            color:
-                              "rgb(var(--module-accent-rgb, var(--color-text-accent-rgb)))",
+                            color: "rgb(var(--module-accent-rgb, var(--color-text-accent-rgb)))",
                           }}
                         >
                           {weatherSymbolForCode(payload.conditionCode, payload.isDay)}
@@ -651,7 +631,7 @@ export const moduleDefinition = defineModule({
                         ) : null}
                       </div>
 
-                    {showStats ? (
+                      {showStats ? (
                         <div className="module-panel-card mt-2 flex max-w-[22rem] flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2">
                           {todayStats.map((stat) => (
                             <WeatherInlineStat
@@ -675,8 +655,7 @@ export const moduleDefinition = defineModule({
                             aria-hidden
                             className={heroIconClass}
                             style={{
-                              color:
-                                "rgb(var(--module-accent-rgb, var(--color-text-accent-rgb)))",
+                              color: "rgb(var(--module-accent-rgb, var(--color-text-accent-rgb)))",
                             }}
                           >
                             {weatherSymbolForCode(payload.conditionCode, payload.isDay)}
@@ -702,10 +681,7 @@ export const moduleDefinition = defineModule({
                     }}
                   >
                     {forecastDays.map((day, index) => (
-                      <div
-                        key={day.date}
-                        className="module-panel-card p-2.5 text-left"
-                      >
+                      <div key={day.date} className="module-panel-card p-2.5 text-left">
                         <div className="flex items-start justify-between gap-2">
                           <p
                             className={`${WEATHER_SECTION_LABEL_CLASS} text-[color:var(--color-text-secondary)]`}
@@ -919,7 +895,7 @@ export const moduleDefinition = defineModule({
 
             {settings.latitude !== null && settings.longitude !== null ? (
               <p className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-200">
-                Using pinned coordinates: {settings.latitude.toFixed(4)}, {" "}
+                Using pinned coordinates: {settings.latitude.toFixed(4)},{" "}
                 {settings.longitude.toFixed(4)}
               </p>
             ) : (
@@ -963,8 +939,7 @@ export const moduleDefinition = defineModule({
               value={settings.temperatureUnit}
               onChange={(event) =>
                 applyPatch({
-                  temperatureUnit:
-                    event.target.value === "fahrenheit" ? "fahrenheit" : "celsius",
+                  temperatureUnit: event.target.value === "fahrenheit" ? "fahrenheit" : "celsius",
                 })
               }
             >
@@ -982,11 +957,7 @@ export const moduleDefinition = defineModule({
                 const nextUnit = event.target.value;
                 applyPatch({
                   windSpeedUnit:
-                    nextUnit === "mph"
-                      ? "mph"
-                      : nextUnit === "knots"
-                        ? "knots"
-                        : "kmh",
+                    nextUnit === "mph" ? "mph" : nextUnit === "knots" ? "knots" : "kmh",
                 });
               }}
             >
@@ -1026,30 +997,22 @@ export const moduleDefinition = defineModule({
               <WeatherSettingsToggle
                 label="Show condition text"
                 checked={settings.showTodayConditionLabel}
-                onChange={(showTodayConditionLabel) =>
-                  applyPatch({ showTodayConditionLabel })
-                }
+                onChange={(showTodayConditionLabel) => applyPatch({ showTodayConditionLabel })}
               />
               <WeatherSettingsToggle
                 label="Show condition symbol"
                 checked={settings.showTodayConditionIcon}
-                onChange={(showTodayConditionIcon) =>
-                  applyPatch({ showTodayConditionIcon })
-                }
+                onChange={(showTodayConditionIcon) => applyPatch({ showTodayConditionIcon })}
               />
               <WeatherSettingsToggle
                 label="Show max / min"
                 checked={settings.showTodayMinTemperature}
-                onChange={(showTodayMinTemperature) =>
-                  applyPatch({ showTodayMinTemperature })
-                }
+                onChange={(showTodayMinTemperature) => applyPatch({ showTodayMinTemperature })}
               />
               <WeatherSettingsToggle
                 label="Show rain chance"
                 checked={settings.showTodayPrecipitation}
-                onChange={(showTodayPrecipitation) =>
-                  applyPatch({ showTodayPrecipitation })
-                }
+                onChange={(showTodayPrecipitation) => applyPatch({ showTodayPrecipitation })}
               />
               <WeatherSettingsToggle
                 label="Show wind"
@@ -1081,17 +1044,13 @@ export const moduleDefinition = defineModule({
                 label="Show temperatures"
                 checked={settings.showForecastTemperature}
                 disabled={!settings.showForecast}
-                onChange={(showForecastTemperature) =>
-                  applyPatch({ showForecastTemperature })
-                }
+                onChange={(showForecastTemperature) => applyPatch({ showForecastTemperature })}
               />
               <WeatherSettingsToggle
                 label="Show rain chance"
                 checked={settings.showForecastPrecipitation}
                 disabled={!settings.showForecast}
-                onChange={(showForecastPrecipitation) =>
-                  applyPatch({ showForecastPrecipitation })
-                }
+                onChange={(showForecastPrecipitation) => applyPatch({ showForecastPrecipitation })}
               />
               <WeatherSettingsToggle
                 label="Show wind"

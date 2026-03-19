@@ -49,10 +49,7 @@ const ESV_PASSAGE_RESPONSE_SCHEMA = z.object({
   passages: z.array(z.string().min(1)).min(1),
 });
 
-export const selectDailyPassageReference = (
-  date: Date,
-  siteTimezone: string,
-): string => {
+export const selectDailyPassageReference = (date: Date, siteTimezone: string): string => {
   const index = getDayOfYearInTimeZone(date, siteTimezone) % DAILY_PASSAGE_REFERENCES.length;
   return DAILY_PASSAGE_REFERENCES[index] ?? "john 3:16";
 };
@@ -107,11 +104,9 @@ const fetchVerseOfDay = async (siteTimezone: string) => {
 const readActiveConfig = (
   services: AppServices,
   instanceId: string,
-):
-  | {
-      config: ReturnType<typeof bibleVerseModuleConfigSchema.parse>;
-    }
-  | null => {
+): {
+  config: ReturnType<typeof bibleVerseModuleConfigSchema.parse>;
+} | null => {
   const instance = services.layoutRepository.findModuleInstance(instanceId, "bible-verse");
   if (!instance) {
     return null;
@@ -127,10 +122,7 @@ const readActiveConfig = (
   };
 };
 
-export const registerBibleVerseRoutes = (
-  app: FastifyInstance,
-  services: AppServices,
-): void => {
+export const registerBibleVerseRoutes = (app: FastifyInstance, services: AppServices): void => {
   app.get("/modules/bible-verse/:instanceId/today", async (request, reply) => {
     const params = bibleVerseModuleParamsSchema.safeParse(request.params);
     if (!params.success) {

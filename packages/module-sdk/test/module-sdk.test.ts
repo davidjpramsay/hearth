@@ -72,7 +72,10 @@ test("validateData validates data schema when provided", () => {
   assert.equal(data.uptimeSeconds, 42);
   assert.equal(definition.manifest.timeMode, "source-local");
 
-  assert.throws(() => validateData(definition, { ok: true, uptimeSeconds: -1 }), /greater than or equal to 0/);
+  assert.throws(
+    () => validateData(definition, { ok: true, uptimeSeconds: -1 }),
+    /greater than or equal to 0/,
+  );
 });
 
 test("createLayoutLogicRegistry validates duplicate ids", () => {

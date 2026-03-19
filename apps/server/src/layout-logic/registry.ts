@@ -8,9 +8,7 @@ import {
 } from "@hearth/shared";
 import type { LocalWarningService } from "../services/local-warning-service.js";
 
-type ConditionResolver = (
-  input: LayoutLogicConditionEvaluationInput,
-) => boolean | null;
+type ConditionResolver = (input: LayoutLogicConditionEvaluationInput) => boolean | null;
 
 type ActionResolver = (
   input: LayoutLogicActionResolutionInput,

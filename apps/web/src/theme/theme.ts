@@ -89,10 +89,7 @@ const broadcastThemeChange = (themeId: ThemeId): void => {
   window.dispatchEvent(new CustomEvent<ThemeId>(THEME_CHANGE_EVENT, { detail: themeId }));
 };
 
-export const applyTheme = (
-  themeId: ThemeId | string,
-  options: ApplyThemeOptions = {},
-): ThemeId => {
+export const applyTheme = (themeId: ThemeId | string, options: ApplyThemeOptions = {}): ThemeId => {
   const { persist = true, broadcast = true } = options;
   const nextThemeId = normalizeThemeId(themeId);
   const root = getRootElement();
@@ -119,9 +116,7 @@ export const applyTheme = (
 export const initializeTheme = (): ThemeId =>
   applyTheme(getStoredThemeId(), { persist: false, broadcast: false });
 
-export const subscribeToThemeChanges = (
-  callback: (themeId: ThemeId) => void,
-): (() => void) => {
+export const subscribeToThemeChanges = (callback: (themeId: ThemeId) => void): (() => void) => {
   if (typeof window === "undefined") {
     return () => undefined;
   }

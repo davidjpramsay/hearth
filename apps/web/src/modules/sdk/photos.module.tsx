@@ -12,10 +12,7 @@ import { defineModule } from "@hearth/module-sdk";
 import { getPhotoCollections } from "../../api/client";
 import { getAuthToken } from "../../auth/storage";
 import { getDeviceId } from "../../device/device-id";
-import {
-  resolveModuleConnectivityState,
-  useBrowserOnlineStatus,
-} from "../data/connection-state";
+import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 
@@ -41,8 +38,7 @@ const getDisplaySourceKindFromStorage = (): "set" | "layout" | null => {
   }
 
   try {
-    const sourceKind =
-      window.localStorage.getItem(DISPLAY_SOURCE_KIND_STORAGE_KEY)?.trim() ?? "";
+    const sourceKind = window.localStorage.getItem(DISPLAY_SOURCE_KIND_STORAGE_KEY)?.trim() ?? "";
     if (sourceKind === "set" || sourceKind === "layout") {
       return sourceKind;
     }
@@ -59,14 +55,12 @@ const getSetCycleIntervalFromStorage = (): number | null => {
   }
 
   try {
-    const sourceKind =
-      window.localStorage.getItem(DISPLAY_SOURCE_KIND_STORAGE_KEY)?.trim() ?? "";
+    const sourceKind = window.localStorage.getItem(DISPLAY_SOURCE_KIND_STORAGE_KEY)?.trim() ?? "";
     if (sourceKind !== "set") {
       return null;
     }
 
-    const rawSeconds =
-      window.localStorage.getItem(DISPLAY_CYCLE_SECONDS_STORAGE_KEY)?.trim() ?? "";
+    const rawSeconds = window.localStorage.getItem(DISPLAY_CYCLE_SECONDS_STORAGE_KEY)?.trim() ?? "";
     const parsedSeconds = Number.parseInt(rawSeconds, 10);
     return Number.isFinite(parsedSeconds) ? clampIntervalSeconds(parsedSeconds) : null;
   } catch {
@@ -80,8 +74,7 @@ const getSetCollectionIdFromStorage = (): string | null => {
   }
 
   try {
-    const sourceKind =
-      window.localStorage.getItem(DISPLAY_SOURCE_KIND_STORAGE_KEY)?.trim() ?? "";
+    const sourceKind = window.localStorage.getItem(DISPLAY_SOURCE_KIND_STORAGE_KEY)?.trim() ?? "";
     if (sourceKind !== "set") {
       return null;
     }
@@ -122,9 +115,7 @@ const toSetCollectionIdFromContext = (
 const getLayoutRatioLabel = (orientation: PhotosLayoutOrientation): string =>
   orientation === "portrait" ? "Portrait 3:4" : "Landscape 4:3";
 
-const toLegacyFolderSourceLabel = (
-  folderPath: string | null | undefined,
-): string | null => {
+const toLegacyFolderSourceLabel = (folderPath: string | null | undefined): string | null => {
   if (typeof folderPath !== "string") {
     return null;
   }
@@ -152,9 +143,7 @@ const toLegacyFolderSourceLabel = (
 
   if (normalized.startsWith("/")) {
     const legacyRootIndex = normalized.lastIndexOf(`${LEGACY_PHOTO_LIBRARY_ROOT_LABEL}/`);
-    return legacyRootIndex >= 0
-      ? normalized.slice(legacyRootIndex).replace(/\/+$/, "")
-      : null;
+    return legacyRootIndex >= 0 ? normalized.slice(legacyRootIndex).replace(/\/+$/, "") : null;
   }
 
   return `${LEGACY_PHOTO_LIBRARY_ROOT_LABEL}/${normalized}`.replace(/\/+$/, "");
@@ -227,11 +216,11 @@ export const moduleDefinition = defineModule({
   runtime: {
     Component: ({ instanceId, settings, isEditing }) => {
       const imageFitClass = "object-cover";
-      const [setCycleIntervalSeconds, setSetCycleIntervalSeconds] = useState<number | null>(
-        () => getSetCycleIntervalFromStorage(),
+      const [setCycleIntervalSeconds, setSetCycleIntervalSeconds] = useState<number | null>(() =>
+        getSetCycleIntervalFromStorage(),
       );
-      const [displaySourceKind, setDisplaySourceKind] = useState<"set" | "layout" | null>(
-        () => getDisplaySourceKindFromStorage(),
+      const [displaySourceKind, setDisplaySourceKind] = useState<"set" | "layout" | null>(() =>
+        getDisplaySourceKindFromStorage(),
       );
       const [setCollectionId, setSetCollectionId] = useState<string | null>(() =>
         getSetCollectionIdFromStorage(),
@@ -270,24 +259,16 @@ export const moduleDefinition = defineModule({
             event && "detail" in event
               ? ((event as CustomEvent<DisplayCycleContextEventDetail>).detail ?? null)
               : null;
-          setDisplaySourceKind(
-            eventDetail?.sourceKind ??
-              getDisplaySourceKindFromStorage(),
-          );
+          setDisplaySourceKind(eventDetail?.sourceKind ?? getDisplaySourceKindFromStorage());
           const fromEvent = toSetCycleIntervalFromContext(eventDetail);
-          setSetCycleIntervalSeconds(
-            fromEvent ?? getSetCycleIntervalFromStorage(),
-          );
+          setSetCycleIntervalSeconds(fromEvent ?? getSetCycleIntervalFromStorage());
           setSetCollectionId(
             toSetCollectionIdFromContext(eventDetail) ?? getSetCollectionIdFromStorage(),
           );
         };
 
         applyCurrentContext();
-        window.addEventListener(
-          DISPLAY_CYCLE_CONTEXT_EVENT,
-          applyCurrentContext as EventListener,
-        );
+        window.addEventListener(DISPLAY_CYCLE_CONTEXT_EVENT, applyCurrentContext as EventListener);
 
         return () => {
           window.removeEventListener(
@@ -343,12 +324,9 @@ export const moduleDefinition = defineModule({
         };
 
         void refreshFrame();
-        const timer = window.setInterval(
-          () => {
-            void refreshFrame();
-          },
-          effectiveIntervalSeconds * 1000,
-        );
+        const timer = window.setInterval(() => {
+          void refreshFrame();
+        }, effectiveIntervalSeconds * 1000);
 
         return () => {
           active = false;
@@ -397,12 +375,7 @@ export const moduleDefinition = defineModule({
             },
           }),
         );
-      }, [
-        displayFrame?.imageId,
-        displayFrame?.orientation,
-        instanceId,
-        isEditing,
-      ]);
+      }, [displayFrame?.imageId, displayFrame?.orientation, instanceId, isEditing]);
 
       const previewSourceLabel =
         settings.collectionId && settings.collectionId.trim().length > 0
@@ -412,9 +385,7 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-copy-title text-slate-100">
-              Photo slideshow preview
-            </p>
+            <p className="module-copy-title text-slate-100">Photo slideshow preview</p>
             <p className="module-copy-meta mt-2 text-slate-300">
               Photo source: {previewSourceLabel}
             </p>
@@ -457,10 +428,7 @@ export const moduleDefinition = defineModule({
             />
           ) : null}
 
-          {!loading &&
-          !connectivityState.blockingError &&
-          !displayFrame &&
-          frameData.warning ? (
+          {!loading && !connectivityState.blockingError && !displayFrame && frameData.warning ? (
             <div className="module-copy-meta flex h-full items-center justify-center px-3 text-center text-slate-300">
               {frameData.warning}
             </div>
@@ -498,10 +466,9 @@ export const moduleDefinition = defineModule({
       const hasLegacyFolderOverride =
         legacyFolderSourceLabel !== null &&
         legacyFolderSourceLabel !== LEGACY_PHOTO_LIBRARY_ROOT_LABEL;
-      const sourceValue =
-        hasLegacyFolderOverride
-          ? "__legacy_folder__"
-          : settings.collectionId && settings.collectionId.trim().length > 0
+      const sourceValue = hasLegacyFolderOverride
+        ? "__legacy_folder__"
+        : settings.collectionId && settings.collectionId.trim().length > 0
           ? settings.collectionId.trim()
           : "__photos_root__";
 
@@ -542,7 +509,8 @@ export const moduleDefinition = defineModule({
             {hasLegacyFolderOverride ? (
               <p className="text-xs text-amber-300">
                 This module is still using a legacy folder-path source. Switching this field will
-                replace it with the selected collection or the root {LEGACY_PHOTO_LIBRARY_ROOT_LABEL} library.
+                replace it with the selected collection or the root{" "}
+                {LEGACY_PHOTO_LIBRARY_ROOT_LABEL} library.
               </p>
             ) : null}
           </label>
@@ -557,15 +525,13 @@ export const moduleDefinition = defineModule({
               value={settings.intervalSeconds}
               onChange={(event) =>
                 applyPatch({
-                  intervalSeconds: Math.max(
-                    3,
-                    Math.min(3600, Number(event.target.value) || 3),
-                  ),
+                  intervalSeconds: Math.max(3, Math.min(3600, Number(event.target.value) || 3)),
                 })
               }
             />
             <p className="text-xs text-slate-400">
-              If this layout is used in a set, this slide interval is overridden by the set layout timer.
+              If this layout is used in a set, this slide interval is overridden by the set layout
+              timer.
             </p>
           </label>
 
@@ -585,8 +551,7 @@ export const moduleDefinition = defineModule({
               value={settings.layoutOrientation}
               onChange={(event) =>
                 applyPatch({
-                  layoutOrientation:
-                    event.target.value === "portrait" ? "portrait" : "landscape",
+                  layoutOrientation: event.target.value === "portrait" ? "portrait" : "landscape",
                 })
               }
             >

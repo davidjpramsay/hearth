@@ -30,9 +30,7 @@ export const AdminLoginPage = () => {
         window.location.replace(from);
       }
     } catch (submitError) {
-      setError(
-        submitError instanceof Error ? submitError.message : "Login failed",
-      );
+      setError(submitError instanceof Error ? submitError.message : "Login failed");
     } finally {
       setIsLoading(false);
     }

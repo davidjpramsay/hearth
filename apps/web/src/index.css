@@ -467,11 +467,7 @@ body {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.035) 0%,
-      transparent 55%
-    );
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0%, transparent 55%);
   }
 
   .module-panel-card {
@@ -607,12 +603,11 @@ body {
     border-bottom: 0;
     border-left: 0;
     border-radius: 0;
-    background:
-      linear-gradient(
-        90deg,
-        rgb(var(--color-status-loading-rgb) / 0.12),
-        rgb(var(--tone-slate-950-rgb) / 0.92) 16%
-      );
+    background: linear-gradient(
+      90deg,
+      rgb(var(--color-status-loading-rgb) / 0.12),
+      rgb(var(--tone-slate-950-rgb) / 0.92) 16%
+    );
     box-shadow:
       0 14px 28px rgba(2, 6, 23, 0.34),
       inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -1106,17 +1101,16 @@ body {
   width: 14px;
   height: 14px;
   border-radius: 999px;
-  background:
-    linear-gradient(
-      135deg,
-      transparent 0 22%,
-      rgba(103, 232, 249, 0.28) 22% 32%,
-      transparent 32% 46%,
-      rgba(103, 232, 249, 0.58) 46% 56%,
-      transparent 56% 70%,
-      rgba(165, 243, 252, 0.95) 70% 80%,
-      transparent 80% 100%
-    );
+  background: linear-gradient(
+    135deg,
+    transparent 0 22%,
+    rgba(103, 232, 249, 0.28) 22% 32%,
+    transparent 32% 46%,
+    rgba(103, 232, 249, 0.58) 46% 56%,
+    transparent 56% 70%,
+    rgba(165, 243, 252, 0.95) 70% 80%,
+    transparent 80% 100%
+  );
   pointer-events: none;
 }
 

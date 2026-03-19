@@ -13,8 +13,7 @@ const toIcsDate = (date: Date): string =>
   ].join("");
 
 const toUtcMidnightIso = (date: Date): string =>
-  new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0))
-    .toISOString();
+  new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0)).toISOString();
 
 test("CalendarFeedService serializes all-day events as calendar days", async (t) => {
   const tempDir = await mkdtemp(join(tmpdir(), "hearth-calendar-"));

@@ -23,11 +23,9 @@ const MIME_TYPES: Record<string, string> = {
 const getActivePhotosConfig = (
   services: AppServices,
   instanceId: string,
-):
-  | {
-      config: ReturnType<typeof photosModuleConfigSchema.parse>;
-    }
-  | null => {
+): {
+  config: ReturnType<typeof photosModuleConfigSchema.parse>;
+} | null => {
   const moduleInstance = services.layoutRepository.findModuleInstance(instanceId, "photos");
   if (!moduleInstance) {
     return null;
@@ -43,10 +41,7 @@ const getActivePhotosConfig = (
   };
 };
 
-export const registerPhotoRoutes = (
-  app: FastifyInstance,
-  services: AppServices,
-): void => {
+export const registerPhotoRoutes = (app: FastifyInstance, services: AppServices): void => {
   app.get("/modules/photos/:instanceId/next", async (request, reply) => {
     const params = photosModuleParamsSchema.safeParse(request.params);
     if (!params.success) {
@@ -89,15 +84,13 @@ export const registerPhotoRoutes = (
       return reply.code(404).send({ message: "Photos module instance not found" });
     }
 
-    const imagePath = await services.photosSlideshowService.resolveImagePathFromToken(
-      {
-        moduleConfig: activeConfig.config,
-        token: params.data.token,
-        requestedCollectionId: query.data.collectionId ?? null,
-        requestedSourceKind: query.data.sourceKind ?? null,
-        collectionsConfig: services.settingsRepository.getPhotoCollections(),
-      },
-    );
+    const imagePath = await services.photosSlideshowService.resolveImagePathFromToken({
+      moduleConfig: activeConfig.config,
+      token: params.data.token,
+      requestedCollectionId: query.data.collectionId ?? null,
+      requestedSourceKind: query.data.sourceKind ?? null,
+      collectionsConfig: services.settingsRepository.getPhotoCollections(),
+    });
 
     if (!imagePath) {
       return reply.code(404).send({ message: "Image not found" });

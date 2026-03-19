@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { withModulePresentation } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import { getServerStatus, serverStatusResponseSchema } from "../../api/server-status";
 import { useModuleQuery } from "../data/useModuleQuery";
 import { ModuleFrame } from "../ui/ModuleFrame";
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
@@ -11,20 +12,6 @@ const settingsSchema = withModulePresentation(
     showMemory: z.boolean().default(true),
   }),
 );
-
-const statusSchema = z.object({
-  ok: z.boolean(),
-  service: z.string(),
-  uptimeSeconds: z.number().nonnegative(),
-  timestamp: z.string(),
-  memory: z
-    .object({
-      rss: z.number().nonnegative(),
-      heapUsed: z.number().nonnegative(),
-      heapTotal: z.number().nonnegative(),
-    })
-    .optional(),
-});
 
 type Settings = z.infer<typeof settingsSchema>;
 
@@ -105,22 +92,12 @@ export const moduleDefinition = defineModule({
     dataSources: [{ id: "server-status-rest", kind: "rest", pollMs: 30_000 }],
   },
   settingsSchema,
-  dataSchema: statusSchema,
+  dataSchema: serverStatusResponseSchema,
   runtime: {
     Component: ({ settings, isEditing }) => {
       const status = useModuleQuery({
         key: `server-status:${settings.pollSeconds}`,
-        queryFn: async () => {
-          const response = await fetch("/api/modules/server-status", {
-            method: "GET",
-          });
-
-          if (!response.ok) {
-            throw new Error(`Server status request failed (${response.status})`);
-          }
-
-          return statusSchema.parse(await response.json());
-        },
+        queryFn: getServerStatus,
         intervalMs: settings.pollSeconds * 1000,
         staleMs: Math.max(1000, settings.pollSeconds * 1000 - 1000),
         enabled: !isEditing,
@@ -129,9 +106,7 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-copy-title text-slate-100">
-              Server status preview
-            </p>
+            <p className="module-copy-title text-slate-100">Server status preview</p>
             <p className="module-copy-meta mt-2 text-slate-300">
               Poll every {settings.pollSeconds}s
             </p>
@@ -155,9 +130,7 @@ export const moduleDefinition = defineModule({
         >
           {status.data ? (
             <div className="space-y-3 rounded border border-slate-700 bg-slate-950/60 p-3 text-slate-100">
-              <div className="module-copy-body text-slate-300">
-                Service: {status.data.service}
-              </div>
+              <div className="module-copy-body text-slate-300">Service: {status.data.service}</div>
               <div className="module-copy-body text-slate-300">
                 Uptime: {Math.floor(status.data.uptimeSeconds)}s
               </div>

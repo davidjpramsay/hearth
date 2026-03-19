@@ -1,7 +1,4 @@
-import {
-  parseLocalWarningConditionParams,
-  type LocalWarningConditionParams,
-} from "@hearth/shared";
+import { parseLocalWarningConditionParams, type LocalWarningConditionParams } from "@hearth/shared";
 
 const DEFAULT_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const DEFAULT_WARNING_POINT_RADIUS_KM = 40;
@@ -61,15 +58,17 @@ const decodeXmlEntities = (value: string): string =>
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, "\"")
+    .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&amp;/g, "&");
 
 const stripXmlTags = (value: string): string =>
-  decodeXmlEntities(value).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  decodeXmlEntities(value)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
-const escapeRegex = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const readXmlTag = (xml: string, tagName: string): string | null => {
   const match = new RegExp(
@@ -82,10 +81,7 @@ const readXmlTag = (xml: string, tagName: string): string | null => {
 const readXmlTagValues = (xml: string, tagName: string): string[] =>
   Array.from(
     xml.matchAll(
-      new RegExp(
-        `<${escapeRegex(tagName)}[^>]*>([\\s\\S]*?)<\\/${escapeRegex(tagName)}>`,
-        "gi",
-      ),
+      new RegExp(`<${escapeRegex(tagName)}[^>]*>([\\s\\S]*?)<\\/${escapeRegex(tagName)}>`, "gi"),
     ),
   )
     .map((match) => stripXmlTags(match[1] ?? ""))
@@ -94,10 +90,7 @@ const readXmlTagValues = (xml: string, tagName: string): string[] =>
 const readXmlBlocks = (xml: string, tagName: string): string[] =>
   Array.from(
     xml.matchAll(
-      new RegExp(
-        `<${escapeRegex(tagName)}\\b[^>]*>([\\s\\S]*?)<\\/${escapeRegex(tagName)}>`,
-        "gi",
-      ),
+      new RegExp(`<${escapeRegex(tagName)}\\b[^>]*>([\\s\\S]*?)<\\/${escapeRegex(tagName)}>`, "gi"),
     ),
   )
     .map((match) => match[1] ?? "")
@@ -112,7 +105,11 @@ const toTimestampMs = (value: string | null): number | null => {
 };
 
 const normalizeSearchText = (value: string): string =>
-  value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 const extractLocationTerms = (value: string): string[] => {
   const firstPart = value.split(",")[0]?.trim() ?? "";
@@ -212,10 +209,7 @@ const parseCircle = (value: string): WarningCircle | null => {
 const matchesSearchTerms = (searchText: string, terms: string[]): boolean =>
   terms.some((term) => term.length > 0 && searchText.includes(term));
 
-const isPointInsidePolygon = (
-  point: PointCoordinate,
-  polygon: PointCoordinate[],
-): boolean => {
+const isPointInsidePolygon = (point: PointCoordinate, polygon: PointCoordinate[]): boolean => {
   let inside = false;
 
   for (
@@ -229,7 +223,7 @@ const isPointInsidePolygon = (
       current.latitude > point.latitude !== previous.latitude > point.latitude &&
       point.longitude <
         ((previous.longitude - current.longitude) * (point.latitude - current.latitude)) /
-          ((previous.latitude - current.latitude) || Number.EPSILON) +
+          (previous.latitude - current.latitude || Number.EPSILON) +
           current.longitude;
 
     if (intersects) {
@@ -253,9 +247,7 @@ const distanceKm = (left: PointCoordinate, right: PointCoordinate): number => {
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-const parseEmergencyWaWarnings = (
-  xml: string,
-): EmergencyWaWarningRecord[] =>
+const parseEmergencyWaWarnings = (xml: string): EmergencyWaWarningRecord[] =>
   readXmlBlocks(xml, "cap:alert").flatMap((alertXml, alertIndex) => {
     const msgType = (readXmlTag(alertXml, "cap:msgType") ?? "").toLowerCase();
     if (msgType === "cancel") {
@@ -309,13 +301,9 @@ const parseEmergencyWaWarnings = (
         const detailUrl = trimOrNull(readXmlTag(infoXml, "cap:web"));
         const severity = trimOrNull(readXmlTag(infoXml, "cap:severity"));
         const searchText = normalizeSearchText(
-          [
-            headline,
-            categoryLabel ?? "",
-            eventLabel ?? "",
-            alertLevel ?? "",
-            ...areaLabels,
-          ].join(" "),
+          [headline, categoryLabel ?? "", eventLabel ?? "", alertLevel ?? "", ...areaLabels].join(
+            " ",
+          ),
         );
 
         if (!searchText) {
@@ -489,9 +477,7 @@ export class LocalWarningService {
     void this.refreshPromise.catch(() => undefined);
   }
 
-  private getMatchingWarnings(
-    params: LocalWarningConditionParams,
-  ): EmergencyWaWarningRecord[] {
+  private getMatchingWarnings(params: LocalWarningConditionParams): EmergencyWaWarningRecord[] {
     const locationTerms = extractLocationTerms(params.locationQuery);
     const coordinates =
       typeof params.latitude === "number" && typeof params.longitude === "number"
@@ -507,9 +493,10 @@ export class LocalWarningService {
         }
 
         if (
-          warning.circles.some((circle) =>
-            distanceKm(circle.center, coordinates) <=
-            Math.max(circle.radiusKm, DEFAULT_WARNING_POINT_RADIUS_KM),
+          warning.circles.some(
+            (circle) =>
+              distanceKm(circle.center, coordinates) <=
+              Math.max(circle.radiusKm, DEFAULT_WARNING_POINT_RADIUS_KM),
           )
         ) {
           return true;
@@ -544,9 +531,7 @@ export class LocalWarningService {
     };
   }
 
-  private createForcedWarningMatch(
-    params: LocalWarningConditionParams,
-  ): LocalWarningMatch {
+  private createForcedWarningMatch(params: LocalWarningConditionParams): LocalWarningMatch {
     const locationLabel = toLocationLabel(params.locationQuery);
     return {
       id: `dev-force-warning:${normalizeSearchText(locationLabel) || "local-area"}`,

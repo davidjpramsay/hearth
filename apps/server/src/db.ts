@@ -102,9 +102,7 @@ const ensureColumnExists = (
   column: string,
   alterSql: string,
 ): void => {
-  const columns = db
-    .prepare<[], { name: string }>(`PRAGMA table_info(${table})`)
-    .all();
+  const columns = db.prepare<[], { name: string }>(`PRAGMA table_info(${table})`).all();
 
   if (columns.some((entry) => entry.name === column)) {
     return;
@@ -119,8 +117,7 @@ const normalizeLayoutName = (value: string): string => value.trim().toLowerCase(
 
 const toUniqueLayoutName = (baseName: string, used: Set<string>): string => {
   const trimmedBase = baseName.trim();
-  const normalizedBase =
-    trimmedBase.length > 0 ? trimmedBase : "Layout";
+  const normalizedBase = trimmedBase.length > 0 ? trimmedBase : "Layout";
   const cappedBase = normalizedBase.slice(0, MAX_LAYOUT_NAME_LENGTH);
 
   let candidate = cappedBase;
@@ -138,9 +135,7 @@ const toUniqueLayoutName = (baseName: string, used: Set<string>): string => {
 
 const ensureUniqueLayoutNames = (db: Database.Database): void => {
   const rows = db
-    .prepare<[], { id: number; name: string }>(
-      "SELECT id, name FROM layouts ORDER BY id ASC",
-    )
+    .prepare<[], { id: number; name: string }>("SELECT id, name FROM layouts ORDER BY id ASC")
     .all();
 
   if (rows.length === 0) {
@@ -547,10 +542,7 @@ const DEFAULT_SCREEN_PROFILE_LAYOUTS = {
       ],
       portraitPhotoLayoutName: "16:9 Standard Landscape",
       landscapePhotoLayoutName: "16:9 Standard Landscape",
-      portraitPhotoLayoutNames: [
-        "16:9 Standard Landscape",
-        "16:9 Standard Portrait",
-      ],
+      portraitPhotoLayoutNames: ["16:9 Standard Landscape", "16:9 Standard Portrait"],
       landscapePhotoLayoutNames: ["16:9 Standard Landscape"],
     },
   },
@@ -627,12 +619,7 @@ export const createDatabase = (filePath: string): Database.Database => {
     "weekly_allowance",
     "ALTER TABLE members ADD COLUMN weekly_allowance REAL NOT NULL DEFAULT 0",
   );
-  ensureColumnExists(
-    db,
-    "chores",
-    "starts_on",
-    "ALTER TABLE chores ADD COLUMN starts_on TEXT",
-  );
+  ensureColumnExists(db, "chores", "starts_on", "ALTER TABLE chores ADD COLUMN starts_on TEXT");
   ensureColumnExists(
     db,
     "devices",

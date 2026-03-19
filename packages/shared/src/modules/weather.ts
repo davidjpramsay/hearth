@@ -25,31 +25,28 @@ const weatherModuleConfigObjectSchema = withModulePresentation(
   }),
 );
 
-export const weatherModuleConfigSchema = z.preprocess(
-  (input) => {
-    if (!input || typeof input !== "object" || Array.isArray(input)) {
-      return input;
-    }
+export const weatherModuleConfigSchema = z.preprocess((input) => {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return input;
+  }
 
-    const record = input as Record<string, unknown>;
-    return {
-      ...record,
-      showTodayWind:
-        typeof record.showTodayWind === "boolean"
-          ? record.showTodayWind
-          : typeof record.showWind === "boolean"
-            ? record.showWind
-            : undefined,
-      showTodayHumidity:
-        typeof record.showTodayHumidity === "boolean"
-          ? record.showTodayHumidity
-          : typeof record.showHumidity === "boolean"
-            ? record.showHumidity
-            : undefined,
-    };
-  },
-  weatherModuleConfigObjectSchema,
-);
+  const record = input as Record<string, unknown>;
+  return {
+    ...record,
+    showTodayWind:
+      typeof record.showTodayWind === "boolean"
+        ? record.showTodayWind
+        : typeof record.showWind === "boolean"
+          ? record.showWind
+          : undefined,
+    showTodayHumidity:
+      typeof record.showTodayHumidity === "boolean"
+        ? record.showTodayHumidity
+        : typeof record.showHumidity === "boolean"
+          ? record.showHumidity
+          : undefined,
+  };
+}, weatherModuleConfigObjectSchema);
 
 export const weatherModuleCurrentResponseSchema = z.object({
   generatedAt: z.string().datetime({ offset: true }),
@@ -104,12 +101,8 @@ export const weatherLocationSearchResponseSchema = z.object({
 export type WeatherTemperatureUnit = z.infer<typeof weatherTemperatureUnitSchema>;
 export type WeatherWindSpeedUnit = z.infer<typeof weatherWindSpeedUnitSchema>;
 export type WeatherModuleConfig = z.infer<typeof weatherModuleConfigSchema>;
-export type WeatherModuleCurrentResponse = z.infer<
-  typeof weatherModuleCurrentResponseSchema
->;
+export type WeatherModuleCurrentResponse = z.infer<typeof weatherModuleCurrentResponseSchema>;
 export type WeatherModuleParams = z.infer<typeof weatherModuleParamsSchema>;
 export type WeatherLocationSearchQuery = z.infer<typeof weatherLocationSearchQuerySchema>;
 export type WeatherLocationResult = z.infer<typeof weatherLocationResultSchema>;
-export type WeatherLocationSearchResponse = z.infer<
-  typeof weatherLocationSearchResponseSchema
->;
+export type WeatherLocationSearchResponse = z.infer<typeof weatherLocationSearchResponseSchema>;

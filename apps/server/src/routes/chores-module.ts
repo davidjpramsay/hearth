@@ -9,10 +9,7 @@ import {
 import type { FastifyInstance } from "fastify";
 import type { AppServices } from "../types.js";
 
-export const registerChoresModuleRoutes = (
-  app: FastifyInstance,
-  services: AppServices,
-): void => {
+export const registerChoresModuleRoutes = (app: FastifyInstance, services: AppServices): void => {
   app.get("/modules/chores/:instanceId/summary", async (request, reply) => {
     const params = choresModuleParamsSchema.safeParse(request.params);
     if (!params.success) {
@@ -26,8 +23,7 @@ export const registerChoresModuleRoutes = (
 
     const payoutConfig = services.settingsRepository.getChoresPayoutConfig();
     const startDate =
-      query.data.startDate ??
-      toCalendarDateInTimeZone(new Date(), payoutConfig.siteTimezone);
+      query.data.startDate ?? toCalendarDateInTimeZone(new Date(), payoutConfig.siteTimezone);
     reply.header("cache-control", "no-store");
     const moduleInstance = services.layoutRepository.findModuleInstance(
       params.data.instanceId,

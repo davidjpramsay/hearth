@@ -23,14 +23,8 @@ import {
   type ScreenFamilyLayoutTarget,
   type ScreenProfileLayouts,
 } from "@hearth/shared";
-import {
-  resolveLayoutLogicAction,
-  resolveLayoutLogicCondition,
-} from "../layout-logic/registry.js";
-import {
-  isEscalatingLocalWarning,
-  type LocalWarningService,
-} from "./local-warning-service.js";
+import { resolveLayoutLogicAction, resolveLayoutLogicCondition } from "../layout-logic/registry.js";
+import { isEscalatingLocalWarning, type LocalWarningService } from "./local-warning-service.js";
 import type { DeviceRepository } from "../repositories/device-repository.js";
 import type { LayoutRepository } from "../repositories/layout-repository.js";
 import type { SettingsRepository } from "../repositories/settings-repository.js";
@@ -41,8 +35,7 @@ const DEFAULT_SET_ID = "set-1";
 const LOCAL_WARNING_LAYOUT_ID = 2_147_483_000;
 const LOCAL_WARNING_MODULE_INSTANCE_ID = "local-warnings-auto";
 
-const clampCycleSeconds = (value: number): number =>
-  Math.max(3, Math.min(3600, Math.round(value)));
+const clampCycleSeconds = (value: number): number => Math.max(3, Math.min(3600, Math.round(value)));
 
 const toAutoOrientation = (
   orientation: PhotosOrientation | null,
@@ -60,9 +53,7 @@ const toAvailableSets = (mapping: ScreenProfileLayouts) =>
     name: targets.name,
   }));
 
-const toAvailableLayouts = (
-  names: string[],
-): ReportScreenProfileLayoutOption[] =>
+const toAvailableLayouts = (names: string[]): ReportScreenProfileLayoutOption[] =>
   names.map((name) => ({ name }));
 
 const createAutomaticWarningLayout = (
@@ -136,15 +127,12 @@ type ValidateManagedDeviceTargetSelectionResult =
       message: string;
     };
 
-const toSequenceKey = (
-  family: string,
-  targets: AutoLayoutTarget[],
-): string =>
+const toSequenceKey = (family: string, targets: AutoLayoutTarget[]): string =>
   `${family}::${targets
     .map(
       (target) =>
         `${target.layoutName}:${clampCycleSeconds(target.cycleSeconds ?? DEFAULT_TARGET_CYCLE_SECONDS)}`,
-      )
+    )
     .join("|")}`;
 
 const createDeviceTargetCatalog = (input: {
@@ -266,9 +254,7 @@ export class ScreenProfileService {
     const nowMs = Date.now();
     this.pruneStaleSessions(nowMs);
     const mapping = this.settingsRepository.getScreenProfileLayouts();
-    const layoutNames = this.layoutRepository
-      .listLayouts(false)
-      .map((layout) => layout.name);
+    const layoutNames = this.layoutRepository.listLayouts(false).map((layout) => layout.name);
     const targetCatalog = createDeviceTargetCatalog({
       mapping,
       layoutNames,
@@ -307,22 +293,18 @@ export class ScreenProfileService {
         setId: null,
       });
     const requestedSetId =
-      effectiveTargetSelection.kind === "set"
-        ? effectiveTargetSelection.setId
-        : null;
+      effectiveTargetSelection.kind === "set" ? effectiveTargetSelection.setId : null;
     const selectedSet =
-      (requestedSetId
-        ? availableSets.find((set) => set.id === requestedSetId)
-        : null) ?? availableSets[0] ?? null;
+      (requestedSetId ? availableSets.find((set) => set.id === requestedSetId) : null) ??
+      availableSets[0] ??
+      null;
     const family = selectedSet?.id ?? DEFAULT_SET_ID;
     const familyTargets: ScreenFamilyLayoutTarget = selectedSet
       ? mapping.families[selectedSet.id]
       : screenFamilyLayoutTargetSchema.parse({});
     const requestedPhotoOrientation = payload.photoOrientation ?? null;
     const appliedPhotoOrientation =
-      effectiveTargetSelection.kind === "set"
-        ? toAutoOrientation(requestedPhotoOrientation)
-        : null;
+      effectiveTargetSelection.kind === "set" ? toAutoOrientation(requestedPhotoOrientation) : null;
     const resolution =
       effectiveTargetSelection.kind === "layout"
         ? {
@@ -455,19 +437,17 @@ export class ScreenProfileService {
         name: trackedDevice.name,
         themeId: trackedDevice.themeId,
         targetSelection: deviceTargetSelection,
-        },
-        resolvedTargetSelection,
-        layout: null,
-        warningTicker,
-        reason: "no-layout",
-      });
+      },
+      resolvedTargetSelection,
+      layout: null,
+      warningTicker,
+      reason: "no-layout",
+    });
   }
 
   private getDeviceTargetCatalog(): DeviceTargetCatalog {
     const mapping = this.settingsRepository.getScreenProfileLayouts();
-    const layoutNames = this.layoutRepository
-      .listLayouts(false)
-      .map((layout) => layout.name);
+    const layoutNames = this.layoutRepository.listLayouts(false).map((layout) => layout.name);
 
     return createDeviceTargetCatalog({
       mapping,
@@ -510,9 +490,7 @@ export class ScreenProfileService {
     let state: SessionCycleState;
     if (!existing || existing.sequenceKey !== sequenceKey) {
       const initialDurationMs =
-        clampCycleSeconds(
-          input.targets[0]?.cycleSeconds ?? DEFAULT_TARGET_CYCLE_SECONDS,
-        ) * 1000;
+        clampCycleSeconds(input.targets[0]?.cycleSeconds ?? DEFAULT_TARGET_CYCLE_SECONDS) * 1000;
       state = {
         sequenceKey,
         index: 0,
@@ -623,7 +601,10 @@ export class ScreenProfileService {
       return null;
     }
 
-    const warningById = new Map<string, Awaited<ReturnType<LocalWarningService["listActiveWarnings"]>>[number]>();
+    const warningById = new Map<
+      string,
+      Awaited<ReturnType<LocalWarningService["listActiveWarnings"]>>[number]
+    >();
     let locationLabel: string | null = null;
 
     for (const node of warningNodes) {

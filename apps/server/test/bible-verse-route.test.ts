@@ -46,27 +46,24 @@ test("bible verse route selects the verse of the day using the household timezon
   }) as typeof fetch;
 
   const app = Fastify();
-  registerBibleVerseRoutes(
-    app,
-    {
-      layoutRepository: {
-        findModuleInstance: () => ({
-          module: {
-            config: {
-              refreshIntervalSeconds: 300,
-              showReference: true,
-              showSource: false,
-            },
+  registerBibleVerseRoutes(app, {
+    layoutRepository: {
+      findModuleInstance: () => ({
+        module: {
+          config: {
+            refreshIntervalSeconds: 300,
+            showReference: true,
+            showSource: false,
           },
-        }),
-      },
-      settingsRepository: {
-        getSiteTimeConfig: () => ({
-          siteTimezone: "Australia/Perth",
-        }),
-      },
-    } as unknown as AppServices,
-  );
+        },
+      }),
+    },
+    settingsRepository: {
+      getSiteTimeConfig: () => ({
+        siteTimezone: "Australia/Perth",
+      }),
+    },
+  } as unknown as AppServices);
 
   try {
     const response = await app.inject({
@@ -74,10 +71,7 @@ test("bible verse route selects the verse of the day using the household timezon
       url: "/modules/bible-verse/test-instance/today",
     });
 
-    const expectedReference = selectDailyPassageReference(
-      fixedNow,
-      "Australia/Perth",
-    );
+    const expectedReference = selectDailyPassageReference(fixedNow, "Australia/Perth");
     assert.equal(response.statusCode, 200);
     assert.equal(response.headers["cache-control"], "no-store");
     assert.equal(requestedReference, expectedReference);

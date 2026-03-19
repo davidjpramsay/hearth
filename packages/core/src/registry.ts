@@ -1,8 +1,4 @@
-import {
-  moduleManifestSchema,
-  type ModuleDefinition,
-  type ModuleManifest,
-} from "@hearth/shared";
+import { moduleManifestSchema, type ModuleDefinition, type ModuleManifest } from "@hearth/shared";
 
 export class ModuleRegistry {
   private readonly modules = new Map<string, ModuleDefinition<any>>();

@@ -6,10 +6,7 @@ const streamQuerySchema = z.object({
   topic: z.string().trim().min(1),
 });
 
-export const registerModuleAdapterRoutes = (
-  app: FastifyInstance,
-  services: AppServices,
-): void => {
+export const registerModuleAdapterRoutes = (app: FastifyInstance, services: AppServices): void => {
   app.get("/modules/adapters", async (_request, reply) => {
     const adapters = services.moduleAdapterService.listAdapters().map((adapter) => ({
       id: adapter.id,
@@ -36,9 +33,7 @@ export const registerModuleAdapterRoutes = (
 
     const eventBus = services.moduleAdapterService.getEventBus();
     const unsubscribe = eventBus.subscribe(parsedQuery.data.topic, (payload) => {
-      reply.raw.write(
-        `data: ${JSON.stringify({ topic: parsedQuery.data.topic, payload })}\n\n`,
-      );
+      reply.raw.write(`data: ${JSON.stringify({ topic: parsedQuery.data.topic, payload })}\n\n`);
     });
 
     const heartbeat = setInterval(() => {

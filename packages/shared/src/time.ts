@@ -3,11 +3,7 @@ import { z } from "zod";
 const FALLBACK_TIME_ZONE = "UTC";
 const CALENDAR_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-export const moduleTimeModeSchema = z.enum([
-  "device-local",
-  "site-local",
-  "source-local",
-]);
+export const moduleTimeModeSchema = z.enum(["device-local", "site-local", "source-local"]);
 
 export const isValidIanaTimeZone = (value: string): boolean => {
   const candidate = value.trim();
@@ -23,14 +19,9 @@ export const isValidIanaTimeZone = (value: string): boolean => {
   }
 };
 
-export const ianaTimeZoneSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(120)
-  .refine(isValidIanaTimeZone, {
-    message: "Invalid IANA time zone",
-  });
+export const ianaTimeZoneSchema = z.string().trim().min(1).max(120).refine(isValidIanaTimeZone, {
+  message: "Invalid IANA time zone",
+});
 
 export const siteTimeConfigSchema = z.object({
   siteTimezone: ianaTimeZoneSchema.default(FALLBACK_TIME_ZONE),
@@ -43,10 +34,7 @@ export const getRuntimeTimeZone = (): string => {
     : FALLBACK_TIME_ZONE;
 };
 
-export const toCalendarDateInTimeZone = (
-  date: Date,
-  timeZone: string,
-): string => {
+export const toCalendarDateInTimeZone = (date: Date, timeZone: string): string => {
   const normalizedTimeZone = ianaTimeZoneSchema.parse(timeZone);
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: normalizedTimeZone,

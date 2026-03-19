@@ -8,6 +8,7 @@ test("server status adapter response schema accepts valid payload", () => {
     service: "hearth-server",
     uptimeSeconds: 123.4,
     timestamp: new Date().toISOString(),
+    processStartedAt: new Date().toISOString(),
     memory: {
       rss: 1000,
       heapUsed: 500,
@@ -17,8 +18,17 @@ test("server status adapter response schema accepts valid payload", () => {
       hostname: "local",
       platform: "darwin",
     },
+    build: {
+      serverEntrySha1: "abc123",
+      serverEntryBuiltAt: new Date().toISOString(),
+      webIndexSha1: "def456",
+      webIndexBuiltAt: new Date().toISOString(),
+      webMainScript: "/assets/index-123.js",
+      webMainStylesheet: "/assets/index-123.css",
+    },
   });
 
   assert.equal(parsed.ok, true);
   assert.equal(parsed.service, "hearth-server");
+  assert.equal(parsed.build.webMainScript, "/assets/index-123.js");
 });

@@ -210,6 +210,4 @@ export type UpdateChoreMemberRequest = z.infer<typeof updateChoreMemberRequestSc
 export type CreateChoreRequest = z.infer<typeof createChoreRequestSchema>;
 export type UpdateChoreRequest = z.infer<typeof updateChoreRequestSchema>;
 export type SetChoreCompletionRequest = z.infer<typeof setChoreCompletionRequestSchema>;
-export type UpdateChoresPayoutConfigRequest = z.infer<
-  typeof updateChoresPayoutConfigRequestSchema
->;
+export type UpdateChoresPayoutConfigRequest = z.infer<typeof updateChoresPayoutConfigRequestSchema>;

@@ -9,8 +9,9 @@ import type { ModuleInstanceStore, PersistedModuleInstance } from "./module-inst
 
 type SdkModuleAny = SdkModuleDefinition<any, any>;
 
-export interface RegisteredModuleDefinition<TConfig = unknown>
-  extends SharedModuleDefinition<TConfig> {
+export interface RegisteredModuleDefinition<
+  TConfig = unknown,
+> extends SharedModuleDefinition<TConfig> {
   source: "sdk";
   version: string;
   description?: string;
@@ -43,9 +44,7 @@ const createFallbackSettingsPanel =
     </div>
   );
 
-export const adaptSdkModule = (
-  definition: SdkModuleAny,
-): RegisteredModuleDefinition<any> => {
+export const adaptSdkModule = (definition: SdkModuleAny): RegisteredModuleDefinition<any> => {
   const fallbackSettingsPanel = createFallbackSettingsPanel<any>();
 
   return {
@@ -118,10 +117,7 @@ export class UnifiedModuleRegistry {
     return this.modules.get(id);
   }
 
-  createInstance(
-    moduleId: string,
-    config?: Record<string, unknown>,
-  ): PersistedModuleInstance {
+  createInstance(moduleId: string, config?: Record<string, unknown>): PersistedModuleInstance {
     const moduleDefinition = this.getModule(moduleId);
     if (!moduleDefinition) {
       throw new Error(`Unknown module '${moduleId}'`);

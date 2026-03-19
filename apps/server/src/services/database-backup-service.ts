@@ -89,7 +89,10 @@ export class DatabaseBackupService {
 
   private async createBackup(): Promise<void> {
     const timestamp = toBackupTimestamp(new Date());
-    const targetPath = join(this.backupDir, `${BACKUP_FILE_PREFIX}${timestamp}${BACKUP_FILE_SUFFIX}`);
+    const targetPath = join(
+      this.backupDir,
+      `${BACKUP_FILE_PREFIX}${timestamp}${BACKUP_FILE_SUFFIX}`,
+    );
     await this.db.backup(targetPath);
     this.logger.info(`[backup] Created ${targetPath}`);
   }
@@ -103,10 +106,7 @@ export class DatabaseBackupService {
         continue;
       }
 
-      if (
-        !entry.name.startsWith(BACKUP_FILE_PREFIX) ||
-        !entry.name.endsWith(BACKUP_FILE_SUFFIX)
-      ) {
+      if (!entry.name.startsWith(BACKUP_FILE_PREFIX) || !entry.name.endsWith(BACKUP_FILE_SUFFIX)) {
         continue;
       }
 
@@ -119,4 +119,3 @@ export class DatabaseBackupService {
     }
   }
 }
-

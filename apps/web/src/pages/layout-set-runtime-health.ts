@@ -89,9 +89,7 @@ const sequenceSummary = (sequence: AutoLayoutTarget[]): string => {
     .join(" -> ");
 };
 
-const getOutgoingByNode = (
-  edges: LayoutSetLogicEdge[],
-): Map<string, LayoutSetLogicEdge[]> => {
+const getOutgoingByNode = (edges: LayoutSetLogicEdge[]): Map<string, LayoutSetLogicEdge[]> => {
   const grouped = new Map<string, LayoutSetLogicEdge[]>();
   for (const edge of edges) {
     const current = grouped.get(edge.from);

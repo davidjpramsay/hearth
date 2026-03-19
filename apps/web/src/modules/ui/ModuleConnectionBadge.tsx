@@ -28,12 +28,7 @@ export const ModuleConnectionBadge = ({
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        <path
-          d="M4 4l16 16"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
+        <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     </div>
   );

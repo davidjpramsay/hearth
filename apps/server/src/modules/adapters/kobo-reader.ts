@@ -129,10 +129,7 @@ const classifyKoboReaderError = (error: unknown): Error => {
   return error;
 };
 
-const withReadonlyDatabase = <T,>(
-  filePath: string,
-  run: (db: Database.Database) => T,
-): T => {
+const withReadonlyDatabase = <T>(filePath: string, run: (db: Database.Database) => T): T => {
   const db = openReadonlyDatabase(filePath);
 
   try {
@@ -142,10 +139,7 @@ const withReadonlyDatabase = <T,>(
   }
 };
 
-const resolveContainedPath = (
-  rootPath: string,
-  ...segments: string[]
-): string | null => {
+const resolveContainedPath = (rootPath: string, ...segments: string[]): string | null => {
   const resolvedRoot = resolve(rootPath);
   const candidatePath = resolve(rootPath, ...segments);
 
@@ -214,10 +208,7 @@ const findLatestReadingState = (
     )
     .get(userName) ?? null;
 
-const findLatestBookmark = (
-  db: Database.Database,
-  stateId: number,
-): KoboBookmarkRow | null =>
+const findLatestBookmark = (db: Database.Database, stateId: number): KoboBookmarkRow | null =>
   db
     .prepare<[number], KoboBookmarkRow>(
       `
@@ -233,10 +224,7 @@ const findLatestBookmark = (
     )
     .get(stateId) ?? null;
 
-const findLatestStatistics = (
-  db: Database.Database,
-  stateId: number,
-): KoboStatisticsRow | null =>
+const findLatestStatistics = (db: Database.Database, stateId: number): KoboStatisticsRow | null =>
   db
     .prepare<[number], KoboStatisticsRow>(
       `
@@ -251,10 +239,7 @@ const findLatestStatistics = (
     )
     .get(stateId) ?? null;
 
-const findBookById = (
-  db: Database.Database,
-  bookId: number,
-): KoboBookRow | null =>
+const findBookById = (db: Database.Database, bookId: number): KoboBookRow | null =>
   db
     .prepare<[number], KoboBookRow>(
       `
@@ -334,7 +319,9 @@ export const readLatestKoboBook = (userName: string): KoboReaderCurrentResponse 
     });
   }
 
-  const book = withReadonlyDatabase(paths.libraryDbPath, (db) => findBookById(db, state.state.bookId));
+  const book = withReadonlyDatabase(paths.libraryDbPath, (db) =>
+    findBookById(db, state.state.bookId),
+  );
   if (!book) {
     return koboReaderCurrentResponseSchema.parse({
       generatedAt: new Date().toISOString(),
@@ -379,9 +366,7 @@ export const koboReaderAdapter: ModuleServerAdapter = {
   registerRoutes: (app) => {
     app.get("/users", async (request, reply) => {
       try {
-        return reply
-          .header("cache-control", "no-store")
-          .send(readKoboUsers());
+        return reply.header("cache-control", "no-store").send(readKoboUsers());
       } catch (error) {
         const classifiedError = classifyKoboReaderError(error);
         const message = classifiedError.message || "Failed to load Kobo users.";
@@ -429,7 +414,8 @@ export const koboReaderAdapter: ModuleServerAdapter = {
           return reply.code(404).send({ message: "Cover image not found." });
         }
 
-        const mimeType = COVER_MIME_TYPES[extname(cover.coverFilePath).toLowerCase()] ?? "image/jpeg";
+        const mimeType =
+          COVER_MIME_TYPES[extname(cover.coverFilePath).toLowerCase()] ?? "image/jpeg";
         reply.header("Cache-Control", "public, max-age=31536000, immutable");
         reply.type(mimeType);
         return reply.send(createReadStream(cover.coverFilePath));

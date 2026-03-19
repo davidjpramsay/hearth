@@ -25,8 +25,7 @@ const DEFAULT_TARGET_CYCLE_SECONDS = 20;
 const DEFAULT_SET_ID = "set-1";
 const DEFAULT_SET_NAME = "Layout set 1";
 
-const clampCycleSeconds = (value: number): number =>
-  Math.max(3, Math.min(3600, Math.round(value)));
+const clampCycleSeconds = (value: number): number => Math.max(3, Math.min(3600, Math.round(value)));
 
 const normalizeSetId = (value: string): string => {
   const trimmed = value.trim();
@@ -39,8 +38,7 @@ const normalizeSetId = (value: string): string => {
 const isValidLayoutName = (
   layoutName: string | null | undefined,
   knownLayoutNames: Set<string>,
-): layoutName is string =>
-  typeof layoutName === "string" && knownLayoutNames.has(layoutName);
+): layoutName is string => typeof layoutName === "string" && knownLayoutNames.has(layoutName);
 
 const uniqueLayoutNames = (
   values: Array<string | null | undefined>,
@@ -83,11 +81,7 @@ export interface NormalizeScreenProfileLayoutsInput {
   input: ScreenProfileLayouts;
   knownLayoutNames: Iterable<string>;
   fallbackStaticLayoutName?: string | null;
-  resolveSetId?: (input: {
-    sourceSetId: string;
-    index: number;
-    usedSetIds: Set<string>;
-  }) => string;
+  resolveSetId?: (input: { sourceSetId: string; index: number; usedSetIds: Set<string> }) => string;
   resolveSetName?: (input: {
     sourceName: string;
     sourceSetId: string;
@@ -105,8 +99,7 @@ export const normalizeScreenProfileLayoutsConfig = (
   const parsed = screenProfileLayoutsSchema.parse(input.input);
   const knownLayoutNames = new Set(input.knownLayoutNames);
   const defaultSetId = normalizeSetId(input.defaultSetId ?? DEFAULT_SET_ID);
-  const defaultSetName =
-    input.defaultSetName?.trim().slice(0, 80) || DEFAULT_SET_NAME;
+  const defaultSetName = input.defaultSetName?.trim().slice(0, 80) || DEFAULT_SET_NAME;
   const defaultPhotoActionType =
     input.defaultPhotoActionType ?? DEFAULT_LAYOUT_LOGIC_PHOTO_ACTION_TYPE;
 
@@ -131,10 +124,7 @@ export const normalizeScreenProfileLayoutsConfig = (
 
     usedSetIds.add(setId);
 
-    const staticLayoutName = isValidLayoutName(
-      source.staticLayoutName,
-      knownLayoutNames,
-    )
+    const staticLayoutName = isValidLayoutName(source.staticLayoutName, knownLayoutNames)
       ? source.staticLayoutName
       : null;
 
@@ -156,20 +146,12 @@ export const normalizeScreenProfileLayoutsConfig = (
       source.autoLayoutTargets.length > 0
         ? source.autoLayoutTargets
         : [
-            ...(staticLayoutName
-              ? [toRule(staticLayoutName, "always")]
-              : []),
-            ...legacyPortraitTargets.map((layoutName) =>
-              toRule(layoutName, "portrait-photo"),
-            ),
-            ...legacyLandscapeTargets.map((layoutName) =>
-              toRule(layoutName, "landscape-photo"),
-            ),
+            ...(staticLayoutName ? [toRule(staticLayoutName, "always")] : []),
+            ...legacyPortraitTargets.map((layoutName) => toRule(layoutName, "portrait-photo")),
+            ...legacyLandscapeTargets.map((layoutName) => toRule(layoutName, "landscape-photo")),
           ];
 
-    const shouldMigrateLegacyTargets = isDefaultLayoutSetLogicGraph(
-      source.logicGraph,
-    );
+    const shouldMigrateLegacyTargets = isDefaultLayoutSetLogicGraph(source.logicGraph);
     const initialGraph =
       shouldMigrateLegacyTargets && sourceTargets.length > 0
         ? createLayoutSetLogicGraphFromTargets(sourceTargets)
@@ -196,20 +178,15 @@ export const normalizeScreenProfileLayoutsConfig = (
     const autoLayoutTargets = toAutoLayoutTargetsFromLogicGraph(logicGraph);
     const branches = getLayoutSetLogicBranches(logicGraph);
 
-    const resolvedStaticLayoutName =
-      staticLayoutName ?? autoLayoutTargets[0]?.layoutName ?? null;
+    const resolvedStaticLayoutName = staticLayoutName ?? autoLayoutTargets[0]?.layoutName ?? null;
 
     const portraitPhotoLayoutNames = uniqueLayoutNames(
-      [...branches.alwaysRules, ...branches.portraitRules].map(
-        (target) => target.layoutName,
-      ),
+      [...branches.alwaysRules, ...branches.portraitRules].map((target) => target.layoutName),
       knownLayoutNames,
     );
 
     const landscapePhotoLayoutNames = uniqueLayoutNames(
-      [...branches.alwaysRules, ...branches.landscapeRules].map(
-        (target) => target.layoutName,
-      ),
+      [...branches.alwaysRules, ...branches.landscapeRules].map((target) => target.layoutName),
       knownLayoutNames,
     );
 
@@ -220,9 +197,7 @@ export const normalizeScreenProfileLayoutsConfig = (
         setId,
         index: entryIndex + 1,
       }) ??
-      (source.name?.trim().length
-        ? source.name.trim().slice(0, 80)
-        : `Set ${setId}`.slice(0, 80));
+      (source.name?.trim().length ? source.name.trim().slice(0, 80) : `Set ${setId}`.slice(0, 80));
 
     families[setId] = {
       name: resolvedName,
@@ -267,12 +242,8 @@ export const normalizeScreenProfileLayoutsConfig = (
       autoLayoutTargets: fallbackTargets,
       portraitPhotoLayoutName: fallbackStaticLayoutName,
       landscapePhotoLayoutName: fallbackStaticLayoutName,
-      portraitPhotoLayoutNames: fallbackStaticLayoutName
-        ? [fallbackStaticLayoutName]
-        : [],
-      landscapePhotoLayoutNames: fallbackStaticLayoutName
-        ? [fallbackStaticLayoutName]
-        : [],
+      portraitPhotoLayoutNames: fallbackStaticLayoutName ? [fallbackStaticLayoutName] : [],
+      landscapePhotoLayoutNames: fallbackStaticLayoutName ? [fallbackStaticLayoutName] : [],
     };
   }
 

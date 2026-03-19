@@ -93,8 +93,7 @@ const customConditionTypes: LayoutLogicConditionTypeDefinition[] = [
   {
     id: LOCAL_WARNING_CONDITION_TYPE,
     label: "Local warning is active",
-    description:
-      "Match when Emergency WA reports an active local warning for the chosen place.",
+    description: "Match when Emergency WA reports an active local warning for the chosen place.",
     trigger: "portrait-photo",
     paramsSchema: localWarningConditionParamsSchema,
     paramFields: [
@@ -135,17 +134,17 @@ const layoutLogicRegistry = createLayoutLogicRegistry({
   conditions: [
     ...BUILTIN_LAYOUT_LOGIC_CONDITIONS.map(
       (condition): LayoutLogicConditionTypeDefinition => ({
-      id: condition.id,
-      label: condition.label,
-      description: condition.description,
-      trigger: condition.trigger,
-      evaluate: (context: LayoutLogicContext, params: LayoutLogicParams) =>
-        condition.evaluate({
-          conditionType: condition.id,
-          conditionParams: params,
-          trigger: condition.trigger,
-          orientation: context.orientation,
-        }) ?? false,
+        id: condition.id,
+        label: condition.label,
+        description: condition.description,
+        trigger: condition.trigger,
+        evaluate: (context: LayoutLogicContext, params: LayoutLogicParams) =>
+          condition.evaluate({
+            conditionType: condition.id,
+            conditionParams: params,
+            trigger: condition.trigger,
+            orientation: context.orientation,
+          }) ?? false,
       }),
     ),
     ...customConditionTypes,
@@ -188,15 +187,12 @@ const layoutLogicRegistry = createLayoutLogicRegistry({
   ],
 });
 
-export const LOGIC_CONDITION_TYPES: LogicConditionTypeDefinition[] =
-  layoutLogicRegistry.conditions;
+export const LOGIC_CONDITION_TYPES: LogicConditionTypeDefinition[] = layoutLogicRegistry.conditions;
 export const LOGIC_CANVAS_ACTION_TYPES: LogicCanvasActionTypeDefinition[] =
   layoutLogicRegistry.canvasActions;
-export const LOGIC_ACTION_TYPES: LogicActionTypeDefinition[] =
-  layoutLogicRegistry.ruleActions;
+export const LOGIC_ACTION_TYPES: LogicActionTypeDefinition[] = layoutLogicRegistry.ruleActions;
 
-const DEFAULT_ACTION_TYPE =
-  LOGIC_ACTION_TYPES[0]?.id ?? DEFAULT_LAYOUT_LOGIC_ACTION_TYPE;
+const DEFAULT_ACTION_TYPE = LOGIC_ACTION_TYPES[0]?.id ?? DEFAULT_LAYOUT_LOGIC_ACTION_TYPE;
 const DEFAULT_CANVAS_ACTION_TYPE =
   LOGIC_CANVAS_ACTION_TYPES[0]?.id ?? DEFAULT_LAYOUT_LOGIC_PHOTO_ACTION_TYPE;
 const DEFAULT_CONDITION_PORTRAIT =
@@ -204,9 +200,7 @@ const DEFAULT_CONDITION_PORTRAIT =
 const DEFAULT_CONDITION_LANDSCAPE =
   LOGIC_CONDITION_TYPES[1]?.id ?? DEFAULT_LANDSCAPE_LAYOUT_LOGIC_CONDITION_TYPE;
 
-export const getDefaultConditionTypeForTrigger = (
-  trigger: LogicBranchTrigger,
-): string | null => {
+export const getDefaultConditionTypeForTrigger = (trigger: LogicBranchTrigger): string | null => {
   if (trigger === "always") {
     return null;
   }
@@ -218,12 +212,10 @@ export const getDefaultConditionTypeForTrigger = (
 };
 
 export const getDefaultActionTypeId = (): string => DEFAULT_ACTION_TYPE;
-export const getDefaultCanvasActionTypeId = (): string =>
-  DEFAULT_CANVAS_ACTION_TYPE;
+export const getDefaultCanvasActionTypeId = (): string => DEFAULT_CANVAS_ACTION_TYPE;
 export const getDefaultConditionParamsForTrigger = (
   trigger: Exclude<LogicBranchTrigger, "always">,
-): LogicParams =>
-  parseConditionParamsByType(getDefaultConditionTypeForTrigger(trigger), {});
+): LogicParams => parseConditionParamsByType(getDefaultConditionTypeForTrigger(trigger), {});
 
 export const getConditionTypeById = (
   id: string | null | undefined,
@@ -233,12 +225,9 @@ export const getConditionTypeById = (
 export const getCanvasActionTypeById = (
   id: string | null | undefined,
 ): LogicCanvasActionTypeDefinition =>
-  LOGIC_CANVAS_ACTION_TYPES.find((entry) => entry.id === id) ??
-  LOGIC_CANVAS_ACTION_TYPES[0];
+  LOGIC_CANVAS_ACTION_TYPES.find((entry) => entry.id === id) ?? LOGIC_CANVAS_ACTION_TYPES[0];
 
-export const getActionTypeById = (
-  id: string | null | undefined,
-): LogicActionTypeDefinition =>
+export const getActionTypeById = (id: string | null | undefined): LogicActionTypeDefinition =>
   LOGIC_ACTION_TYPES.find((entry) => entry.id === id) ?? LOGIC_ACTION_TYPES[0];
 
 export const parseActionParamsByType = (
@@ -257,9 +246,8 @@ export const parseConditionParamsByType = (
   return parseLogicParams(condition?.paramsSchema, params);
 };
 
-export const getDefaultActionParams = (
-  actionTypeId: string | null | undefined,
-): LogicParams => parseActionParamsByType(actionTypeId, {});
+export const getDefaultActionParams = (actionTypeId: string | null | undefined): LogicParams =>
+  parseActionParamsByType(actionTypeId, {});
 
 export const getDefaultConditionParams = (
   conditionTypeId: string | null | undefined,
@@ -270,10 +258,7 @@ export const resolveRuleActionTargets = (input: {
   orientation: "portrait" | "landscape" | null;
 }): Array<{ layoutName: string; cycleSeconds: number }> => {
   const action = getActionTypeById(input.rule.actionType);
-  const actionParams = parseActionParamsByType(
-    input.rule.actionType,
-    input.rule.actionParams,
-  );
+  const actionParams = parseActionParamsByType(input.rule.actionType, input.rule.actionParams);
   const resolved = action.resolveTargets?.({
     layoutName: input.rule.layoutName,
     cycleSeconds: toSafeSeconds(input.rule.cycleSeconds),
@@ -310,8 +295,7 @@ export const evaluateConditionById = (input: {
 }): boolean | null => {
   const condition =
     LOGIC_CONDITION_TYPES.find(
-      (entry) =>
-        entry.id === input.conditionType && entry.trigger === input.trigger,
+      (entry) => entry.id === input.conditionType && entry.trigger === input.trigger,
     ) ?? null;
   if (!condition?.evaluate) {
     return null;

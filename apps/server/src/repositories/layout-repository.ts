@@ -1,8 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
-import {
-  createEmptyLayoutConfig,
-  validateLayoutConfig,
-} from "@hearth/core";
+import { createEmptyLayoutConfig, validateLayoutConfig } from "@hearth/core";
 import {
   layoutRecordSchema,
   type LayoutConfig,
@@ -38,9 +35,7 @@ export class LayoutRepository {
     private readonly db: Database.Database,
     options: { calendarEncryptionSecret: string },
   ) {
-    this.calendarKey = createHash("sha256")
-      .update(options.calendarEncryptionSecret)
-      .digest();
+    this.calendarKey = createHash("sha256").update(options.calendarEncryptionSecret).digest();
 
     this.migrateStoredCalendarSources();
   }
@@ -155,9 +150,7 @@ export class LayoutRepository {
   }
 
   private migrateStoredCalendarSources(): void {
-    const rows = this.db
-      .prepare<[], LayoutConfigRow>("SELECT id, config_json FROM layouts")
-      .all();
+    const rows = this.db.prepare<[], LayoutConfigRow>("SELECT id, config_json FROM layouts").all();
     const updates: Array<{ id: number; configJson: string }> = [];
 
     for (const row of rows) {
@@ -182,20 +175,22 @@ export class LayoutRepository {
       return;
     }
 
-    const transaction = this.db.transaction((entries: Array<{ id: number; configJson: string }>) => {
-      const updateStatement = this.db.prepare<{ id: number; configJson: string }>(
-        `
+    const transaction = this.db.transaction(
+      (entries: Array<{ id: number; configJson: string }>) => {
+        const updateStatement = this.db.prepare<{ id: number; configJson: string }>(
+          `
         UPDATE layouts
         SET config_json = @configJson,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = @id
         `,
-      );
+        );
 
-      for (const entry of entries) {
-        updateStatement.run(entry);
-      }
-    });
+        for (const entry of entries) {
+          updateStatement.run(entry);
+        }
+      },
+    );
 
     transaction(updates);
   }
@@ -231,9 +226,10 @@ export class LayoutRepository {
 
   getByName(name: string): LayoutRecord | null {
     const row = this.db
-      .prepare<{ name: string }, LayoutRow>(
-        "SELECT * FROM layouts WHERE lower(name) = lower(@name) LIMIT 1",
-      )
+      .prepare<
+        { name: string },
+        LayoutRow
+      >("SELECT * FROM layouts WHERE lower(name) = lower(@name) LIMIT 1")
       .get({ name });
 
     return row ? this.toLayoutRecord(row) : null;
@@ -260,8 +256,7 @@ export class LayoutRepository {
 
       const moduleInstance = layout.config.modules.find(
         (instance) =>
-          instance.id === instanceId &&
-          (moduleId === undefined || instance.moduleId === moduleId),
+          instance.id === instanceId && (moduleId === undefined || instance.moduleId === moduleId),
       );
 
       if (!moduleInstance) {
@@ -432,9 +427,7 @@ export class LayoutRepository {
     }
 
     const transaction = this.db.transaction(() => {
-      this.db
-        .prepare<{ id: number }>("DELETE FROM layouts WHERE id = @id")
-        .run({ id });
+      this.db.prepare<{ id: number }>("DELETE FROM layouts WHERE id = @id").run({ id });
 
       if (existing.active === 1) {
         const replacement = this.db

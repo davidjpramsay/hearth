@@ -6,10 +6,7 @@ import {
 import type { FastifyInstance } from "fastify";
 import type { AppServices } from "../types.js";
 
-export const registerCalendarRoutes = (
-  app: FastifyInstance,
-  services: AppServices,
-): void => {
+export const registerCalendarRoutes = (app: FastifyInstance, services: AppServices): void => {
   app.get("/modules/calendar/:instanceId/events", async (request, reply) => {
     const params = calendarModuleParamsSchema.safeParse(request.params);
 
@@ -26,15 +23,12 @@ export const registerCalendarRoutes = (
       return reply.code(404).send({ message: "Calendar module instance not found" });
     }
 
-    const parsedConfig = calendarModuleConfigSchema.safeParse(
-      calendarInstanceMatch.module.config,
-    );
+    const parsedConfig = calendarModuleConfigSchema.safeParse(calendarInstanceMatch.module.config);
     const normalizedConfig = parsedConfig.success
       ? parsedConfig.data
       : calendarModuleConfigSchema.parse({});
 
-    const calendarData =
-      await services.calendarFeedService.getUpcomingEvents(normalizedConfig);
+    const calendarData = await services.calendarFeedService.getUpcomingEvents(normalizedConfig);
 
     return reply.send(calendarModuleEventsResponseSchema.parse(calendarData));
   });

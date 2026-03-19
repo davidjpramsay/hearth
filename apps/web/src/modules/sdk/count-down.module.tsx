@@ -54,11 +54,7 @@ const parseDateInputToMs = (value: string): number | null => {
   const month = Number(monthPart);
   const day = Number(dayPart);
 
-  if (
-    !Number.isFinite(year) ||
-    !Number.isFinite(month) ||
-    !Number.isFinite(day)
-  ) {
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
     return null;
   }
 
@@ -98,12 +94,7 @@ const splitDuration = (remainingMs: number): CountdownParts => {
   };
 };
 
-const parseBoundedInteger = (
-  value: string,
-  min: number,
-  max: number,
-  fallback: number,
-): number => {
+const parseBoundedInteger = (value: string, min: number, max: number, fallback: number): number => {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed)) {
     return fallback;
@@ -271,8 +262,8 @@ export const moduleDefinition = defineModule({
   runtime: {
     Component: ({ instanceId, settings, isEditing }) => {
       const [nowMs, setNowMs] = useState(() => Date.now());
-      const [durationTargetMs, setDurationTargetMs] = useState(() =>
-        Date.now() + durationToMs(settings),
+      const [durationTargetMs, setDurationTargetMs] = useState(
+        () => Date.now() + durationToMs(settings),
       );
 
       useEffect(() => {
@@ -344,9 +335,7 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-copy-title text-slate-100">
-              Count Down preview
-            </p>
+            <p className="module-copy-title text-slate-100">Count Down preview</p>
             <p className="module-copy-meta mt-2 text-slate-300">
               {settings.eventName.trim() || "Upcoming Event"}
             </p>
@@ -373,9 +362,7 @@ export const moduleDefinition = defineModule({
           ) : null}
 
           <div>
-            <p
-              className="module-copy-label truncate text-[color:var(--color-text-secondary)]"
-            >
+            <p className="module-copy-label truncate text-[color:var(--color-text-secondary)]">
               Event
             </p>
             <p
@@ -415,9 +402,7 @@ export const moduleDefinition = defineModule({
                   >
                     {segment.value}
                   </p>
-                  <p className="module-copy-label mt-2 text-slate-300">
-                    {segment.label}
-                  </p>
+                  <p className="module-copy-label mt-2 text-slate-300">{segment.label}</p>
                 </div>
               ))}
             </div>

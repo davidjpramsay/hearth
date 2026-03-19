@@ -5,10 +5,7 @@ interface AdminNavActionsProps {
   onLogout: () => void;
 }
 
-export const AdminNavActions = ({
-  current,
-  onLogout,
-}: AdminNavActionsProps) => {
+export const AdminNavActions = ({ current, onLogout }: AdminNavActionsProps) => {
   const navigate = useNavigate();
 
   return (

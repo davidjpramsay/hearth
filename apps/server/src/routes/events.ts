@@ -1,10 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { AppServices } from "../types.js";
 
-export const registerEventRoutes = (
-  app: FastifyInstance,
-  services: AppServices,
-): void => {
+export const registerEventRoutes = (app: FastifyInstance, services: AppServices): void => {
   app.get("/events/layouts", async (request, reply) => {
     reply.hijack();
     reply.raw.writeHead(200, {

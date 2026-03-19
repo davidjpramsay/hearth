@@ -6,10 +6,7 @@ import {
 import type { FastifyInstance } from "fastify";
 import type { AppServices } from "../types.js";
 
-export const registerLocalWarningsRoutes = (
-  app: FastifyInstance,
-  services: AppServices,
-): void => {
+export const registerLocalWarningsRoutes = (app: FastifyInstance, services: AppServices): void => {
   app.get("/modules/local-warnings/current", async (request, reply) => {
     const parsedQuery = localWarningsModuleCurrentQuerySchema.safeParse(request.query ?? {});
 

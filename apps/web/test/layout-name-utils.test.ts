@@ -14,11 +14,7 @@ test("uses (copy) suffix when no collision exists", () => {
 test("increments copy suffix when collisions exist", () => {
   const name = buildDuplicateLayoutName({
     sourceName: "Home layout",
-    existingNames: [
-      "Home layout",
-      "Home layout (copy)",
-      "home layout (copy 2)",
-    ],
+    existingNames: ["Home layout", "Home layout (copy)", "home layout (copy 2)"],
   });
 
   assert.equal(name, "Home layout (copy 3)");

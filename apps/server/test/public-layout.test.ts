@@ -51,10 +51,7 @@ test("sanitizeLayoutRecordForPublicDisplay redacts calendar URLs and photo folde
 
   const sanitized = sanitizeLayoutRecordForPublicDisplay(layout);
   assert.ok(sanitized);
-  assert.deepEqual(sanitized.config.modules[0]?.config.calendars, [
-    "Calendar 1",
-    "Calendar 2",
-  ]);
+  assert.deepEqual(sanitized.config.modules[0]?.config.calendars, ["Calendar 1", "Calendar 2"]);
   assert.equal(sanitized.config.modules[0]?.config.calendarLabels[0], "School");
   assert.equal(sanitized.config.modules[1]?.config.folderPath, "/photos");
 });

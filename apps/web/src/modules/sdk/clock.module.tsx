@@ -1,13 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
-import {
-  clampModulePresentationScale,
-  withModulePresentation,
-} from "@hearth/shared";
+import { clampModulePresentationScale, withModulePresentation } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
-import {
-  ModulePresentationControls,
-} from "../ui/ModulePresentationControls";
+import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { useTileDensity } from "../ui/useTileDensity";
 
 const baseSettingsSchema = withModulePresentation(
@@ -190,9 +185,7 @@ export const moduleDefinition = defineModule({
         ? `${timeParts.primary}:${timeParts.second}`
         : timeParts.primary;
       const inlineDayPeriod =
-        !settings.use24Hour && timeParts.dayPeriod
-          ? timeParts.dayPeriod
-          : null;
+        !settings.use24Hour && timeParts.dayPeriod ? timeParts.dayPeriod : null;
       const timeRowClass = compact ? "items-end gap-2.5" : "items-end gap-3";
       const timeInlineMetaClass = "module-copy-meta";
 
@@ -240,9 +233,7 @@ export const moduleDefinition = defineModule({
             ) : null}
 
             <div className={`flex w-full ${timeRowClass}`}>
-              <p
-                className="module-copy-hero leading-none text-[color:var(--color-text-accent)]"
-              >
+              <p className="module-copy-hero leading-none text-[color:var(--color-text-accent)]">
                 {inlineTime}
                 {inlineDayPeriod ? (
                   <span
@@ -253,7 +244,6 @@ export const moduleDefinition = defineModule({
                 ) : null}
               </p>
             </div>
-
           </div>
         </div>
       );

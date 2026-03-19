@@ -12,10 +12,8 @@ export const DEFAULT_LAYOUT_LOGIC_ACTION_TYPE = "layout.display";
 export const PRIORITY_LAYOUT_LOGIC_ACTION_TYPE = "layout.display.priority";
 export const DEFAULT_LAYOUT_LOGIC_PHOTO_ACTION_TYPE = "photo.select-next";
 export const PHOTO_COLLECTION_ACTION_PARAM_KEY = "photoCollectionId";
-export const DEFAULT_PORTRAIT_LAYOUT_LOGIC_CONDITION_TYPE =
-  "photo.orientation.portrait";
-export const DEFAULT_LANDSCAPE_LAYOUT_LOGIC_CONDITION_TYPE =
-  "photo.orientation.landscape";
+export const DEFAULT_PORTRAIT_LAYOUT_LOGIC_CONDITION_TYPE = "photo.orientation.portrait";
+export const DEFAULT_LANDSCAPE_LAYOUT_LOGIC_CONDITION_TYPE = "photo.orientation.landscape";
 
 type LayoutLogicConditionTrigger = Exclude<AutoLayoutTargetTrigger, "always">;
 
@@ -24,9 +22,7 @@ export interface BuiltinLayoutLogicConditionDefinition {
   label: string;
   description: string;
   trigger: LayoutLogicConditionTrigger;
-  evaluate: (
-    input: LayoutLogicConditionEvaluationInput,
-  ) => boolean | null;
+  evaluate: (input: LayoutLogicConditionEvaluationInput) => boolean | null;
 }
 
 export interface BuiltinLayoutLogicCanvasActionDefinition {
@@ -46,8 +42,7 @@ export interface BuiltinLayoutLogicRuleActionDefinition {
   ) => LayoutLogicResolvedTarget | LayoutLogicResolvedTarget[] | null;
 }
 
-const clampCycleSeconds = (value: number): number =>
-  Math.max(3, Math.min(3600, Math.round(value)));
+const clampCycleSeconds = (value: number): number => Math.max(3, Math.min(3600, Math.round(value)));
 
 export const BUILTIN_LAYOUT_LOGIC_CONDITIONS: BuiltinLayoutLogicConditionDefinition[] = [
   {
@@ -66,24 +61,20 @@ export const BUILTIN_LAYOUT_LOGIC_CONDITIONS: BuiltinLayoutLogicConditionDefinit
   },
 ];
 
-export const BUILTIN_LAYOUT_LOGIC_CANVAS_ACTIONS: BuiltinLayoutLogicCanvasActionDefinition[] =
-  [
-    {
-      id: DEFAULT_LAYOUT_LOGIC_PHOTO_ACTION_TYPE,
-      label: "Select next photo",
-      nodeLabel: "Select next photo from library",
-      description:
-        "Pick the next photo and determine its orientation before evaluating If branches.",
-    },
-  ];
+export const BUILTIN_LAYOUT_LOGIC_CANVAS_ACTIONS: BuiltinLayoutLogicCanvasActionDefinition[] = [
+  {
+    id: DEFAULT_LAYOUT_LOGIC_PHOTO_ACTION_TYPE,
+    label: "Select next photo",
+    nodeLabel: "Select next photo from library",
+    description: "Pick the next photo and determine its orientation before evaluating If branches.",
+  },
+];
 
 const resolveDisplayLayoutAction = (
   input: LayoutLogicActionResolutionInput,
 ): LayoutLogicResolvedTarget => ({
   layoutName: input.layoutName,
-  cycleSeconds: clampCycleSeconds(
-    input.cycleSeconds ?? DEFAULT_TARGET_CYCLE_SECONDS,
-  ),
+  cycleSeconds: clampCycleSeconds(input.cycleSeconds ?? DEFAULT_TARGET_CYCLE_SECONDS),
   actionParams: input.actionParams,
 });
 
@@ -97,19 +88,14 @@ export const BUILTIN_LAYOUT_LOGIC_RULE_ACTIONS: BuiltinLayoutLogicRuleActionDefi
   {
     id: PRIORITY_LAYOUT_LOGIC_ACTION_TYPE,
     label: "Display layout (priority)",
-    description:
-      "Same as Display layout, but tagged as priority for future scheduler rules.",
+    description: "Same as Display layout, but tagged as priority for future scheduler rules.",
     summaryPrefix: "Priority",
     resolveTargets: resolveDisplayLayoutAction,
   },
 ];
 
-const conditionById = new Map(
-  BUILTIN_LAYOUT_LOGIC_CONDITIONS.map((entry) => [entry.id, entry]),
-);
-const actionById = new Map(
-  BUILTIN_LAYOUT_LOGIC_RULE_ACTIONS.map((entry) => [entry.id, entry]),
-);
+const conditionById = new Map(BUILTIN_LAYOUT_LOGIC_CONDITIONS.map((entry) => [entry.id, entry]));
+const actionById = new Map(BUILTIN_LAYOUT_LOGIC_RULE_ACTIONS.map((entry) => [entry.id, entry]));
 
 export const getDefaultLayoutLogicConditionTypeForTrigger = (
   trigger: LayoutLogicConditionTrigger,
@@ -154,9 +140,7 @@ export const renderBuiltinLayoutLogicRuleSummary = (input: {
   cycleSeconds: number;
 }): string => {
   const action = actionById.get(input.actionType);
-  const safeCycleSeconds = clampCycleSeconds(
-    input.cycleSeconds ?? DEFAULT_TARGET_CYCLE_SECONDS,
-  );
+  const safeCycleSeconds = clampCycleSeconds(input.cycleSeconds ?? DEFAULT_TARGET_CYCLE_SECONDS);
   const layoutName = input.layoutName || "No layout";
 
   if (action?.summaryPrefix) {
@@ -172,8 +156,6 @@ export const getPhotoCollectionIdFromActionParams = (
   if (!params || typeof params !== "object") {
     return null;
   }
-  const parsed = photoCollectionIdSchema.safeParse(
-    params[PHOTO_COLLECTION_ACTION_PARAM_KEY],
-  );
+  const parsed = photoCollectionIdSchema.safeParse(params[PHOTO_COLLECTION_ACTION_PARAM_KEY]);
   return parsed.success ? parsed.data : null;
 };

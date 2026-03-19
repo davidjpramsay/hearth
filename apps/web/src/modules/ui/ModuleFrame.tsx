@@ -110,9 +110,7 @@ export const ModuleFrame = ({
         {error ? (
           <div className="module-frame__feedback module-frame__feedback--error">{error}</div>
         ) : empty ? (
-          <div className="module-frame__feedback module-frame__feedback--empty">
-            {emptyMessage}
-          </div>
+          <div className="module-frame__feedback module-frame__feedback--empty">{emptyMessage}</div>
         ) : (
           children
         )}

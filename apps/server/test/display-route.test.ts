@@ -30,21 +30,18 @@ const createHarness = async () => {
   const app = Fastify();
 
   app.decorate("authenticate", async () => {});
-  registerDisplayRoutes(
-    app,
-    {
-      layoutRepository,
-      choresRepository: {} as AppServices["choresRepository"],
-      deviceRepository,
-      settingsRepository,
-      moduleStateRepository: {} as AppServices["moduleStateRepository"],
-      calendarFeedService: {} as AppServices["calendarFeedService"],
-      photosSlideshowService: {} as AppServices["photosSlideshowService"],
-      screenProfileService,
-      layoutEventBus,
-      moduleAdapterService: {} as AppServices["moduleAdapterService"],
-    },
-  );
+  registerDisplayRoutes(app, {
+    layoutRepository,
+    choresRepository: {} as AppServices["choresRepository"],
+    deviceRepository,
+    settingsRepository,
+    moduleStateRepository: {} as AppServices["moduleStateRepository"],
+    calendarFeedService: {} as AppServices["calendarFeedService"],
+    photosSlideshowService: {} as AppServices["photosSlideshowService"],
+    screenProfileService,
+    layoutEventBus,
+    moduleAdapterService: {} as AppServices["moduleAdapterService"],
+  });
   await app.ready();
 
   return {

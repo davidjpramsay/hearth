@@ -54,8 +54,7 @@ const legacyScreenProfileLayoutsSchema = z.object({
   photoLandscapeLayoutId: z.number().int().positive().nullable().optional(),
 });
 
-const clampCycleSeconds = (value: number): number =>
-  Math.max(3, Math.min(3600, Math.round(value)));
+const clampCycleSeconds = (value: number): number => Math.max(3, Math.min(3600, Math.round(value)));
 
 const toRule = (
   layoutName: string,
@@ -84,9 +83,8 @@ export class SettingsRepository {
 
   private getDefaultSiteTimeZone(): string {
     const configuredTimeZone = this.options.defaultSiteTimeZone?.trim() ?? "";
-    const parsedConfiguredTimeZone = siteTimeConfigSchema.shape.siteTimezone.safeParse(
-      configuredTimeZone,
-    );
+    const parsedConfiguredTimeZone =
+      siteTimeConfigSchema.shape.siteTimezone.safeParse(configuredTimeZone);
     if (parsedConfiguredTimeZone.success) {
       return parsedConfiguredTimeZone.data;
     }
@@ -94,21 +92,14 @@ export class SettingsRepository {
     return getRuntimeTimeZone();
   }
 
-  private toNeutralSetId(
-    setId: string,
-    fallbackIndex: number,
-    usedIds: Set<string>,
-  ): string {
+  private toNeutralSetId(setId: string, fallbackIndex: number, usedIds: Set<string>): string {
     const legacyMapped = LEGACY_SET_ID_TO_NEUTRAL_ID[setId];
     const slug = setId
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
-    const baseId = (legacyMapped ?? (slug.length > 0 ? slug : `set-${fallbackIndex}`)).slice(
-      0,
-      80,
-    );
+    const baseId = (legacyMapped ?? (slug.length > 0 ? slug : `set-${fallbackIndex}`)).slice(0, 80);
 
     if (!usedIds.has(baseId)) {
       usedIds.add(baseId);
@@ -132,11 +123,7 @@ export class SettingsRepository {
 
   private resolveSetName(currentName: string, fallbackIndex: number): string {
     const trimmed = currentName.trim();
-    if (
-      trimmed.length > 0 &&
-      trimmed !== "Layout set" &&
-      !LEGACY_SET_NAMES.has(trimmed)
-    ) {
+    if (trimmed.length > 0 && trimmed !== "Layout set" && !LEGACY_SET_NAMES.has(trimmed)) {
       return trimmed.slice(0, 80);
     }
 
@@ -144,17 +131,16 @@ export class SettingsRepository {
   }
 
   private listLayoutNames(): Set<string> {
-    const rows = this.db
-      .prepare<[], { name: string }>("SELECT name FROM layouts")
-      .all();
+    const rows = this.db.prepare<[], { name: string }>("SELECT name FROM layouts").all();
     return new Set(rows.map((row) => row.name));
   }
 
   private getPreferredLayoutName(): string | null {
     const row = this.db
-      .prepare<[], { name: string }>(
-        "SELECT name FROM layouts ORDER BY active DESC, id ASC LIMIT 1",
-      )
+      .prepare<
+        [],
+        { name: string }
+      >("SELECT name FROM layouts ORDER BY active DESC, id ASC LIMIT 1")
       .get();
     return row?.name ?? null;
   }
@@ -170,8 +156,7 @@ export class SettingsRepository {
       fallbackStaticLayoutName: this.getPreferredLayoutName(),
       resolveSetId: ({ sourceSetId, index, usedSetIds }) =>
         this.toNeutralSetId(sourceSetId, index, usedSetIds),
-      resolveSetName: ({ sourceName, index }) =>
-        this.resolveSetName(sourceName, index),
+      resolveSetName: ({ sourceName, index }) => this.resolveSetName(sourceName, index),
       defaultSetId: DEFAULT_SET_ID,
       defaultSetName: DEFAULT_SET_NAME,
       defaultPhotoActionType: DEFAULT_PHOTO_ACTION_TYPE,
@@ -221,21 +206,15 @@ export class SettingsRepository {
         logicDisconnectedEdgeIds: [],
         autoLayoutTargets,
         portraitPhotoLayoutName:
-          branches.portraitRules[0]?.layoutName ??
-          branches.alwaysRules[0]?.layoutName ??
-          null,
+          branches.portraitRules[0]?.layoutName ?? branches.alwaysRules[0]?.layoutName ?? null,
         landscapePhotoLayoutName:
-          branches.landscapeRules[0]?.layoutName ??
-          branches.alwaysRules[0]?.layoutName ??
-          null,
-        portraitPhotoLayoutNames: [
-          ...branches.alwaysRules,
-          ...branches.portraitRules,
-        ].map((rule) => rule.layoutName),
-        landscapePhotoLayoutNames: [
-          ...branches.alwaysRules,
-          ...branches.landscapeRules,
-        ].map((rule) => rule.layoutName),
+          branches.landscapeRules[0]?.layoutName ?? branches.alwaysRules[0]?.layoutName ?? null,
+        portraitPhotoLayoutNames: [...branches.alwaysRules, ...branches.portraitRules].map(
+          (rule) => rule.layoutName,
+        ),
+        landscapePhotoLayoutNames: [...branches.alwaysRules, ...branches.landscapeRules].map(
+          (rule) => rule.layoutName,
+        ),
       };
     };
 
@@ -297,9 +276,7 @@ export class SettingsRepository {
 
   private getValue(key: string): string | null {
     const row = this.db
-      .prepare<{ key: string }, { value: string }>(
-        "SELECT value FROM settings WHERE key = @key",
-      )
+      .prepare<{ key: string }, { value: string }>("SELECT value FROM settings WHERE key = @key")
       .get({ key });
 
     return row?.value ?? null;

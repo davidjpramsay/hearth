@@ -124,11 +124,7 @@ const installBrowserShims = () => {
     configurable: true,
     value: async (input: string | URL | Request) => {
       const url =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.toString()
-            : input.url;
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
       return createFetchResponse(url);
     },
   });
@@ -181,10 +177,7 @@ const restoreBrowserShims = () => {
   });
 };
 
-const renderModule = (
-  moduleDefinition: TestModuleDefinition,
-  isEditing: boolean,
-) => {
+const renderModule = (moduleDefinition: TestModuleDefinition, isEditing: boolean) => {
   const Component = moduleDefinition.runtime.Component;
   return React.createElement(
     StrictMode,

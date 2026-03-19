@@ -9,9 +9,7 @@ export class ModuleStateRepository {
 
   getState<T>(key: string): T | null {
     const row = this.db
-      .prepare<{ key: string }, ModuleStateRow>(
-        "SELECT value FROM module_state WHERE key = @key",
-      )
+      .prepare<{ key: string }, ModuleStateRow>("SELECT value FROM module_state WHERE key = @key")
       .get({ key });
 
     if (!row) {

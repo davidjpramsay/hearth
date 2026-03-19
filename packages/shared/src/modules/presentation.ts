@@ -15,10 +15,7 @@ const modulePresentationScaleSchema = z
   .min(MODULE_PRESENTATION_SCALE_MIN)
   .max(MODULE_PRESENTATION_SCALE_MAX);
 
-export const clampModulePresentationScale = (
-  value: number,
-  fallback: number = 1,
-): number => {
+export const clampModulePresentationScale = (value: number, fallback: number = 1): number => {
   if (!Number.isFinite(value)) {
     return fallback;
   }

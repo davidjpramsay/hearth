@@ -7,8 +7,7 @@ export class DuplicateDeviceNameError extends Error {
   }
 }
 
-export const normalizeDeviceName = (value: string): string =>
-  value.trim().toLowerCase();
+export const normalizeDeviceName = (value: string): string => value.trim().toLowerCase();
 
 const formatDeviceCode = (deviceId: string): string => {
   const compact = deviceId

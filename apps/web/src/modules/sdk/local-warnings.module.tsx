@@ -75,9 +75,10 @@ const getWarningTone = (warning: LocalWarningItem) => {
     warning.headline,
   );
 
-  const accentRgb = haystack.includes("watch and act") || haystack.includes("emergency warning")
-    ? "var(--color-status-error-rgb)"
-    : "var(--color-status-loading-rgb)";
+  const accentRgb =
+    haystack.includes("watch and act") || haystack.includes("emergency warning")
+      ? "var(--color-status-error-rgb)"
+      : "var(--color-status-loading-rgb)";
 
   return {
     accentRgb,
@@ -133,8 +134,7 @@ const SettingsPanel = ({
         onChange={(event) =>
           onChange({
             ...settings,
-            refreshIntervalSeconds:
-              Number(event.target.value) || settings.refreshIntervalSeconds,
+            refreshIntervalSeconds: Number(event.target.value) || settings.refreshIntervalSeconds,
           })
         }
       />
@@ -196,9 +196,7 @@ export const moduleDefinition = defineModule({
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
             <p className="module-copy-title text-slate-100">Local warnings preview</p>
             <p className="module-copy-meta mt-2 text-slate-300">{settings.locationQuery}</p>
-            <p className="module-copy-meta mt-1 text-slate-400">
-              Source: Emergency WA CAP-AU
-            </p>
+            <p className="module-copy-meta mt-1 text-slate-400">Source: Emergency WA CAP-AU</p>
           </div>
         );
       }

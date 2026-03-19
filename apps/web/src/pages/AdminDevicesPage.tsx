@@ -13,6 +13,7 @@ import {
   getScreenProfileLayouts,
   updateDisplayDevice,
 } from "../api/client";
+import { getServerStatus, type ServerStatusResponse } from "../api/server-status";
 import { logoutAdminSession } from "../auth/session";
 import { getAuthToken } from "../auth/storage";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
@@ -109,7 +110,9 @@ const toDeviceDraft = (input: {
   };
 };
 
-const toUpdatePayload = (draft: DeviceDraft): {
+const toUpdatePayload = (
+  draft: DeviceDraft,
+): {
   name: string;
   themeId: ThemeId;
   targetSelection: ReportScreenTargetSelection | null;
@@ -160,6 +163,23 @@ const formatLastSeen = (value: string): string => {
   return new Date(timestamp).toLocaleString();
 };
 
+const formatTimestamp = (value: string | null): string => {
+  if (!value) {
+    return "Unavailable";
+  }
+
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleString() : value;
+};
+
+const formatFingerprint = (value: string | null): string => {
+  if (!value) {
+    return "Unavailable";
+  }
+
+  return value.slice(0, 12);
+};
+
 const hasValidRoutingTarget = (draft: DeviceDraft): boolean => {
   if (draft.routingMode === "set") {
     return draft.setId.trim().length > 0;
@@ -175,6 +195,8 @@ export const AdminDevicesPage = () => {
     useState<ScreenProfileLayouts>(defaultProfileLayouts);
   const [layoutNames, setLayoutNames] = useState<string[]>([]);
   const [drafts, setDrafts] = useState<Record<string, DeviceDraft>>({});
+  const [serverStatus, setServerStatus] = useState<ServerStatusResponse | null>(null);
+  const [serverStatusError, setServerStatusError] = useState<string | null>(null);
   const [busyDeviceState, setBusyDeviceState] = useState<{
     deviceId: string;
     action: BusyDeviceAction;
@@ -206,15 +228,27 @@ export const AdminDevicesPage = () => {
 
     try {
       setError(null);
-      const [devicesResponse, layoutsResponse, profileResponse] = await Promise.all([
-        getDisplayDevices(token),
-        getLayouts(false, token),
-        getScreenProfileLayouts(token),
-      ]);
+      const [devicesResponse, layoutsResponse, profileResponse, serverStatusResult] =
+        await Promise.all([
+          getDisplayDevices(token),
+          getLayouts(false, token),
+          getScreenProfileLayouts(token),
+          getServerStatus()
+            .then((data) => ({ data, error: null }))
+            .catch((statusError) => ({
+              data: null,
+              error:
+                statusError instanceof Error
+                  ? statusError.message
+                  : "Failed to load build visibility data",
+            })),
+        ]);
 
       setDevices(devicesResponse.devices);
       setLayoutNames(layoutsResponse.map((layout) => layout.name));
       setScreenProfileLayouts(profileResponse);
+      setServerStatus(serverStatusResult.data);
+      setServerStatusError(serverStatusResult.error);
 
       const nextAvailableSetIds = new Set(Object.keys(profileResponse.families));
       const nextFirstAvailableSetId = Object.keys(profileResponse.families)[0] ?? "";
@@ -340,10 +374,108 @@ export const AdminDevicesPage = () => {
       <section className="mb-6 rounded-xl border border-slate-700 bg-slate-900/70 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
+            <h2 className="text-lg font-semibold text-slate-100">Build visibility</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Shows the deployed web asset names and current server/runtime fingerprint so you can
+              confirm exactly what build is running.
+            </p>
+          </div>
+        </div>
+
+        {serverStatusError ? (
+          <p className="mt-4 rounded border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+            {serverStatusError}
+          </p>
+        ) : null}
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+            <h3 className="text-sm font-semibold text-slate-100">Server runtime</h3>
+            <dl className="mt-3 space-y-2 text-sm text-slate-300">
+              <div>
+                <dt className="text-slate-500">Host</dt>
+                <dd className="font-mono text-slate-200">
+                  {serverStatus?.host.hostname ?? "Unavailable"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Platform</dt>
+                <dd>{serverStatus?.host.platform ?? "Unavailable"}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Started</dt>
+                <dd>{formatTimestamp(serverStatus?.processStartedAt ?? null)}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Uptime</dt>
+                <dd>
+                  {serverStatus ? `${Math.floor(serverStatus.uptimeSeconds)}s` : "Unavailable"}
+                </dd>
+              </div>
+            </dl>
+          </article>
+
+          <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+            <h3 className="text-sm font-semibold text-slate-100">Deployed web build</h3>
+            <dl className="mt-3 space-y-2 text-sm text-slate-300">
+              <div>
+                <dt className="text-slate-500">Main script</dt>
+                <dd className="break-all font-mono text-slate-200">
+                  {serverStatus?.build.webMainScript ?? "Unavailable"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Stylesheet</dt>
+                <dd className="break-all font-mono text-slate-200">
+                  {serverStatus?.build.webMainStylesheet ?? "Unavailable"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Built at</dt>
+                <dd>{formatTimestamp(serverStatus?.build.webIndexBuiltAt ?? null)}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Index SHA</dt>
+                <dd className="font-mono text-slate-200">
+                  {formatFingerprint(serverStatus?.build.webIndexSha1 ?? null)}
+                </dd>
+              </div>
+            </dl>
+          </article>
+
+          <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+            <h3 className="text-sm font-semibold text-slate-100">Server build</h3>
+            <dl className="mt-3 space-y-2 text-sm text-slate-300">
+              <div>
+                <dt className="text-slate-500">Entry built at</dt>
+                <dd>{formatTimestamp(serverStatus?.build.serverEntryBuiltAt ?? null)}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Entry SHA</dt>
+                <dd className="font-mono text-slate-200">
+                  {formatFingerprint(serverStatus?.build.serverEntrySha1 ?? null)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Service</dt>
+                <dd>{serverStatus?.service ?? "Unavailable"}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Status</dt>
+                <dd>{serverStatus?.ok ? "Healthy" : "Unavailable"}</dd>
+              </div>
+            </dl>
+          </article>
+        </div>
+      </section>
+
+      <section className="mb-6 rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
             <h2 className="text-lg font-semibold text-slate-100">Connected displays</h2>
             <p className="mt-1 text-sm text-slate-400">
-              Devices appear here after they open the display page once. Give each one a
-              custom name so it is easy to tell your screens apart.
+              Devices appear here after they open the display page once. Give each one a custom name
+              so it is easy to tell your screens apart.
             </p>
           </div>
           <button
@@ -363,12 +495,14 @@ export const AdminDevicesPage = () => {
       ) : (
         <section className="grid gap-4">
           {devices.map((device) => {
-            const draft = drafts[device.id] ?? toDeviceDraft({
-              device,
-              availableSetIds,
-              availableLayoutNames,
-              firstAvailableSetId,
-            });
+            const draft =
+              drafts[device.id] ??
+              toDeviceDraft({
+                device,
+                availableSetIds,
+                availableLayoutNames,
+                firstAvailableSetId,
+              });
             const payload = toUpdatePayload({
               ...draft,
               name: draft.name.trim().length > 0 ? draft.name : device.name,
@@ -483,9 +617,7 @@ export const AdminDevicesPage = () => {
                             routingMode: nextRoutingMode,
                             setId: nextRoutingMode === "set" ? nextSetId : current.setId,
                             layoutName:
-                              nextRoutingMode === "layout"
-                                ? nextLayoutName
-                                : current.layoutName,
+                              nextRoutingMode === "layout" ? nextLayoutName : current.layoutName,
                             preserveImplicitSelection: false,
                           };
                         })
@@ -512,7 +644,9 @@ export const AdminDevicesPage = () => {
                         className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
                       >
                         <option value="" disabled={availableSetOptions.length > 0}>
-                          {availableSetOptions.length === 0 ? "No sets available" : "Choose a set..."}
+                          {availableSetOptions.length === 0
+                            ? "No sets available"
+                            : "Choose a set..."}
                         </option>
                         {availableSetOptions.map((option) => (
                           <option key={option.id} value={option.id}>

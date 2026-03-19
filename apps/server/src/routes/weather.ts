@@ -103,10 +103,7 @@ interface CurrentWeatherCacheEntry extends TimedCacheEntry {
 const locationSearchCache = new Map<string, LocationSearchCacheEntry>();
 const currentWeatherCache = new Map<string, CurrentWeatherCacheEntry>();
 
-const fetchJson = async <T>(
-  url: string,
-  parser: (payload: unknown) => T,
-): Promise<T> => {
+const fetchJson = async <T>(url: string, parser: (payload: unknown) => T): Promise<T> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 7000);
 
@@ -184,9 +181,7 @@ const readFreshCacheEntry = <T extends TimedCacheEntry>(
   return entry;
 };
 
-const readFreshCurrentWeatherCacheEntry = (
-  key: string,
-): CurrentWeatherCacheEntry | null => {
+const readFreshCurrentWeatherCacheEntry = (key: string): CurrentWeatherCacheEntry | null => {
   const entry = currentWeatherCache.get(key);
   if (!entry) {
     return null;
@@ -215,8 +210,7 @@ const parseLocationParts = (
     .filter(Boolean);
   const firstPart = parts[0] ?? null;
   const lastPart = parts.at(-1) ?? null;
-  const countryCode =
-    lastPart && /^[a-z]{2}$/i.test(lastPart) ? lastPart.toUpperCase() : null;
+  const countryCode = lastPart && /^[a-z]{2}$/i.test(lastPart) ? lastPart.toUpperCase() : null;
 
   if (countryCode && parts.length >= 2) {
     return {
@@ -257,9 +251,8 @@ const fetchGeocodeResults = async (input: {
     geocodeUrl.searchParams.set("countryCode", input.countryCode);
   }
 
-  const geocodePayload = await fetchJson(
-    geocodeUrl.toString(),
-    (payload) => GEOCODE_RESPONSE_SCHEMA.parse(payload),
+  const geocodePayload = await fetchJson(geocodeUrl.toString(), (payload) =>
+    GEOCODE_RESPONSE_SCHEMA.parse(payload),
   );
 
   return geocodePayload.results;
@@ -277,11 +270,7 @@ const findLocations = async (
       return;
     }
 
-    if (
-      attempts.some(
-        (entry) => entry.name === cleanedName && entry.countryCode === countryCode,
-      )
-    ) {
+    if (attempts.some((entry) => entry.name === cleanedName && entry.countryCode === countryCode)) {
       return;
     }
 
@@ -316,22 +305,16 @@ const toLocationLabel = (location: {
   country?: string;
   country_code?: string;
 }): string =>
-  [
-    location.name,
-    location.admin1 ?? null,
-    location.country_code ?? location.country ?? null,
-  ]
+  [location.name, location.admin1 ?? null, location.country_code ?? location.country ?? null]
     .filter((value): value is string => Boolean(value))
     .join(", ");
 
 const readActiveConfig = (
   services: AppServices,
   instanceId: string,
-):
-  | {
-      config: ReturnType<typeof weatherModuleConfigSchema.parse>;
-    }
-  | null => {
+): {
+  config: ReturnType<typeof weatherModuleConfigSchema.parse>;
+} | null => {
   const instance = services.layoutRepository.findModuleInstance(instanceId, "weather");
   if (!instance) {
     return null;
@@ -358,10 +341,7 @@ const buildCurrentWeatherCacheKey = (
     windSpeedUnit: activeConfig.windSpeedUnit,
   });
 
-export const registerWeatherRoutes = (
-  app: FastifyInstance,
-  services: AppServices,
-): void => {
+export const registerWeatherRoutes = (app: FastifyInstance, services: AppServices): void => {
   app.get("/modules/weather/locations", async (request, reply) => {
     const query = weatherLocationSearchQuerySchema.safeParse(request.query);
     if (!query.success) {
@@ -451,8 +431,7 @@ export const registerWeatherRoutes = (
 
     const generatedAt = new Date().toISOString();
     const currentWeatherCacheKey = buildCurrentWeatherCacheKey(activeConfig.config);
-    const currentWeatherTtlMs =
-      Math.max(60, activeConfig.config.refreshIntervalSeconds) * 1000;
+    const currentWeatherTtlMs = Math.max(60, activeConfig.config.refreshIntervalSeconds) * 1000;
     const cachedCurrent = readFreshCurrentWeatherCacheEntry(currentWeatherCacheKey);
     if (cachedCurrent) {
       return reply.send(weatherModuleCurrentResponseSchema.parse(cachedCurrent.payload));
@@ -496,9 +475,7 @@ export const registerWeatherRoutes = (
           });
           trimOldestCacheEntries(currentWeatherCache, CURRENT_WEATHER_CACHE_MAX_ENTRIES);
 
-          return reply.send(
-            payload,
-          );
+          return reply.send(payload);
         }
 
         latitude = location.latitude;
@@ -518,9 +495,7 @@ export const registerWeatherRoutes = (
         });
         trimOldestCacheEntries(currentWeatherCache, CURRENT_WEATHER_CACHE_MAX_ENTRIES);
 
-        return reply.send(
-          payload,
-        );
+        return reply.send(payload);
       }
 
       const forecastUrl = new URL("https://api.open-meteo.com/v1/forecast");
@@ -541,9 +516,8 @@ export const registerWeatherRoutes = (
       );
       forecastUrl.searchParams.set("timezone", "auto");
 
-      const forecastPayload = await fetchJson(
-        forecastUrl.toString(),
-        (payload) => FORECAST_RESPONSE_SCHEMA.parse(payload),
+      const forecastPayload = await fetchJson(forecastUrl.toString(), (payload) =>
+        FORECAST_RESPONSE_SCHEMA.parse(payload),
       );
 
       const current = forecastPayload.current;
@@ -560,9 +534,7 @@ export const registerWeatherRoutes = (
         });
         trimOldestCacheEntries(currentWeatherCache, CURRENT_WEATHER_CACHE_MAX_ENTRIES);
 
-        return reply.send(
-          payload,
-        );
+        return reply.send(payload);
       }
 
       const conditionCode = Number.isFinite(current.weather_code)
@@ -590,12 +562,7 @@ export const registerWeatherRoutes = (
                 : null,
             precipitationChancePercent:
               typeof daily.precipitation_probability_max?.[index] === "number"
-                ? Math.round(
-                    Math.max(
-                      0,
-                      Math.min(100, daily.precipitation_probability_max[index]),
-                    ),
-                  )
+                ? Math.round(Math.max(0, Math.min(100, daily.precipitation_probability_max[index])))
                 : null,
           }))
         : [];
@@ -606,10 +573,8 @@ export const registerWeatherRoutes = (
         temperature: current.temperature_2m,
         conditionCode,
         conditionLabel: conditionLabelFor(conditionCode),
-        isDay:
-          current.is_day === 1 ? true : current.is_day === 0 ? false : null,
-        windSpeed:
-          typeof current.wind_speed_10m === "number" ? current.wind_speed_10m : null,
+        isDay: current.is_day === 1 ? true : current.is_day === 0 ? false : null,
+        windSpeed: typeof current.wind_speed_10m === "number" ? current.wind_speed_10m : null,
         humidityPercent:
           typeof current.relative_humidity_2m === "number"
             ? Math.round(current.relative_humidity_2m)

@@ -1,4 +1,13 @@
-import { FormEvent, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createLayout,
@@ -17,10 +26,7 @@ import { AdminNavActions } from "../components/admin/AdminNavActions";
 import type { LogicBranchTrigger } from "../components/admin/logicNodeRegistry";
 import { PageShell } from "../components/PageShell";
 import { buildDuplicateLayoutName } from "./layout-name-utils";
-import {
-  analyzeSetRuntimeHealth,
-  type RuntimeHealthReport,
-} from "./layout-set-runtime-health";
+import { analyzeSetRuntimeHealth, type RuntimeHealthReport } from "./layout-set-runtime-health";
 import {
   compileLayoutSetAuthoringToLogicGraph,
   getLayoutSetLogicBranches,
@@ -172,9 +178,7 @@ const getNextCollectionFolderPath = (
   availableFolders: string[],
 ): string | null => {
   const used = new Set(
-    folders
-      .map((folder) => folder.trim())
-      .filter((folder) => folder.length > 0),
+    folders.map((folder) => folder.trim()).filter((folder) => folder.length > 0),
   );
 
   for (const folder of availableFolders) {
@@ -195,10 +199,8 @@ const normalizePhotoLibraryFolders = (folders: string[]): string[] =>
     .map((folder) => folder.trim())
     .filter((folder, index, all) => folder.length > 0 && all.indexOf(folder) === index);
 
-const areProfileLayoutsEqual = (
-  left: ScreenProfileLayouts,
-  right: ScreenProfileLayouts,
-): boolean => JSON.stringify(left) === JSON.stringify(right);
+const areProfileLayoutsEqual = (left: ScreenProfileLayouts, right: ScreenProfileLayouts): boolean =>
+  JSON.stringify(left) === JSON.stringify(right);
 
 const unique = (values: Array<string | null | undefined>): string[] => {
   const seen = new Set<string>();
@@ -299,9 +301,7 @@ const buildSetConfigFromAuthoring = (input: {
   const nextTargets = toAutoLayoutTargetsFromLogicGraph(nextGraph);
   const nextBranches = getLayoutSetLogicBranches(nextGraph);
   const nextPortraitLayoutNames = unique(
-    [...nextBranches.alwaysRules, ...nextBranches.portraitRules].map(
-      (target) => target.layoutName,
-    ),
+    [...nextBranches.alwaysRules, ...nextBranches.portraitRules].map((target) => target.layoutName),
   );
   const nextLandscapeLayoutNames = unique(
     [...nextBranches.alwaysRules, ...nextBranches.landscapeRules].map(
@@ -517,9 +517,7 @@ export const AdminLayoutsPage = () => {
       setError(null);
     } catch (refreshError) {
       setError(
-        refreshError instanceof Error
-          ? refreshError.message
-          : "Failed to refresh photo folders",
+        refreshError instanceof Error ? refreshError.message : "Failed to refresh photo folders",
       );
     } finally {
       setRefreshingPhotoFolders(false);
@@ -634,9 +632,7 @@ export const AdminLayoutsPage = () => {
       await loadLayouts();
       setError(null);
     } catch (createError) {
-      setError(
-        createError instanceof Error ? createError.message : "Failed to create layout",
-      );
+      setError(createError instanceof Error ? createError.message : "Failed to create layout");
     }
   };
 
@@ -650,9 +646,7 @@ export const AdminLayoutsPage = () => {
       await loadLayouts();
       setError(null);
     } catch (renameError) {
-      setError(
-        renameError instanceof Error ? renameError.message : "Failed to rename layout",
-      );
+      setError(renameError instanceof Error ? renameError.message : "Failed to rename layout");
     }
   };
 
@@ -661,9 +655,7 @@ export const AdminLayoutsPage = () => {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Delete layout "${layout.name}"? This cannot be undone.`,
-    );
+    const confirmed = window.confirm(`Delete layout "${layout.name}"? This cannot be undone.`);
     if (!confirmed) {
       return;
     }
@@ -673,9 +665,7 @@ export const AdminLayoutsPage = () => {
       await loadLayouts();
       setError(null);
     } catch (deleteError) {
-      setError(
-        deleteError instanceof Error ? deleteError.message : "Failed to delete layout",
-      );
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete layout");
     }
   };
 
@@ -698,9 +688,7 @@ export const AdminLayoutsPage = () => {
       setError(null);
     } catch (duplicateError) {
       setError(
-        duplicateError instanceof Error
-          ? duplicateError.message
-          : "Failed to duplicate layout",
+        duplicateError instanceof Error ? duplicateError.message : "Failed to duplicate layout",
       );
     }
   };
@@ -730,17 +718,12 @@ export const AdminLayoutsPage = () => {
       setError(null);
     } catch (updateError) {
       setError(
-        updateError instanceof Error
-          ? updateError.message
-          : "Failed to add photo collection",
+        updateError instanceof Error ? updateError.message : "Failed to add photo collection",
       );
     }
   };
 
-  const onRenamePhotoCollection = async (
-    collectionId: string,
-    nextNameRaw: string,
-  ) => {
+  const onRenamePhotoCollection = async (collectionId: string, nextNameRaw: string) => {
     const nextName = toUniqueCollectionName({
       desiredName: nextNameRaw,
       existing: photoCollectionsRef.current.collections,
@@ -761,17 +744,12 @@ export const AdminLayoutsPage = () => {
       setError(null);
     } catch (updateError) {
       setError(
-        updateError instanceof Error
-          ? updateError.message
-          : "Failed to rename photo collection",
+        updateError instanceof Error ? updateError.message : "Failed to rename photo collection",
       );
     }
   };
 
-  const onUpdatePhotoCollectionFolders = async (
-    collectionId: string,
-    nextFolders: string[],
-  ) => {
+  const onUpdatePhotoCollectionFolders = async (collectionId: string, nextFolders: string[]) => {
     try {
       await persistPhotoCollections((current) => ({
         collections: current.collections.map((collection) =>
@@ -786,9 +764,7 @@ export const AdminLayoutsPage = () => {
       setError(null);
     } catch (updateError) {
       setError(
-        updateError instanceof Error
-          ? updateError.message
-          : "Failed to update collection folders",
+        updateError instanceof Error ? updateError.message : "Failed to update collection folders",
       );
     }
   };
@@ -801,9 +777,7 @@ export const AdminLayoutsPage = () => {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Remove photo collection "${collection.name}"?`,
-    );
+    const confirmed = window.confirm(`Remove photo collection "${collection.name}"?`);
     if (!confirmed) {
       return;
     }
@@ -847,17 +821,12 @@ export const AdminLayoutsPage = () => {
       setError(null);
     } catch (updateError) {
       setError(
-        updateError instanceof Error
-          ? updateError.message
-          : "Failed to remove photo collection",
+        updateError instanceof Error ? updateError.message : "Failed to remove photo collection",
       );
     }
   };
 
-  const onUpdateSetAuthoring = async (
-    family: string,
-    nextAuthoringRaw: LayoutSetAuthoring,
-  ) => {
+  const onUpdateSetAuthoring = async (family: string, nextAuthoringRaw: LayoutSetAuthoring) => {
     const knownLayoutNames = new Set(layouts.map((layout) => layout.name));
     const currentSetConfig = screenProfileLayoutsRef.current.families[family];
     if (!currentSetConfig) {
@@ -873,9 +842,7 @@ export const AdminLayoutsPage = () => {
       graph: nextConfig.logicGraph,
       knownLayoutNames,
     });
-    const blockingIssue = runtimeHealth.issues.find(
-      (issue) => issue.severity === "error",
-    );
+    const blockingIssue = runtimeHealth.issues.find((issue) => issue.severity === "error");
     if (blockingIssue) {
       setError(`Set logic error: ${blockingIssue.message}`);
       return;
@@ -898,11 +865,7 @@ export const AdminLayoutsPage = () => {
       });
       setError(null);
     } catch (updateError) {
-      setError(
-        updateError instanceof Error
-          ? updateError.message
-          : "Failed to update set routing",
-      );
+      setError(updateError instanceof Error ? updateError.message : "Failed to update set routing");
     }
   };
 
@@ -932,11 +895,7 @@ export const AdminLayoutsPage = () => {
       });
       setError(null);
     } catch (updateError) {
-      setError(
-        updateError instanceof Error
-          ? updateError.message
-          : "Failed to rename set",
-      );
+      setError(updateError instanceof Error ? updateError.message : "Failed to rename set");
     }
   };
 
@@ -982,9 +941,7 @@ export const AdminLayoutsPage = () => {
       }));
       setError(null);
     } catch (updateError) {
-      setError(
-        updateError instanceof Error ? updateError.message : "Failed to add set",
-      );
+      setError(updateError instanceof Error ? updateError.message : "Failed to add set");
     }
   };
 
@@ -1011,9 +968,7 @@ export const AdminLayoutsPage = () => {
       });
       setError(null);
     } catch (updateError) {
-      setError(
-        updateError instanceof Error ? updateError.message : "Failed to remove set",
-      );
+      setError(updateError instanceof Error ? updateError.message : "Failed to remove set");
     }
   };
 
@@ -1208,8 +1163,8 @@ export const AdminLayoutsPage = () => {
         </div>
         <p className="mt-1 text-sm text-slate-300">
           <span className="block">
-            Collections are built from subfolders in your main photos library.
-            Add one or more folders to each collection.
+            Collections are built from subfolders in your main photos library. Add one or more
+            folders to each collection.
           </span>
           <span className="block">
             If no collection is selected, the default /photos library root is used.
@@ -1310,10 +1265,8 @@ export const AdminLayoutsPage = () => {
                   ]);
                 }}
                 disabled={
-                  getNextCollectionFolderPath(
-                    collection.folders,
-                    sortedPhotoLibraryFolders,
-                  ) === null
+                  getNextCollectionFolderPath(collection.folders, sortedPhotoLibraryFolders) ===
+                  null
                 }
               >
                 Add folder
@@ -1338,8 +1291,8 @@ export const AdminLayoutsPage = () => {
           <span className="block">Build each set as an action graph.</span>
           <span className="block">
             Start with a Photo Orientation node: choose a photo source, define portrait and
-            landscape conditions, drag action and layout nodes into the top-down canvas, wire
-            the paths, and the runtime compiles that into the execution graph automatically.
+            landscape conditions, drag action and layout nodes into the top-down canvas, wire the
+            paths, and the runtime compiles that into the execution graph automatically.
           </span>
         </p>
 

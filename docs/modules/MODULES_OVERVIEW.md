@@ -23,11 +23,13 @@ Hearth runtime is SDK-first:
 ## Architecture Layers
 
 1. Module SDK (`packages/module-sdk`)
+
 - `defineModule(...)`
 - typed manifest + schemas + runtime hooks
 - runtime validation helpers (`validateSettings`, `validateData`)
 
 2. Web registry abstraction (`apps/web/src/registry`)
+
 - `UnifiedModuleRegistry` with:
   - `listModules()`
   - `getModule(id)`
@@ -36,22 +38,26 @@ Hearth runtime is SDK-first:
 - primary runtime path for SDK module registration and rendering
 
 3. Standard data layer (`apps/web/src/modules/data`)
+
 - `useModuleQuery(...)` for polling + cache + SWR
 - `useModuleStream(...)` for SSE topic subscriptions
 
 4. Module UI shell (`apps/web/src/modules/ui/ModuleFrame.tsx`)
+
 - title bar
 - status indicator
 - last-updated timestamp
 - loading/error/empty presentation
 
 5. Server adapter layer (`apps/server/src/modules`)
+
 - adapter contract (`types.ts`)
 - event bus (`event-bus.ts`)
 - adapter lifecycle and route registration (`service.ts`)
 - routes mounted under `/api/modules/<adapter-id>`
 
 6. Generator
+
 - `pnpm create-module`
 - scaffolds web module + optional server adapter + module README
 

@@ -1,8 +1,4 @@
-import {
-  photosModuleConfigSchema,
-  type GridItem,
-  type ModuleInstance,
-} from "@hearth/shared";
+import { photosModuleConfigSchema, type GridItem, type ModuleInstance } from "@hearth/shared";
 
 const MIN_GRID_DIMENSION = 4;
 const TARGET_SHORT_SIDE_CELLS = 24;
@@ -63,10 +59,7 @@ const greatestCommonDivisor = (left: number, right: number): number => {
   return Math.max(1, a);
 };
 
-const reduceAspectUnits = (
-  width: number,
-  height: number,
-): { cols: number; rows: number } => {
+const reduceAspectUnits = (width: number, height: number): { cols: number; rows: number } => {
   const safeWidth = Math.max(1, Math.round(width));
   const safeHeight = Math.max(1, Math.round(height));
   const divisor = greatestCommonDivisor(safeWidth, safeHeight);
@@ -91,14 +84,12 @@ const shortSideScore = (shortSide: number): number => {
   return distanceFromTarget;
 };
 
-export const getAdaptiveGridMetrics = (
-  input: {
-    canvasWidth: number;
-    canvasHeight: number;
-    aspectWidth: number;
-    aspectHeight: number;
-  },
-): AdaptiveGridMetrics => {
+export const getAdaptiveGridMetrics = (input: {
+  canvasWidth: number;
+  canvasHeight: number;
+  aspectWidth: number;
+  aspectHeight: number;
+}): AdaptiveGridMetrics => {
   const safeCanvasWidth = Math.max(1, input.canvasWidth);
   const safeCanvasHeight = Math.max(1, input.canvasHeight);
   const safeAspectWidth = Math.max(1, input.aspectWidth);
@@ -130,10 +121,7 @@ export const getAdaptiveGridMetrics = (
   };
   const rowHeight = Math.max(
     1,
-    Math.min(
-      safeCanvasWidth / resolvedCandidate.cols,
-      safeCanvasHeight / resolvedCandidate.rows,
-    ),
+    Math.min(safeCanvasWidth / resolvedCandidate.cols, safeCanvasHeight / resolvedCandidate.rows),
   );
 
   return {
@@ -236,8 +224,7 @@ const quantizePhotoSize = (input: {
     if (
       score < bestScore ||
       (score === bestScore &&
-        (ratioError < bestRatioError ||
-          (ratioError === bestRatioError && distance < bestDistance)))
+        (ratioError < bestRatioError || (ratioError === bestRatioError && distance < bestDistance)))
     ) {
       bestCandidate = candidate;
       bestScore = score;
@@ -275,16 +262,8 @@ export const sanitizeGridItems = (input: {
   const yScale = input.sourceRows > 0 ? input.targetRows / input.sourceRows : 1;
   const prepared = input.items
     .map((item) => {
-      let nextWidth = clamp(
-        Math.round(Math.max(1, item.w) * xScale),
-        1,
-        input.targetCols,
-      );
-      let nextHeight = clamp(
-        Math.round(Math.max(1, item.h) * yScale),
-        1,
-        input.targetRows,
-      );
+      let nextWidth = clamp(Math.round(Math.max(1, item.w) * xScale), 1, input.targetCols);
+      let nextHeight = clamp(Math.round(Math.max(1, item.h) * yScale), 1, input.targetRows);
       const lock = getPhotoLayoutLock(modulesById.get(item.i));
 
       if (lock !== null) {

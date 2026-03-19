@@ -13,24 +13,21 @@ test("photo image route serves cacheable versioned assets", async () => {
   writeFileSync(imagePath, "fake-image");
 
   const app = Fastify();
-  registerPhotoRoutes(
-    app,
-    {
-      layoutRepository: {
-        findModuleInstance: () => ({
-          module: {
-            config: {},
-          },
-        }),
-      },
-      settingsRepository: {
-        getPhotoCollections: () => ({ collections: [] }),
-      },
-      photosSlideshowService: {
-        resolveImagePathFromToken: async () => imagePath,
-      },
-    } as unknown as AppServices,
-  );
+  registerPhotoRoutes(app, {
+    layoutRepository: {
+      findModuleInstance: () => ({
+        module: {
+          config: {},
+        },
+      }),
+    },
+    settingsRepository: {
+      getPhotoCollections: () => ({ collections: [] }),
+    },
+    photosSlideshowService: {
+      resolveImagePathFromToken: async () => imagePath,
+    },
+  } as unknown as AppServices);
 
   try {
     const response = await app.inject({
@@ -39,10 +36,7 @@ test("photo image route serves cacheable versioned assets", async () => {
     });
 
     assert.equal(response.statusCode, 200);
-    assert.equal(
-      response.headers["cache-control"],
-      "public, max-age=31536000, immutable",
-    );
+    assert.equal(response.headers["cache-control"], "public, max-age=31536000, immutable");
     assert.match(response.headers["content-type"] ?? "", /^image\/jpeg\b/);
   } finally {
     await app.close();

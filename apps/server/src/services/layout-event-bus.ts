@@ -30,10 +30,7 @@ export interface DisplayDeviceUpdatedEvent {
   reason: "device-updated";
 }
 
-export type AppEvent =
-  | LayoutUpdatedEvent
-  | ChoresUpdatedEvent
-  | DisplayDeviceUpdatedEvent;
+export type AppEvent = LayoutUpdatedEvent | ChoresUpdatedEvent | DisplayDeviceUpdatedEvent;
 
 type Listener = (event: AppEvent) => void;
 

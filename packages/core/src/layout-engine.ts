@@ -102,19 +102,13 @@ export const addModuleToLayoutAtPosition = (
   };
 };
 
-export const removeModuleFromLayout = (
-  config: LayoutConfig,
-  instanceId: string,
-): LayoutConfig => ({
+export const removeModuleFromLayout = (config: LayoutConfig, instanceId: string): LayoutConfig => ({
   ...config,
   modules: config.modules.filter((instance) => instance.id !== instanceId),
   items: config.items.filter((item) => item.i !== instanceId),
 });
 
-export const updateLayoutGridItems = (
-  config: LayoutConfig,
-  items: GridItem[],
-): LayoutConfig => {
+export const updateLayoutGridItems = (config: LayoutConfig, items: GridItem[]): LayoutConfig => {
   const validIds = new Set(config.modules.map((module) => module.id));
 
   return {

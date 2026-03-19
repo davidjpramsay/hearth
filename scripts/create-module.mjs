@@ -78,7 +78,9 @@ export const moduleDefinition = defineModule({
   settingsSchema,
   runtime: {
     Component: ({ settings }) => {
-      ${includeDataHook ? `const data = useModuleQuery({
+      ${
+        includeDataHook
+          ? `const data = useModuleQuery({
         key: "${slug}",
         queryFn: async () => {
           const response = await fetch("/api/modules/${slug}");
@@ -88,7 +90,9 @@ export const moduleDefinition = defineModule({
           return await response.json();
         },
         intervalMs: 30_000,
-      });` : ""}
+      });`
+          : ""
+      }
 
       return (
         <ModuleFrame
@@ -96,7 +100,7 @@ export const moduleDefinition = defineModule({
           ${includeDataHook ? "loading={data.loading} error={data.error} lastUpdatedMs={data.lastUpdatedMs}" : ""}
         >
           <div className="rounded-lg border border-slate-700 bg-slate-950/60 p-3 text-slate-200">
-            ${includeDataHook ? "<pre className=\"max-h-40 overflow-auto text-xs\">{JSON.stringify(data.data ?? { ok: true }, null, 2)}</pre>" : '<p className="text-sm">Generated module scaffold is ready.</p>'}
+            ${includeDataHook ? '<pre className="max-h-40 overflow-auto text-xs">{JSON.stringify(data.data ?? { ok: true }, null, 2)}</pre>' : '<p className="text-sm">Generated module scaffold is ready.</p>'}
           </div>
         </ModuleFrame>
       );
@@ -110,7 +114,12 @@ export const moduleDefinition = defineModule({
 export default moduleDefinition;
 `;
 
-const moduleReadmeTemplate = (slug, displayName, typeLabel, includeServerAdapter) => `# ${displayName}
+const moduleReadmeTemplate = (
+  slug,
+  displayName,
+  typeLabel,
+  includeServerAdapter,
+) => `# ${displayName}
 
 - Module ID: \`${slug}\`
 - Type: ${typeLabel}
@@ -199,11 +208,7 @@ const run = async () => {
     }
 
     const displayName = await ask(rl, "Display name", toPascalCase(slug));
-    const type = await ask(
-      rl,
-      "Module type [ui-only|rest-poll|streaming|composite]",
-      "ui-only",
-    );
+    const type = await ask(rl, "Module type [ui-only|rest-poll|streaming|composite]", "ui-only");
     const normalizedType = ["ui-only", "rest-poll", "streaming", "composite"].includes(type)
       ? type
       : "ui-only";
@@ -225,12 +230,7 @@ const run = async () => {
 
     await fs.writeFile(
       moduleFile,
-      moduleTemplate(
-        slug,
-        displayName,
-        normalizedType,
-        normalizedType !== "ui-only",
-      ),
+      moduleTemplate(slug, displayName, normalizedType, normalizedType !== "ui-only"),
       "utf8",
     );
     await fs.writeFile(
@@ -249,7 +249,9 @@ const run = async () => {
     process.stdout.write(`- ${path.relative(rootDir, moduleFile)}\n`);
     process.stdout.write(`- ${path.relative(rootDir, readmeFile)}\n`);
     if (includeServerAdapter) {
-      process.stdout.write(`- ${path.relative(rootDir, path.join(serverAdaptersDir, `${slug}.ts`))}\n`);
+      process.stdout.write(
+        `- ${path.relative(rootDir, path.join(serverAdaptersDir, `${slug}.ts`))}\n`,
+      );
     }
     process.stdout.write("\nNext: pnpm -r build\n");
   } finally {

@@ -18,9 +18,7 @@ const nullableCoordinateFromUnknown = z.preprocess((input) => {
   return null;
 }, z.number().nullable());
 
-export const localWarningServiceKindSchema = z.enum([
-  "emergency-wa",
-]);
+export const localWarningServiceKindSchema = z.enum(["emergency-wa"]);
 
 export const localWarningsModuleConfigSchema = withModulePresentation(
   z.object({
@@ -63,9 +61,7 @@ export const localWarningsModuleCurrentResponseSchema = z.object({
 });
 
 export type LocalWarningsModuleConfig = z.infer<typeof localWarningsModuleConfigSchema>;
-export type LocalWarningsModuleCurrentQuery = z.infer<
-  typeof localWarningsModuleCurrentQuerySchema
->;
+export type LocalWarningsModuleCurrentQuery = z.infer<typeof localWarningsModuleCurrentQuerySchema>;
 export type LocalWarningServiceKind = z.infer<typeof localWarningServiceKindSchema>;
 export type LocalWarningItem = z.infer<typeof localWarningItemSchema>;
 export type LocalWarningsModuleCurrentResponse = z.infer<

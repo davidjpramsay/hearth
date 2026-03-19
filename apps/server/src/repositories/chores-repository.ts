@@ -57,9 +57,7 @@ const addDays = (date: Date, days: number): Date => {
 };
 
 const parseSqliteTimestamp = (timestamp: string): Date | null => {
-  const normalizedTimestamp = timestamp.includes("T")
-    ? timestamp
-    : timestamp.replace(" ", "T");
+  const normalizedTimestamp = timestamp.includes("T") ? timestamp : timestamp.replace(" ", "T");
   const withTimezone = normalizedTimestamp.endsWith("Z")
     ? normalizedTimestamp
     : `${normalizedTimestamp}Z`;
@@ -240,9 +238,7 @@ export class ChoresRepository {
   }
 
   deleteMember(id: number): boolean {
-    const result = this.db
-      .prepare("DELETE FROM members WHERE id = @id")
-      .run({ id });
+    const result = this.db.prepare("DELETE FROM members WHERE id = @id").run({ id });
     return result.changes > 0;
   }
 
@@ -255,9 +251,7 @@ export class ChoresRepository {
   }
 
   listChores(siteTimezone = getRuntimeTimeZone()): ChoreRecord[] {
-    const rows = this.db
-      .prepare<[], ChoreRow>("SELECT * FROM chores ORDER BY id ASC")
-      .all();
+    const rows = this.db.prepare<[], ChoreRow>("SELECT * FROM chores ORDER BY id ASC").all();
     return rows.map((row) => toChore(row, siteTimezone));
   }
 
@@ -338,8 +332,7 @@ export class ChoresRepository {
           : changes.startsOn !== undefined
             ? changes.startsOn
             : existing.startsOn,
-      valueAmount:
-        changes.valueAmount !== undefined ? changes.valueAmount : existing.valueAmount,
+      valueAmount: changes.valueAmount !== undefined ? changes.valueAmount : existing.valueAmount,
       active: changes.active ?? existing.active,
     };
 
@@ -371,9 +364,7 @@ export class ChoresRepository {
   }
 
   deleteChore(id: number): boolean {
-    const result = this.db
-      .prepare("DELETE FROM chores WHERE id = @id")
-      .run({ id });
+    const result = this.db.prepare("DELETE FROM chores WHERE id = @id").run({ id });
     return result.changes > 0;
   }
 
@@ -449,9 +440,7 @@ export class ChoresRepository {
     const members = this.listMembers();
     const siteTimezone = input.siteTimezone ?? payoutConfig.siteTimezone;
     const chores = this.listChores(siteTimezone).filter((chore) => chore.active);
-    const choreStartDateById = new Map(
-      chores.map((chore) => [chore.id, chore.startsOn]),
-    );
+    const choreStartDateById = new Map(chores.map((chore) => [chore.id, chore.startsOn]));
     const memberById = new Map(members.map((member) => [member.id, member]));
 
     const rangeStart = input.startDate;
@@ -459,7 +448,10 @@ export class ChoresRepository {
     const completions = this.listCompletionsInRange(rangeStart, rangeEnd);
     const completionKey = (choreId: number, date: string): string => `${choreId}:${date}`;
     const completionMap = new Map(
-      completions.map((completion) => [completionKey(completion.choreId, completion.date), completion]),
+      completions.map((completion) => [
+        completionKey(completion.choreId, completion.date),
+        completion,
+      ]),
     );
 
     const board = Array.from({ length: input.days }, (_entry, dayOffset) => {
@@ -583,11 +575,7 @@ export class ChoresRepository {
           current.recurringCompletedCount += 1;
         }
 
-        if (
-          isOneOff &&
-          input.enableMoneyTracking &&
-          payoutConfig.oneOffBonusEnabled
-        ) {
+        if (isOneOff && input.enableMoneyTracking && payoutConfig.oneOffBonusEnabled) {
           current.bonusPayout += chore.valueAmount ?? 0;
         }
 
@@ -626,10 +614,7 @@ export class ChoresRepository {
       (total, member) => total + member.completedCount,
       0,
     );
-    const weeklyTotalValue = weeklyByMember.reduce(
-      (total, member) => total + member.totalValue,
-      0,
-    );
+    const weeklyTotalValue = weeklyByMember.reduce((total, member) => total + member.totalValue, 0);
 
     return choresBoardResponseSchema.parse({
       generatedAt: new Date().toISOString(),

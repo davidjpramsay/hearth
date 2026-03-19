@@ -13,17 +13,12 @@ const toLocalCalendarDay = (date: Date): Date =>
 // All-day events are calendar dates, not timezone-specific instants.
 // Serialize them as UTC midnight for that date so every client can restore
 // the same day regardless of where the feed was parsed.
-export const serializeCalendarEventBoundary = (
-  date: Date,
-  allDay: boolean,
-): string => (allDay ? toUtcCalendarDay(date) : date).toISOString();
+export const serializeCalendarEventBoundary = (date: Date, allDay: boolean): string =>
+  (allDay ? toUtcCalendarDay(date) : date).toISOString();
 
 // Restore all-day events back to a local calendar day using the UTC date
 // components encoded above. Timed events keep their exact instant.
-export const parseCalendarEventBoundary = (
-  value: string,
-  allDay: boolean,
-): Date | null => {
+export const parseCalendarEventBoundary = (value: string, allDay: boolean): Date | null => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
     return null;
@@ -69,7 +64,5 @@ export const calendarModuleParamsSchema = z.object({
 export type CalendarViewMode = z.infer<typeof calendarViewModeSchema>;
 export type CalendarModuleConfig = z.infer<typeof calendarModuleConfigSchema>;
 export type CalendarModuleEvent = z.infer<typeof calendarModuleEventSchema>;
-export type CalendarModuleEventsResponse = z.infer<
-  typeof calendarModuleEventsResponseSchema
->;
+export type CalendarModuleEventsResponse = z.infer<typeof calendarModuleEventsResponseSchema>;
 export type CalendarModuleParams = z.infer<typeof calendarModuleParamsSchema>;

@@ -165,10 +165,11 @@ test("local warning service can force a dev warning", async () => {
 
 test("local warning service keeps CAP-AU warnings even when expires is stale", async () => {
   const service = new LocalWarningService({
-    fetchText: async () => CAPAU_SAMPLE_XML.replace(
-      "<cap:expires>2026-03-16T09:00:00+08:00</cap:expires>",
-      "<cap:expires>2026-03-15T00:00:00+08:00</cap:expires>",
-    ),
+    fetchText: async () =>
+      CAPAU_SAMPLE_XML.replace(
+        "<cap:expires>2026-03-16T09:00:00+08:00</cap:expires>",
+        "<cap:expires>2026-03-15T00:00:00+08:00</cap:expires>",
+      ),
     now: () => Date.parse("2026-03-16T00:08:00+08:00"),
   });
 

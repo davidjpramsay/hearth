@@ -68,10 +68,7 @@ test("photo-router authoring round-trips portrait and default layout graph rules
   const roundTrippedTargets = toAutoLayoutTargetsFromLogicGraph(
     compileLayoutSetAuthoringToLogicGraph(authoring),
   );
-  assert.deepEqual(
-    roundTrippedTargets,
-    toAutoLayoutTargetsFromLogicGraph(logicGraph),
-  );
+  assert.deepEqual(roundTrippedTargets, toAutoLayoutTargetsFromLogicGraph(logicGraph));
 });
 
 test("legacy landscape-only branches collapse into the photo orientation default path", () => {
@@ -213,9 +210,7 @@ test("screen profile normalization migrates legacy set graphs into photo-router 
   assert.deepEqual(family.logicDisconnectedEdgeIds, []);
   assert.deepEqual(
     toAutoLayoutTargetsFromLogicGraph(family.logicGraph),
-    toAutoLayoutTargetsFromLogicGraph(
-      compileLayoutSetAuthoringToLogicGraph(family.logicBlocks),
-    ),
+    toAutoLayoutTargetsFromLogicGraph(compileLayoutSetAuthoringToLogicGraph(family.logicBlocks)),
   );
 });
 
@@ -622,10 +617,7 @@ test("warning action nodes auto-resolve to the built-in warning layout on match"
     warningActiveSequence.map((target) => target.layoutName),
     [LOCAL_WARNING_AUTO_LAYOUT_NAME],
   );
-  assert.equal(
-    warningActiveSequence[0]?.actionParams.locationQuery,
-    "Perth, AU",
-  );
+  assert.equal(warningActiveSequence[0]?.actionParams.locationQuery, "Perth, AU");
   assert.deepEqual(
     clearSequence.map((target) => target.layoutName),
     ["Fallback layout"],

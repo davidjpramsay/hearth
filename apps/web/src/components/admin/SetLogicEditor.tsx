@@ -185,8 +185,7 @@ const getConditionBranchCopy = (conditionType: string | null | undefined) => {
   };
 };
 
-const clampCycleSeconds = (value: number): number =>
-  Math.max(3, Math.min(3600, Math.round(value)));
+const clampCycleSeconds = (value: number): number => Math.max(3, Math.min(3600, Math.round(value)));
 
 const roundPosition = (value: number): number => Math.round(value);
 
@@ -354,9 +353,7 @@ const LocationSearchFieldEditor = ({
     } catch (nextError) {
       setResults([]);
       setWarning(null);
-      setError(
-        nextError instanceof Error ? nextError.message : "Failed to search locations.",
-      );
+      setError(nextError instanceof Error ? nextError.message : "Failed to search locations.");
     } finally {
       setLoading(false);
     }
@@ -399,12 +396,12 @@ const LocationSearchFieldEditor = ({
   };
 
   return (
-      <div
-        className="rounded-xl border border-slate-700 bg-slate-950/50 p-3 md:col-span-2"
-        onPointerDown={stopCanvasEventPropagation}
-        onMouseDown={stopCanvasEventPropagation}
-        onClick={stopCanvasEventPropagation}
-      >
+    <div
+      className="rounded-xl border border-slate-700 bg-slate-950/50 p-3 md:col-span-2"
+      onPointerDown={stopCanvasEventPropagation}
+      onMouseDown={stopCanvasEventPropagation}
+      onClick={stopCanvasEventPropagation}
+    >
       <label className="block">
         <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
           {field.label}
@@ -461,7 +458,7 @@ const LocationSearchFieldEditor = ({
 
       {hasPinnedCoordinates ? (
         <p className="mt-3 rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-200">
-          Using pinned coordinates: {(latitudeValue as number).toFixed(4)}, {" "}
+          Using pinned coordinates: {(latitudeValue as number).toFixed(4)},{" "}
           {(longitudeValue as number).toFixed(4)}
         </p>
       ) : (
@@ -523,9 +520,7 @@ const toConnectionId = (input: {
   sourceHandle?: string | null;
   target: string;
 }): string =>
-  [input.source.trim(), input.sourceHandle?.trim() || "default", input.target.trim()].join(
-    "::",
-  );
+  [input.source.trim(), input.sourceHandle?.trim() || "default", input.target.trim()].join("::");
 
 const toPhotoSourceLabel = (
   collectionId: string | null | undefined,
@@ -542,31 +537,22 @@ const toPhotoSourceLabel = (
 const omitNodePositions = (
   nodePositions: Record<string, { x: number; y: number }>,
   nodeIds: Set<string>,
-) =>
-  Object.fromEntries(
-    Object.entries(nodePositions).filter(([nodeId]) => !nodeIds.has(nodeId)),
-  );
+) => Object.fromEntries(Object.entries(nodePositions).filter(([nodeId]) => !nodeIds.has(nodeId)));
 
-const isLayoutGraphNode = (
-  node: PhotoRouterGraphNode,
-): node is PhotoRouterLayoutNode => node.nodeType === "layout";
+const isLayoutGraphNode = (node: PhotoRouterGraphNode): node is PhotoRouterLayoutNode =>
+  node.nodeType === "layout";
 
 const isPhotoOrientationNode = (
   node: PhotoRouterGraphNode,
 ): node is PhotoRouterPhotoOrientationNode => node.nodeType === "photo-orientation";
 
-const isWarningCanvasActionType = (
-  actionType: string | null | undefined,
-): boolean => (actionType?.trim() ?? "") === LOCAL_WARNING_CANVAS_ACTION_TYPE;
+const isWarningCanvasActionType = (actionType: string | null | undefined): boolean =>
+  (actionType?.trim() ?? "") === LOCAL_WARNING_CANVAS_ACTION_TYPE;
 
-const getActionNodeKind = (
-  actionType: string | null | undefined,
-): ActionNodeKind => (isWarningCanvasActionType(actionType) ? "warning" : "photo");
+const getActionNodeKind = (actionType: string | null | undefined): ActionNodeKind =>
+  isWarningCanvasActionType(actionType) ? "warning" : "photo";
 
-const getAvailableConditionTypes = (
-  kind: ActionNodeKind,
-  trigger: ConditionalTrigger,
-) =>
+const getAvailableConditionTypes = (kind: ActionNodeKind, trigger: ConditionalTrigger) =>
   LOGIC_CONDITION_TYPES.filter((condition) => {
     if (kind === "warning") {
       return condition.id === LOCAL_WARNING_CONDITION_TYPE;
@@ -593,10 +579,7 @@ const getNormalizedConditionTypeForNodeKind = (
 const getActionNodeKindLabel = (kind: ActionNodeKind): string =>
   kind === "warning" ? "Warning" : "Photo Orientation";
 
-const getDefaultActionNodeTitle = (
-  kind: ActionNodeKind,
-  existingCount: number,
-): string => {
+const getDefaultActionNodeTitle = (kind: ActionNodeKind, existingCount: number): string => {
   const baseTitle = kind === "warning" ? "Warning Node" : "Photo Orientation Node";
   return existingCount === 0 ? baseTitle : `${baseTitle} ${existingCount + 1}`;
 };
@@ -608,7 +591,7 @@ const getGraphNodeById = (
   block: PhotoRouterBlock,
   nodeId: string | null | undefined,
 ): PhotoRouterGraphNode | null =>
-  nodeId ? block.nodes.find((node) => node.id === nodeId) ?? null : null;
+  nodeId ? (block.nodes.find((node) => node.id === nodeId) ?? null) : null;
 
 const wouldCreateGraphCycle = (
   block: PhotoRouterBlock,
@@ -707,8 +690,7 @@ const ParamFieldEditor = ({
   }
 
   if (field.kind === "number") {
-    const fallback =
-      typeof field.min === "number" && Number.isFinite(field.min) ? field.min : 0;
+    const fallback = typeof field.min === "number" && Number.isFinite(field.min) ? field.min : 0;
     return (
       <label className="block">
         <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -934,9 +916,7 @@ const TerminalNode = ({ data }: NodeProps<TerminalNodeType>) => (
           {data.tone}
         </p>
       ) : null}
-      <p className={`${data.tone === "end" ? "mt-1" : ""} text-base font-semibold`}>
-        {data.title}
-      </p>
+      <p className={`${data.tone === "end" ? "mt-1" : ""} text-base font-semibold`}>{data.title}</p>
     </div>
   </div>
 );
@@ -1041,8 +1021,7 @@ const GraphEdge = ({
         style={{
           stroke: style?.stroke ?? "#cbd5e1",
           strokeOpacity: selected ? 0.18 : 0.08,
-          strokeWidth:
-            typeof style?.strokeWidth === "number" ? style.strokeWidth + 8 : 10,
+          strokeWidth: typeof style?.strokeWidth === "number" ? style.strokeWidth + 8 : 10,
           strokeLinecap: "round",
           strokeLinejoin: "round",
         }}
@@ -1105,11 +1084,11 @@ const buildFlowGraph = (input: {
   onRemoveNode: (nodeId: string) => void;
   isCanvasInteractive: boolean;
 }): { nodes: Node[]; edges: Edge[] } => {
-  const actionNodes = input.block.nodes.filter(
-    (node): node is PhotoRouterPhotoOrientationNode => isPhotoOrientationNode(node),
+  const actionNodes = input.block.nodes.filter((node): node is PhotoRouterPhotoOrientationNode =>
+    isPhotoOrientationNode(node),
   );
-  const layoutNodes = input.block.nodes.filter(
-    (node): node is PhotoRouterLayoutNode => isLayoutGraphNode(node),
+  const layoutNodes = input.block.nodes.filter((node): node is PhotoRouterLayoutNode =>
+    isLayoutGraphNode(node),
   );
   const hiddenWarningPortraitSources = new Set(
     actionNodes
@@ -1126,10 +1105,7 @@ const buildFlowGraph = (input: {
   const connectionBySourceHandle = new Map<string, PhotoRouterConnection>();
 
   visibleConnections.forEach((connection) => {
-    incomingCounts.set(
-      connection.target,
-      (incomingCounts.get(connection.target) ?? 0) + 1,
-    );
+    incomingCounts.set(connection.target, (incomingCounts.get(connection.target) ?? 0) + 1);
     connectionBySourceHandle.set(
       `${connection.source}::${connection.sourceHandle?.trim() || "default"}`,
       connection,
@@ -1139,35 +1115,31 @@ const buildFlowGraph = (input: {
   const nodes: Node[] = [];
   const positionedNodes = input.block.nodes.map((node, index) => ({
     node,
-    position:
-      input.block.nodePositions[node.id] ?? getDefaultGraphNodePosition({ node, index }),
+    position: input.block.nodePositions[node.id] ?? getDefaultGraphNodePosition({ node, index }),
   }));
 
-  const firstGraphNodePosition =
-    positionedNodes[0]?.position ?? DEFAULT_ROUTER_POSITION;
+  const firstGraphNodePosition = positionedNodes[0]?.position ?? DEFAULT_ROUTER_POSITION;
   const startTargetId =
     input.block.connections.find((connection) => connection.source === START_NODE_ID)?.target ??
     null;
   const startAnchorEntry =
     (startTargetId
-      ? positionedNodes.find((entry) => entry.node.id === startTargetId) ?? null
-      : null) ?? positionedNodes[0] ?? null;
+      ? (positionedNodes.find((entry) => entry.node.id === startTargetId) ?? null)
+      : null) ??
+    positionedNodes[0] ??
+    null;
   const startAnchorSize = getGraphNodeSize(startAnchorEntry?.node);
 
   nodes.push({
     id: START_NODE_ID,
     type: "terminalNode",
-    position:
-      input.block.nodePositions[START_NODE_ID] ?? {
-        x:
-          (startAnchorEntry?.position.x ?? firstGraphNodePosition.x) +
-          startAnchorSize.width / 2 -
-          TERMINAL_NODE_SIZE / 2,
-        y: Math.max(
-          24,
-          (startAnchorEntry?.position.y ?? firstGraphNodePosition.y) - START_NODE_GAP,
-        ),
-      },
+    position: input.block.nodePositions[START_NODE_ID] ?? {
+      x:
+        (startAnchorEntry?.position.x ?? firstGraphNodePosition.x) +
+        startAnchorSize.width / 2 -
+        TERMINAL_NODE_SIZE / 2,
+      y: Math.max(24, (startAnchorEntry?.position.y ?? firstGraphNodePosition.y) - START_NODE_GAP),
+    },
     draggable: input.isCanvasInteractive,
     selectable: false,
     deletable: false,
@@ -1194,9 +1166,7 @@ const buildFlowGraph = (input: {
     nodes.push({
       id: node.id,
       type: "routerNode",
-      position:
-        input.block.nodePositions[node.id] ??
-        getDefaultGraphNodePosition({ node, index }),
+      position: input.block.nodePositions[node.id] ?? getDefaultGraphNodePosition({ node, index }),
       draggable: input.isCanvasInteractive,
       selectable: true,
       deletable: true,
@@ -1212,10 +1182,7 @@ const buildFlowGraph = (input: {
         sourceLabel:
           actionNodeKind === "warning"
             ? null
-            : toPhotoSourceLabel(
-                node.photoActionCollectionId,
-                input.photoCollectionOptions,
-              ),
+            : toPhotoSourceLabel(node.photoActionCollectionId, input.photoCollectionOptions),
         onRemove: () => input.onRemoveNode(node.id),
         routes:
           actionNodeKind === "warning"
@@ -1304,14 +1271,10 @@ const buildFlowGraph = (input: {
   nodes.push({
     id: END_NODE_ID,
     type: "terminalNode",
-    position:
-      input.block.nodePositions[END_NODE_ID] ?? {
-        x:
-          lowestNodeEntry.position.x +
-          lowestNodeSize.width / 2 -
-          TERMINAL_NODE_SIZE / 2,
-        y: lowestNodeEntry.position.y + lowestNodeSize.height + END_NODE_GAP,
-      },
+    position: input.block.nodePositions[END_NODE_ID] ?? {
+      x: lowestNodeEntry.position.x + lowestNodeSize.width / 2 - TERMINAL_NODE_SIZE / 2,
+      y: lowestNodeEntry.position.y + lowestNodeSize.height + END_NODE_GAP,
+    },
     draggable: input.isCanvasInteractive,
     selectable: false,
     deletable: false,
@@ -1327,9 +1290,7 @@ const buildFlowGraph = (input: {
 
   const edges = visibleConnections.map((connection) => {
     const sourceNode = getGraphNodeById(input.block, connection.source);
-    const branchKey = isBranchKey(connection.sourceHandle)
-      ? connection.sourceHandle
-      : null;
+    const branchKey = isBranchKey(connection.sourceHandle) ? connection.sourceHandle : null;
     const stroke = branchKey
       ? BRANCH_META[branchKey].color
       : sourceNode && isPhotoOrientationNode(sourceNode)
@@ -1363,8 +1324,9 @@ export const SetLogicEditor = ({
   const selectedNodeIdRef = useRef<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isCanvasInteractive, setIsCanvasInteractive] = useState(true);
-  const [reactFlowInstance, setReactFlowInstance] =
-    useState<ReactFlowInstance<Node, Edge> | null>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<Node, Edge> | null>(
+    null,
+  );
 
   useEffect(() => {
     latestAuthoringRef.current = authoring;
@@ -1375,157 +1337,165 @@ export const SetLogicEditor = ({
     selectedNodeIdRef.current = selectedNodeId;
   }, [selectedNodeId]);
 
-  const updateBlock = useCallback((updater: (current: PhotoRouterBlock) => PhotoRouterBlock) => {
-    const currentAuthoring = latestAuthoringRef.current;
-    const currentBlock = latestBlockRef.current;
-    const nextBlock = updater(currentBlock);
-    const nextAuthoring = setPrimaryPhotoRouterBlock({
-      authoring: currentAuthoring,
-      block: nextBlock,
-    });
-    latestAuthoringRef.current = nextAuthoring;
-    latestBlockRef.current = getPrimaryPhotoRouterBlock(nextAuthoring);
-    onChange(nextAuthoring);
-  }, [onChange]);
+  const updateBlock = useCallback(
+    (updater: (current: PhotoRouterBlock) => PhotoRouterBlock) => {
+      const currentAuthoring = latestAuthoringRef.current;
+      const currentBlock = latestBlockRef.current;
+      const nextBlock = updater(currentBlock);
+      const nextAuthoring = setPrimaryPhotoRouterBlock({
+        authoring: currentAuthoring,
+        block: nextBlock,
+      });
+      latestAuthoringRef.current = nextAuthoring;
+      latestBlockRef.current = getPrimaryPhotoRouterBlock(nextAuthoring);
+      onChange(nextAuthoring);
+    },
+    [onChange],
+  );
 
-  const addLayoutNodeAtPosition = useCallback((position: { x: number; y: number }) => {
-    const fallbackLayoutName =
-      layoutOptions[0]?.name ??
-      block.nodes.find((node): node is PhotoRouterLayoutNode => isLayoutGraphNode(node))
-        ?.layoutName ??
-      "";
+  const addLayoutNodeAtPosition = useCallback(
+    (position: { x: number; y: number }) => {
+      const fallbackLayoutName =
+        layoutOptions[0]?.name ??
+        block.nodes.find((node): node is PhotoRouterLayoutNode => isLayoutGraphNode(node))
+          ?.layoutName ??
+        "";
 
-    if (!fallbackLayoutName) {
-      return;
-    }
+      if (!fallbackLayoutName) {
+        return;
+      }
 
-    const nextLayoutNode: PhotoRouterLayoutNode = {
-      id: createStepId(),
-      nodeType: "layout",
-      layoutName: fallbackLayoutName,
-      cycleSeconds: 20,
-      actionType: LOGIC_ACTION_TYPES[0]?.id ?? "layout.display",
-      actionParams: getDefaultActionParams(LOGIC_ACTION_TYPES[0]?.id),
-    };
+      const nextLayoutNode: PhotoRouterLayoutNode = {
+        id: createStepId(),
+        nodeType: "layout",
+        layoutName: fallbackLayoutName,
+        cycleSeconds: 20,
+        actionType: LOGIC_ACTION_TYPES[0]?.id ?? "layout.display",
+        actionParams: getDefaultActionParams(LOGIC_ACTION_TYPES[0]?.id),
+      };
 
-    setSelectedNodeId(nextLayoutNode.id);
-    updateBlock((current) => ({
-      ...current,
-      nodes: [...current.nodes, nextLayoutNode],
-      nodePositions: {
-        ...current.nodePositions,
-        [nextLayoutNode.id]: {
-          x: roundPosition(position.x),
-          y: roundPosition(position.y),
-        },
-      },
-    }));
-  }, [block.nodes, layoutOptions, updateBlock]);
-
-  const addActionNodeAtPosition = useCallback((
-    kind: ActionNodeKind,
-    position: { x: number; y: number },
-  ) => {
-    const existingActionCount = block.nodes.filter(
-      (node) =>
-        isPhotoOrientationNode(node) &&
-        getActionNodeKind(node.photoActionType) === kind,
-    ).length;
-    const nextConditionType =
-      kind === "warning"
-        ? LOCAL_WARNING_CONDITION_TYPE
-        : getDefaultConditionTypeForTrigger("portrait-photo");
-    const nextActionNode: PhotoRouterPhotoOrientationNode = {
-      id: createActionNodeId(),
-      nodeType: "photo-orientation",
-      title: getDefaultActionNodeTitle(kind, existingActionCount),
-      photoActionType:
-        kind === "warning"
-          ? LOCAL_WARNING_CANVAS_ACTION_TYPE
-          : getDefaultCanvasActionTypeId(),
-      photoActionCollectionId: null,
-      portrait: {
-        enabled: true,
-        conditionType: nextConditionType,
-        conditionParams: parseConditionParamsByType(nextConditionType, {}),
-      },
-      landscape: {
-        enabled: false,
-        conditionType: "photo.orientation.landscape",
-        conditionParams: {},
-      },
-    };
-
-    setSelectedNodeId(nextActionNode.id);
-    updateBlock((current) => ({
-      ...current,
-      nodes: [...current.nodes, nextActionNode],
-      nodePositions: {
-        ...current.nodePositions,
-        [nextActionNode.id]: {
-          x: roundPosition(position.x),
-          y: roundPosition(position.y),
-        },
-      },
-    }));
-  }, [block.nodes, updateBlock]);
-
-  const handleNodesDelete = useCallback((deletedNodes: Node[]) => {
-    const deletedNodeIds = new Set(
-      deletedNodes
-        .map((node) => node.id)
-        .filter((nodeId) => nodeId !== START_NODE_ID && nodeId !== END_NODE_ID),
-    );
-    if (deletedNodeIds.size === 0) {
-      return;
-    }
-
-    setSelectedNodeId(null);
-    updateBlock((current) => {
-      const remainingNodes = current.nodes.filter((node) => !deletedNodeIds.has(node.id));
-      const remainingNodeIds = new Set(remainingNodes.map((node) => node.id));
-
-      return {
+      setSelectedNodeId(nextLayoutNode.id);
+      updateBlock((current) => ({
         ...current,
-        nodes: remainingNodes,
-        layoutNodes: current.layoutNodes.filter((step) => remainingNodeIds.has(step.id)),
-        connections: current.connections.filter(
-          (connection) =>
-            !deletedNodeIds.has(connection.source) && !deletedNodeIds.has(connection.target),
-        ),
-        nodePositions: omitNodePositions(current.nodePositions, deletedNodeIds),
-        fallback: {
-          ...current.fallback,
-          steps: current.fallback.steps.filter((step) => remainingNodeIds.has(step.id)),
+        nodes: [...current.nodes, nextLayoutNode],
+        nodePositions: {
+          ...current.nodePositions,
+          [nextLayoutNode.id]: {
+            x: roundPosition(position.x),
+            y: roundPosition(position.y),
+          },
         },
+      }));
+    },
+    [block.nodes, layoutOptions, updateBlock],
+  );
+
+  const addActionNodeAtPosition = useCallback(
+    (kind: ActionNodeKind, position: { x: number; y: number }) => {
+      const existingActionCount = block.nodes.filter(
+        (node) => isPhotoOrientationNode(node) && getActionNodeKind(node.photoActionType) === kind,
+      ).length;
+      const nextConditionType =
+        kind === "warning"
+          ? LOCAL_WARNING_CONDITION_TYPE
+          : getDefaultConditionTypeForTrigger("portrait-photo");
+      const nextActionNode: PhotoRouterPhotoOrientationNode = {
+        id: createActionNodeId(),
+        nodeType: "photo-orientation",
+        title: getDefaultActionNodeTitle(kind, existingActionCount),
+        photoActionType:
+          kind === "warning" ? LOCAL_WARNING_CANVAS_ACTION_TYPE : getDefaultCanvasActionTypeId(),
+        photoActionCollectionId: null,
         portrait: {
-          ...current.portrait,
-          steps: current.portrait.steps.filter((step) => remainingNodeIds.has(step.id)),
+          enabled: true,
+          conditionType: nextConditionType,
+          conditionParams: parseConditionParamsByType(nextConditionType, {}),
         },
         landscape: {
-          ...current.landscape,
-          steps: current.landscape.steps.filter((step) => remainingNodeIds.has(step.id)),
+          enabled: false,
+          conditionType: "photo.orientation.landscape",
+          conditionParams: {},
         },
       };
-    });
-  }, [updateBlock]);
 
-  const removeNodeById = useCallback((nodeId: string) => {
-    if (nodeId === START_NODE_ID || nodeId === END_NODE_ID) {
-      return;
-    }
-
-    handleNodesDelete([
-      {
-        id: nodeId,
-        position: block.nodePositions[nodeId] ?? {
-          x: 0,
-          y: 0,
+      setSelectedNodeId(nextActionNode.id);
+      updateBlock((current) => ({
+        ...current,
+        nodes: [...current.nodes, nextActionNode],
+        nodePositions: {
+          ...current.nodePositions,
+          [nextActionNode.id]: {
+            x: roundPosition(position.x),
+            y: roundPosition(position.y),
+          },
         },
-        data: {},
-      } as Node,
-    ]);
-  }, [block.nodePositions, handleNodesDelete]);
+      }));
+    },
+    [block.nodes, updateBlock],
+  );
+
+  const handleNodesDelete = useCallback(
+    (deletedNodes: Node[]) => {
+      const deletedNodeIds = new Set(
+        deletedNodes
+          .map((node) => node.id)
+          .filter((nodeId) => nodeId !== START_NODE_ID && nodeId !== END_NODE_ID),
+      );
+      if (deletedNodeIds.size === 0) {
+        return;
+      }
+
+      setSelectedNodeId(null);
+      updateBlock((current) => {
+        const remainingNodes = current.nodes.filter((node) => !deletedNodeIds.has(node.id));
+        const remainingNodeIds = new Set(remainingNodes.map((node) => node.id));
+
+        return {
+          ...current,
+          nodes: remainingNodes,
+          layoutNodes: current.layoutNodes.filter((step) => remainingNodeIds.has(step.id)),
+          connections: current.connections.filter(
+            (connection) =>
+              !deletedNodeIds.has(connection.source) && !deletedNodeIds.has(connection.target),
+          ),
+          nodePositions: omitNodePositions(current.nodePositions, deletedNodeIds),
+          fallback: {
+            ...current.fallback,
+            steps: current.fallback.steps.filter((step) => remainingNodeIds.has(step.id)),
+          },
+          portrait: {
+            ...current.portrait,
+            steps: current.portrait.steps.filter((step) => remainingNodeIds.has(step.id)),
+          },
+          landscape: {
+            ...current.landscape,
+            steps: current.landscape.steps.filter((step) => remainingNodeIds.has(step.id)),
+          },
+        };
+      });
+    },
+    [updateBlock],
+  );
+
+  const removeNodeById = useCallback(
+    (nodeId: string) => {
+      if (nodeId === START_NODE_ID || nodeId === END_NODE_ID) {
+        return;
+      }
+
+      handleNodesDelete([
+        {
+          id: nodeId,
+          position: block.nodePositions[nodeId] ?? {
+            x: 0,
+            y: 0,
+          },
+          data: {},
+        } as Node,
+      ]);
+    },
+    [block.nodePositions, handleNodesDelete],
+  );
 
   const graph = useMemo(
     () =>
@@ -1578,10 +1548,7 @@ export const SetLogicEditor = ({
     if (source === END_NODE_ID || target === START_NODE_ID) {
       return false;
     }
-    if (
-      target !== END_NODE_ID &&
-      !block.nodes.some((node) => node.id === target)
-    ) {
+    if (target !== END_NODE_ID && !block.nodes.some((node) => node.id === target)) {
       return false;
     }
 
@@ -1625,7 +1592,7 @@ export const SetLogicEditor = ({
           ? null
           : sourceNode && isLayoutGraphNode(sourceNode)
             ? "next"
-            : connection.sourceHandle?.trim() ?? null;
+            : (connection.sourceHandle?.trim() ?? null);
       if (source !== START_NODE_ID && !sourceHandle) {
         return current;
       }
@@ -1635,10 +1602,7 @@ export const SetLogicEditor = ({
         connections: [
           ...current.connections.filter(
             (entry) =>
-              !(
-                entry.source === source &&
-                (entry.sourceHandle?.trim() || null) === sourceHandle
-              ),
+              !(entry.source === source && (entry.sourceHandle?.trim() || null) === sourceHandle),
           ),
           {
             id: toConnectionId({
@@ -1693,9 +1657,7 @@ export const SetLogicEditor = ({
 
     updateBlock((current) => ({
       ...current,
-      connections: current.connections.filter(
-        (connection) => !deletedEdgeIds.has(connection.id),
-      ),
+      connections: current.connections.filter((connection) => !deletedEdgeIds.has(connection.id)),
     }));
   };
 
@@ -1706,11 +1668,7 @@ export const SetLogicEditor = ({
     }
 
     const blockType = event.dataTransfer.getData(GRAPH_NODE_DRAG_TYPE);
-    if (
-      blockType !== "layout-node" &&
-      blockType !== "photo-node" &&
-      blockType !== "warning-node"
-    ) {
+    if (blockType !== "layout-node" && blockType !== "photo-node" && blockType !== "warning-node") {
       return;
     }
 
@@ -1742,16 +1700,16 @@ export const SetLogicEditor = ({
   };
 
   const selectedLayoutNode = selectedNodeId
-    ? block.nodes.find(
+    ? (block.nodes.find(
         (node): node is PhotoRouterLayoutNode =>
           node.id === selectedNodeId && isLayoutGraphNode(node),
-      ) ?? null
+      ) ?? null)
     : null;
   const selectedActionNode = selectedNodeId
-    ? block.nodes.find(
+    ? (block.nodes.find(
         (node): node is PhotoRouterPhotoOrientationNode =>
           node.id === selectedNodeId && isPhotoOrientationNode(node),
-      ) ?? null
+      ) ?? null)
     : null;
   const selectedActionKind = selectedActionNode
     ? getActionNodeKind(selectedActionNode.photoActionType)
@@ -1797,17 +1755,13 @@ export const SetLogicEditor = ({
     updateBlock((current) => ({
       ...current,
       nodes: current.nodes.map((node) =>
-        node.id === targetNodeId && isLayoutGraphNode(node)
-          ? updater(node)
-          : node,
+        node.id === targetNodeId && isLayoutGraphNode(node) ? updater(node) : node,
       ),
     }));
   };
 
   const updateSelectedActionNode = (
-    updater: (
-      current: PhotoRouterPhotoOrientationNode,
-    ) => PhotoRouterPhotoOrientationNode,
+    updater: (current: PhotoRouterPhotoOrientationNode) => PhotoRouterPhotoOrientationNode,
   ) => {
     const targetNodeId = selectedNodeIdRef.current;
     if (!targetNodeId) {
@@ -1817,9 +1771,7 @@ export const SetLogicEditor = ({
     updateBlock((current) => ({
       ...current,
       nodes: current.nodes.map((node) =>
-        node.id === targetNodeId && isPhotoOrientationNode(node)
-          ? updater(node)
-          : node,
+        node.id === targetNodeId && isPhotoOrientationNode(node) ? updater(node) : node,
       ),
     }));
   };
@@ -1880,7 +1832,9 @@ export const SetLogicEditor = ({
     trigger: ConditionalTrigger,
     branch: PhotoRouterPhotoOrientationNode["portrait"],
     updateBranch: (
-      updater: (current: PhotoRouterPhotoOrientationNode["portrait"]) => PhotoRouterPhotoOrientationNode["portrait"],
+      updater: (
+        current: PhotoRouterPhotoOrientationNode["portrait"],
+      ) => PhotoRouterPhotoOrientationNode["portrait"],
     ) => void,
   ) => {
     const availableConditionTypes = getAvailableConditionTypes(actionKind, trigger);
@@ -1900,9 +1854,7 @@ export const SetLogicEditor = ({
     return (
       <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
         <div>
-          <p className="text-sm font-semibold text-slate-100">
-            {conditionBranchCopy.title}
-          </p>
+          <p className="text-sm font-semibold text-slate-100">{conditionBranchCopy.title}</p>
           <p className="mt-1 text-xs text-slate-400">
             {autoWarningLayout
               ? "When active, this node shows the automatic warning layout. Connect No Warning to continue the normal flow."
@@ -1961,16 +1913,13 @@ export const SetLogicEditor = ({
                   updateBranch((current) => ({
                     ...current,
                     conditionType: normalizedConditionType,
-                    conditionParams: parseConditionParamsByType(
-                      normalizedConditionType,
-                      {
-                        ...parseConditionParamsByType(
-                          normalizedConditionType,
-                          current.conditionParams,
-                        ),
-                        ...patch,
-                      },
-                    ),
+                    conditionParams: parseConditionParamsByType(normalizedConditionType, {
+                      ...parseConditionParamsByType(
+                        normalizedConditionType,
+                        current.conditionParams,
+                      ),
+                      ...patch,
+                    }),
                   }))
                 }
               />
@@ -2044,7 +1993,6 @@ export const SetLogicEditor = ({
               <span className="block text-sm font-semibold">Warning Node</span>
             </button>
           </div>
-
         </aside>
 
         <div
@@ -2166,12 +2114,8 @@ export const SetLogicEditor = ({
             <>
               <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4">
                 <div>
-                  <p className="text-base font-semibold text-slate-100">
-                    Layout Node
-                  </p>
-                  <p className="mt-1 text-sm text-slate-300">
-                    {selectedLayoutNode.layoutName}
-                  </p>
+                  <p className="text-base font-semibold text-slate-100">Layout Node</p>
+                  <p className="mt-1 text-sm text-slate-300">{selectedLayoutNode.layoutName}</p>
                   <p className="mt-1 text-xs text-slate-500">
                     Node {selectedLayoutNode.id.slice(0, 8)}
                   </p>
@@ -2223,7 +2167,6 @@ export const SetLogicEditor = ({
                       }}
                     />
                   </label>
-
                 </div>
               </div>
 
@@ -2343,8 +2286,8 @@ export const SetLogicEditor = ({
                     </label>
                   ) : (
                     <p className="rounded border border-slate-700 bg-slate-900/70 px-3 py-2 text-xs text-slate-300">
-                      This node does not need a photo source. When a warning is active it shows
-                      the automatic warning layout, and the No Warning output continues the graph.
+                      This node does not need a photo source. When a warning is active it shows the
+                      automatic warning layout, and the No Warning output continues the graph.
                     </p>
                   )}
                 </div>

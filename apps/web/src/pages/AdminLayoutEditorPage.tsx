@@ -100,13 +100,7 @@ const areGridItemsEqual = (left: GridItem[], right: GridItem[]): boolean => {
     const a = left[index];
     const b = right[index];
 
-    if (
-      a.i !== b.i ||
-      a.x !== b.x ||
-      a.y !== b.y ||
-      a.w !== b.w ||
-      a.h !== b.h
-    ) {
+    if (a.i !== b.i || a.x !== b.x || a.y !== b.y || a.w !== b.w || a.h !== b.h) {
       return false;
     }
   }
@@ -114,10 +108,7 @@ const areGridItemsEqual = (left: GridItem[], right: GridItem[]): boolean => {
   return true;
 };
 
-const renderResizeHandle = (
-  axis: string,
-  ref: Ref<HTMLElement>,
-): ReactElement => (
+const renderResizeHandle = (axis: string, ref: Ref<HTMLElement>): ReactElement => (
   <span
     ref={ref}
     className={`react-resizable-handle react-resizable-handle-${axis} hearth-layout-resize-handle`}
@@ -132,11 +123,7 @@ interface LayoutTypographyPanelProps {
   onReset: () => void;
 }
 
-const LayoutTypographyPanel = ({
-  value,
-  onChange,
-  onReset,
-}: LayoutTypographyPanelProps) => {
+const LayoutTypographyPanel = ({ value, onChange, onReset }: LayoutTypographyPanelProps) => {
   const updateValue = (key: keyof LayoutTypography, nextValue: number) => {
     if (!Number.isFinite(nextValue)) {
       return;
@@ -194,9 +181,7 @@ const LayoutTypographyPanel = ({
                   <span className="block text-sm font-semibold text-slate-100">
                     {control.label}
                   </span>
-                  <span className="mt-0.5 block text-xs text-slate-400">
-                    {control.description}
-                  </span>
+                  <span className="mt-0.5 block text-xs text-slate-400">{control.description}</span>
                 </div>
                 <span className="w-[6.25rem] rounded border border-slate-700 bg-slate-900/80 px-2 py-1 text-right text-xs tabular-nums text-slate-300">
                   {formatLayoutTypographyValue(value[control.key])}
@@ -236,9 +221,7 @@ export const AdminLayoutEditorPage = () => {
   const [customAspectHeight, setCustomAspectHeight] = useState("9");
   const [previewHostSize, setPreviewHostSize] = useState({ width: 0, height: 0 });
   const [draftGridItems, setDraftGridItems] = useState<GridItem[] | null>(null);
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(
-    "idle",
-  );
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
   const saveTimeoutRef = useRef<number | null>(null);
@@ -355,10 +338,7 @@ export const AdminLayoutEditorPage = () => {
           setError(message);
           setSaveState("error");
 
-          if (
-            typeof message === "string" &&
-            message.toLowerCase().includes("unauthorized")
-          ) {
+          if (typeof message === "string" && message.toLowerCase().includes("unauthorized")) {
             logoutAdminSession();
           }
         }
@@ -428,11 +408,7 @@ export const AdminLayoutEditorPage = () => {
       width: Math.max(1, previewGridMetrics.cols * previewGridMetrics.rowHeight),
       height: Math.max(1, previewGridMetrics.rows * previewGridMetrics.rowHeight),
     }),
-    [
-      previewGridMetrics.cols,
-      previewGridMetrics.rowHeight,
-      previewGridMetrics.rows,
-    ],
+    [previewGridMetrics.cols, previewGridMetrics.rowHeight, previewGridMetrics.rows],
   );
 
   const previewScale = useMemo(() => {
@@ -613,9 +589,7 @@ export const AdminLayoutEditorPage = () => {
         return editorGridItems;
       }
 
-      return areGridItemsEqual(currentDraft, editorGridItems)
-        ? currentDraft
-        : editorGridItems;
+      return areGridItemsEqual(currentDraft, editorGridItems) ? currentDraft : editorGridItems;
     });
   }, [editorGridItems]);
 
@@ -726,9 +700,8 @@ export const AdminLayoutEditorPage = () => {
     () => normalizeLayoutTypography(layout?.config.typography),
     [layout?.config.typography],
   );
-  const [draftTypography, setDraftTypography] = useState<LayoutTypography>(
-    DEFAULT_LAYOUT_TYPOGRAPHY,
-  );
+  const [draftTypography, setDraftTypography] =
+    useState<LayoutTypography>(DEFAULT_LAYOUT_TYPOGRAPHY);
   const isDraftTypographySynced =
     draftTypography.smallRem === layoutTypography.smallRem &&
     draftTypography.bodyRem === layoutTypography.bodyRem &&
@@ -762,17 +735,10 @@ export const AdminLayoutEditorPage = () => {
     return () => {
       window.clearTimeout(timeout);
     };
-  }, [
-    applyLayoutPatch,
-    draftTypography,
-    isDraftTypographySynced,
-    layout,
-  ]);
+  }, [applyLayoutPatch, draftTypography, isDraftTypographySynced, layout]);
 
   const hasSelectedModuleSettings =
-    Boolean(selectedInstance) &&
-    Boolean(selectedModuleDefinition) &&
-    Boolean(selectedModuleConfig);
+    Boolean(selectedInstance) && Boolean(selectedModuleDefinition) && Boolean(selectedModuleConfig);
   const inspectorTitle = hasSelectedModuleSettings ? "Module settings" : "Layout settings";
 
   if (!layout) {
@@ -827,9 +793,7 @@ export const AdminLayoutEditorPage = () => {
       <section className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)_320px]">
         <aside className="flex min-h-0 flex-col rounded-xl border border-slate-700 bg-slate-900/80 p-4">
           <h2 className="font-display text-lg font-semibold text-slate-100">Module palette</h2>
-          <p className="mt-1 text-xs text-slate-400">
-            Drag modules into the grid, or tap Add.
-          </p>
+          <p className="mt-1 text-xs text-slate-400">Drag modules into the grid, or tap Add.</p>
 
           <div className="mt-3 space-y-2 overflow-y-auto pr-1">
             {availableModules.map((moduleManifest) => (
@@ -838,10 +802,7 @@ export const AdminLayoutEditorPage = () => {
                 draggable
                 onDragStart={(event) => {
                   event.dataTransfer.effectAllowed = "copyMove";
-                  event.dataTransfer.setData(
-                    "application/x-hearth-module",
-                    moduleManifest.id,
-                  );
+                  event.dataTransfer.setData("application/x-hearth-module", moduleManifest.id);
                   event.dataTransfer.setData("text/plain", moduleManifest.id);
                   setDraggingModuleId(moduleManifest.id);
                 }}
@@ -883,8 +844,7 @@ export const AdminLayoutEditorPage = () => {
         <div className="flex min-h-0 flex-col rounded-xl border border-slate-700 bg-slate-950/70 p-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
             <span>
-              Fixed preview canvas: {previewCanvasBaseSize.width} x{" "}
-              {previewCanvasBaseSize.height}
+              Fixed preview canvas: {previewCanvasBaseSize.width} x {previewCanvasBaseSize.height}
             </span>
             <div className="flex flex-wrap items-center gap-2">
               <label className="flex items-center gap-2">
@@ -910,8 +870,8 @@ export const AdminLayoutEditorPage = () => {
                 />
               </label>
               <span>
-                Preview ratio: {previewRatioLabel} | Grid{" "}
-                {previewGridMetrics.cols} x {previewGridMetrics.rows} (divisible)
+                Preview ratio: {previewRatioLabel} | Grid {previewGridMetrics.cols} x{" "}
+                {previewGridMetrics.rows} (divisible)
               </span>
             </div>
           </div>
@@ -977,13 +937,13 @@ export const AdminLayoutEditorPage = () => {
                   </g>
                 </svg>
                 <div
-                    style={{
-                      width: `${previewGridCanvasSize.width}px`,
-                      height: `${previewGridCanvasSize.height}px`,
-                      transform: `scale(${previewScale})`,
-                      transformOrigin: "top left",
-                      ...buildLayoutTypographyStyle(draftTypography),
-                    }}
+                  style={{
+                    width: `${previewGridCanvasSize.width}px`,
+                    height: `${previewGridCanvasSize.height}px`,
+                    transform: `scale(${previewScale})`,
+                    transformOrigin: "top left",
+                    ...buildLayoutTypographyStyle(draftTypography),
+                  }}
                   className="relative z-10"
                 >
                   <GridLayout
@@ -1060,10 +1020,7 @@ export const AdminLayoutEditorPage = () => {
                             ...current.config,
                             cols: previewGridMetrics.cols,
                             rows: previewGridMetrics.rows,
-                            rowHeight: Math.max(
-                              10,
-                              Math.round(previewGridMetrics.rowHeight),
-                            ),
+                            rowHeight: Math.max(10, Math.round(previewGridMetrics.rowHeight)),
                           },
                           moduleDefinition,
                           { x: item.x, y: item.y },
@@ -1085,9 +1042,7 @@ export const AdminLayoutEditorPage = () => {
                     onResize={(nextItems) => {
                       applyLiveGridItems(nextItems as GridItem[]);
                     }}
-                    onLayoutChange={(nextItems) =>
-                      applyLiveGridItems(nextItems as GridItem[])
-                    }
+                    onLayoutChange={(nextItems) => applyLiveGridItems(nextItems as GridItem[])}
                     onDragStop={(nextItems) => persistGridItems(nextItems as GridItem[])}
                     onResizeStop={(nextItems) => persistGridItems(nextItems as GridItem[])}
                   >
@@ -1166,9 +1121,7 @@ export const AdminLayoutEditorPage = () => {
         <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900/80 p-4">
           <h2 className="font-display text-lg font-semibold text-slate-100">{inspectorTitle}</h2>
           {hasSelectedModuleSettings ? (
-            <p className="mt-1 text-xs text-slate-400">
-              {selectedModuleDefinition?.displayName}
-            </p>
+            <p className="mt-1 text-xs text-slate-400">{selectedModuleDefinition?.displayName}</p>
           ) : null}
           <div className="mt-3 min-h-0 space-y-4 overflow-y-auto pr-1">
             {!selectedInstance || !selectedModuleDefinition || !selectedModuleConfig ? (

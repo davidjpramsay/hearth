@@ -25,10 +25,7 @@ const FAMILY_LAYOUT_KEYS = [
   "portraitPhotoLayoutName",
   "landscapePhotoLayoutName",
 ] as const;
-const FAMILY_LAYOUT_LIST_KEYS = [
-  "portraitPhotoLayoutNames",
-  "landscapePhotoLayoutNames",
-] as const;
+const FAMILY_LAYOUT_LIST_KEYS = ["portraitPhotoLayoutNames", "landscapePhotoLayoutNames"] as const;
 
 const renameLayoutNameInRouting = (
   mapping: ScreenProfileLayouts,
@@ -49,9 +46,7 @@ const renameLayoutNameInRouting = (
     }
 
     for (const key of FAMILY_LAYOUT_LIST_KEYS) {
-      const nextList = currentTargets[key].map((entry) =>
-        entry === fromName ? toName : entry,
-      );
+      const nextList = currentTargets[key].map((entry) => (entry === fromName ? toName : entry));
       const deduplicated = Array.from(new Set(nextList));
       if (JSON.stringify(deduplicated) !== JSON.stringify(currentTargets[key])) {
         nextTargets[key] = deduplicated;
@@ -60,9 +55,7 @@ const renameLayoutNameInRouting = (
     }
 
     const nextAutoTargets = currentTargets.autoLayoutTargets.map((target) =>
-      target.layoutName === fromName
-        ? { ...target, layoutName: toName }
-        : target,
+      target.layoutName === fromName ? { ...target, layoutName: toName } : target,
     );
     if (JSON.stringify(nextAutoTargets) !== JSON.stringify(currentTargets.autoLayoutTargets)) {
       nextTargets.autoLayoutTargets = nextAutoTargets;
@@ -129,20 +122,15 @@ const clearLayoutNameFromRouting = (
 
     const removedNodeIds = new Set(
       currentTargets.logicGraph.nodes
-        .filter(
-          (node) => node.type === "display" && node.layoutName === layoutName,
-        )
+        .filter((node) => node.type === "display" && node.layoutName === layoutName)
         .map((node) => node.id),
     );
     if (removedNodeIds.size > 0) {
       nextTargets.logicGraph = {
         ...currentTargets.logicGraph,
-        nodes: currentTargets.logicGraph.nodes.filter(
-          (node) => !removedNodeIds.has(node.id),
-        ),
+        nodes: currentTargets.logicGraph.nodes.filter((node) => !removedNodeIds.has(node.id)),
         edges: currentTargets.logicGraph.edges.filter(
-          (edge) =>
-            !removedNodeIds.has(edge.from) && !removedNodeIds.has(edge.to),
+          (edge) => !removedNodeIds.has(edge.from) && !removedNodeIds.has(edge.to),
         ),
       };
       changed = true;
@@ -160,10 +148,7 @@ const clearLayoutNameFromRouting = (
   };
 };
 
-export const registerLayoutRoutes = (
-  app: FastifyInstance,
-  services: AppServices,
-): void => {
+export const registerLayoutRoutes = (app: FastifyInstance, services: AppServices): void => {
   app.get("/layouts", async (request, reply) => {
     const query = layoutsQuerySchema.safeParse(request.query ?? {});
 
@@ -273,11 +258,7 @@ export const registerLayoutRoutes = (
 
     if (existingLayout.name !== updated.name) {
       const currentMapping = services.settingsRepository.getScreenProfileLayouts();
-      const renamed = renameLayoutNameInRouting(
-        currentMapping,
-        existingLayout.name,
-        updated.name,
-      );
+      const renamed = renameLayoutNameInRouting(currentMapping, existingLayout.name, updated.name);
 
       if (renamed.changed) {
         services.settingsRepository.setScreenProfileLayouts(renamed.next);

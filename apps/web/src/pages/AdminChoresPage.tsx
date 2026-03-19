@@ -81,7 +81,10 @@ const getWeekRangeForPayday = (
   };
 };
 
-const clampIsoDateToRange = (date: string, range: { startDate: string; endDate: string }): string => {
+const clampIsoDateToRange = (
+  date: string,
+  range: { startDate: string; endDate: string },
+): string => {
   if (date < range.startDate) {
     return range.startDate;
   }
@@ -179,10 +182,7 @@ export const AdminChoresPage = () => {
         getChoreBoard(token, { days: 1 }),
       ]);
       const nextSiteToday = currentDayBoard.startDate;
-      const weekRange = getWeekRangeForPayday(
-        nextSiteToday,
-        nextPayoutConfig.paydayDayOfWeek,
-      );
+      const weekRange = getWeekRangeForPayday(nextSiteToday, nextPayoutConfig.paydayDayOfWeek);
       const nextBoard = await getChoreBoard(token, { startDate: weekRange.startDate, days: 7 });
       const nextSelectableRange = {
         startDate: weekRange.startDate,
@@ -279,7 +279,12 @@ export const AdminChoresPage = () => {
           isSelected: date === activeSelectedDate,
         };
       }),
-    [activeSelectedDate, boardEntriesByDate, currentWeekRange.startDate, selectableWeekRange.endDate],
+    [
+      activeSelectedDate,
+      boardEntriesByDate,
+      currentWeekRange.startDate,
+      selectableWeekRange.endDate,
+    ],
   );
 
   const onLogout = () => {
@@ -651,13 +656,19 @@ export const AdminChoresPage = () => {
                     }))
                   }
                 >
-                  {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(
-                    (label, index) => (
-                      <option key={label} value={index}>
-                        {label}
-                      </option>
-                    ),
-                  )}
+                  {[
+                    "Sunday",
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                  ].map((label, index) => (
+                    <option key={label} value={index}>
+                      {label}
+                    </option>
+                  ))}
                 </select>
               </label>
             ) : null}
@@ -779,8 +790,7 @@ export const AdminChoresPage = () => {
                 <p className="font-semibold text-slate-100">{chore.name}</p>
                 <p className="text-xs text-slate-300">
                   {members.find((member) => member.id === chore.memberId)?.name ?? "Unknown child"}{" "}
-                  |{" "}
-                  {scheduleLabel(chore)}
+                  | {scheduleLabel(chore)}
                   {chore.valueAmount !== null ? ` | $${chore.valueAmount.toFixed(2)}` : ""}
                   {!chore.active ? " | Inactive" : ""}
                 </p>
@@ -808,7 +818,9 @@ export const AdminChoresPage = () => {
                       await loadData();
                     } catch (deleteError) {
                       setError(
-                        deleteError instanceof Error ? deleteError.message : "Failed to delete chore",
+                        deleteError instanceof Error
+                          ? deleteError.message
+                          : "Failed to delete chore",
                       );
                     } finally {
                       setBusy(false);
@@ -988,10 +1000,7 @@ export const AdminChoresPage = () => {
                 </button>
                 <button
                   type="button"
-                  disabled={
-                    busy ||
-                    siteTimezoneDraft.trim() === payoutConfig.siteTimezone
-                  }
+                  disabled={busy || siteTimezoneDraft.trim() === payoutConfig.siteTimezone}
                   onClick={() => {
                     void savePayoutConfig({
                       siteTimezone: siteTimezoneDraft.trim() || getRuntimeTimeZone(),
@@ -1003,8 +1012,8 @@ export const AdminChoresPage = () => {
                 </button>
               </div>
               <p className="text-xs text-slate-400">
-                Household timezone controls site-local modules. Chores use it for day rollover
-                and week boundaries, and Bible verse uses it for the verse of the day.
+                Household timezone controls site-local modules. Chores use it for day rollover and
+                week boundaries, and Bible verse uses it for the verse of the day.
               </p>
             </div>
             <p className="mt-2 text-xs text-slate-300">

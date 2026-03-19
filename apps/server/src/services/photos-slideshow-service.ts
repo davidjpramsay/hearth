@@ -17,14 +17,7 @@ import { z } from "zod";
 import type { ModuleStateRepository } from "../repositories/module-state-repository.js";
 import { config } from "../config.js";
 
-const IMAGE_EXTENSIONS = new Set([
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".gif",
-  ".webp",
-  ".bmp",
-]);
+const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"]);
 
 const ORIENTATION_DEBOUNCE_MS = 0;
 const FOLDER_RESCAN_INTERVAL_MS = 15_000;
@@ -87,9 +80,7 @@ const photoOrientationStateSchema = z.object({
 
 type PhotoOrientationState = z.infer<typeof photoOrientationStateSchema>;
 
-const normalizeScreenSessionId = (
-  screenSessionId: string | null | undefined,
-): string | null => {
+const normalizeScreenSessionId = (screenSessionId: string | null | undefined): string | null => {
   if (typeof screenSessionId !== "string") {
     return null;
   }
@@ -111,10 +102,7 @@ const toPlaybackStateKey = (
   return `${baseKey}:screen:${screenHash}`;
 };
 
-const toOrientationStateKey = (
-  sourceKey: string,
-  screenSessionId: string | null,
-): string => {
+const toOrientationStateKey = (sourceKey: string, screenSessionId: string | null): string => {
   const sourceHash = createHash("sha1").update(sourceKey).digest("hex");
   const baseKey = `photos-orientation:${sourceHash}`;
   if (!screenSessionId) {
@@ -322,13 +310,9 @@ const parseExifOrientation = (segmentBuffer: Buffer): number | null => {
   }
 
   const readU16 = (offset: number): number =>
-    littleEndian
-      ? segmentBuffer.readUInt16LE(offset)
-      : segmentBuffer.readUInt16BE(offset);
+    littleEndian ? segmentBuffer.readUInt16LE(offset) : segmentBuffer.readUInt16BE(offset);
   const readU32 = (offset: number): number =>
-    littleEndian
-      ? segmentBuffer.readUInt32LE(offset)
-      : segmentBuffer.readUInt32BE(offset);
+    littleEndian ? segmentBuffer.readUInt32LE(offset) : segmentBuffer.readUInt32BE(offset);
 
   if (segmentBuffer.length < tiffOffset + 8) {
     return null;
@@ -424,9 +408,7 @@ const parseJpegMetadata = (
     }
 
     if (marker === 0xe1 && exifOrientation === null) {
-      exifOrientation = parseExifOrientation(
-        input.subarray(segmentDataStart, segmentDataEnd),
-      );
+      exifOrientation = parseExifOrientation(input.subarray(segmentDataStart, segmentDataEnd));
     }
 
     if (sofMarkers.has(marker) && segmentDataStart + 5 <= input.length) {
@@ -519,10 +501,8 @@ const parseWebpMetadata = (input: Buffer): { width: number; height: number } | n
   const chunkType = input.subarray(12, 16).toString("ascii");
 
   if (chunkType === "VP8X" && input.length >= 30) {
-    const width =
-      1 + input[24] + (input[25] << 8) + (input[26] << 16);
-    const height =
-      1 + input[27] + (input[28] << 8) + (input[29] << 16);
+    const width = 1 + input[24] + (input[25] << 8) + (input[26] << 16);
+    const height = 1 + input[27] + (input[28] << 8) + (input[29] << 16);
 
     if (width >= 1 && height >= 1) {
       return { width, height };
@@ -595,9 +575,7 @@ const readFileHead = async (absolutePath: string, maxBytes: number): Promise<Buf
   }
 };
 
-const parseImageMetadata = async (
-  absolutePath: string,
-): Promise<PhotoMetadata | null> => {
+const parseImageMetadata = async (absolutePath: string): Promise<PhotoMetadata | null> => {
   const headBuffer = await readFileHead(absolutePath, IMAGE_METADATA_SCAN_BYTES);
   const headMetadata = parseImageMetadataFromBuffer(headBuffer);
   if (headMetadata) {
@@ -675,9 +653,7 @@ export class PhotosSlideshowService {
     collectionsConfig?: unknown;
   }): Promise<PhotosModuleNextResponse> {
     const moduleConfig = photosModuleConfigSchema.parse(input.config);
-    const collectionsConfig = photoCollectionsConfigSchema.parse(
-      input.collectionsConfig ?? {},
-    );
+    const collectionsConfig = photoCollectionsConfigSchema.parse(input.collectionsConfig ?? {});
     const source = resolvePhotoSource({
       moduleConfig,
       requestedCollectionId: input.requestedCollectionId ?? null,
@@ -690,10 +666,7 @@ export class PhotosSlideshowService {
       moduleConfig.shuffle,
       screenSessionId,
     );
-    const orientationStateKey = toOrientationStateKey(
-      source.sourceKey,
-      screenSessionId,
-    );
+    const orientationStateKey = toOrientationStateKey(source.sourceKey, screenSessionId);
     const photos = await this.getPhotosForFolders(source.folders);
 
     if (photos.length === 0) {
@@ -717,9 +690,7 @@ export class PhotosSlideshowService {
     const photoById = new Map(photos.map((photo) => [photo.id, photo]));
     const availableIds = photos.map((photo) => photo.id);
     const availableIdSet = new Set(availableIds);
-    const previousOrder = previousState.photoOrder.filter((photoId) =>
-      availableIdSet.has(photoId),
-    );
+    const previousOrder = previousState.photoOrder.filter((photoId) => availableIdSet.has(photoId));
     const hasFullCoverage = previousOrder.length === availableIds.length;
     const orderedIds =
       moduleConfig.shuffle !== previousState.shuffle || !hasFullCoverage
@@ -731,7 +702,7 @@ export class PhotosSlideshowService {
           : availableIds;
 
     const previousPhoto = previousState.currentPhotoId
-      ? photoById.get(previousState.currentPhotoId) ?? null
+      ? (photoById.get(previousState.currentPhotoId) ?? null)
       : null;
     const previousIndex = previousPhoto ? orderedIds.indexOf(previousPhoto.id) : -1;
     const frameIntervalMs = Math.max(3, moduleConfig.intervalSeconds) * 1000;
@@ -742,9 +713,9 @@ export class PhotosSlideshowService {
       previousState.lastFrameAdvancedAtMs <= 0 ||
       nowMs - previousState.lastFrameAdvancedAtMs >= frameIntervalMs;
     const selectedPhoto = shouldAdvance
-      ? photoById.get(orderedIds[(previousIndex + 1 + orderedIds.length) % orderedIds.length]) ??
-        photos[0]
-      : previousPhoto ?? photos[0];
+      ? (photoById.get(orderedIds[(previousIndex + 1 + orderedIds.length) % orderedIds.length]) ??
+        photos[0])
+      : (previousPhoto ?? photos[0]);
 
     let stableOrientation = previousOrientationState.stableOrientation;
     let lastOrientationChangeAtMs = previousOrientationState.lastOrientationChangeAtMs;
@@ -762,9 +733,7 @@ export class PhotosSlideshowService {
       currentPhotoId: selectedPhoto.id,
       photoOrder: orderedIds,
       shuffle: moduleConfig.shuffle,
-      lastFrameAdvancedAtMs: shouldAdvance
-        ? nowMs
-        : previousState.lastFrameAdvancedAtMs,
+      lastFrameAdvancedAtMs: shouldAdvance ? nowMs : previousState.lastFrameAdvancedAtMs,
       stableOrientation,
       lastOrientationChangeAtMs,
     });
@@ -800,9 +769,7 @@ export class PhotosSlideshowService {
     requestedSourceKind?: "set" | "layout" | null;
     collectionsConfig?: unknown;
   }): Promise<string | null> {
-    const collectionsConfig = photoCollectionsConfigSchema.parse(
-      input.collectionsConfig ?? {},
-    );
+    const collectionsConfig = photoCollectionsConfigSchema.parse(input.collectionsConfig ?? {});
     const source = resolvePhotoSource({
       moduleConfig: input.moduleConfig,
       requestedCollectionId: input.requestedCollectionId ?? null,
@@ -813,10 +780,7 @@ export class PhotosSlideshowService {
     const photoFromId = photos.find((photo) => photo.id === input.token);
     const candidatePath = photoFromId?.absolutePath ?? this.decodeImageToken(input.token);
 
-    if (
-      !candidatePath ||
-      !source.folders.some((folder) => pathIsWithin(folder, candidatePath))
-    ) {
+    if (!candidatePath || !source.folders.some((folder) => pathIsWithin(folder, candidatePath))) {
       return null;
     }
 
@@ -899,10 +863,7 @@ export class PhotosSlideshowService {
     return parsedState.success ? parsedState.data : photoOrientationStateSchema.parse({});
   }
 
-  private writeOrientationState(
-    stateKey: string,
-    state: PhotoOrientationState,
-  ): void {
+  private writeOrientationState(stateKey: string, state: PhotoOrientationState): void {
     this.moduleStateRepository.setState(stateKey, photoOrientationStateSchema.parse(state));
   }
 
@@ -929,10 +890,7 @@ export class PhotosSlideshowService {
     return existing;
   }
 
-  private async refreshFolderCache(
-    folderPath: string,
-    cache: FolderCache,
-  ): Promise<void> {
+  private async refreshFolderCache(folderPath: string, cache: FolderCache): Promise<void> {
     let scanResult: { files: string[]; directories: string[] };
     try {
       scanResult = await scanFolderTree(folderPath);

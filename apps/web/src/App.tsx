@@ -45,51 +45,27 @@ export const App = () => (
     <Route path="/admin/login" element={withRouteSuspense(<AdminLoginPage />)} />
     <Route
       path="/chores"
-      element={
-        <RequireAuth>
-          {withRouteSuspense(<AdminChoresPage />)}
-        </RequireAuth>
-      }
+      element={<RequireAuth>{withRouteSuspense(<AdminChoresPage />)}</RequireAuth>}
     />
     <Route
       path="/devices"
-      element={
-        <RequireAuth>
-          {withRouteSuspense(<AdminDevicesPage />)}
-        </RequireAuth>
-      }
+      element={<RequireAuth>{withRouteSuspense(<AdminDevicesPage />)}</RequireAuth>}
     />
     <Route
       path="/admin/chores"
-      element={
-        <RequireAuth>
-          {withRouteSuspense(<AdminChoresPage />)}
-        </RequireAuth>
-      }
+      element={<RequireAuth>{withRouteSuspense(<AdminChoresPage />)}</RequireAuth>}
     />
     <Route
       path="/admin/devices"
-      element={
-        <RequireAuth>
-          {withRouteSuspense(<AdminDevicesPage />)}
-        </RequireAuth>
-      }
+      element={<RequireAuth>{withRouteSuspense(<AdminDevicesPage />)}</RequireAuth>}
     />
     <Route
       path="/admin/layouts"
-      element={
-        <RequireAuth>
-          {withRouteSuspense(<AdminLayoutsPage />)}
-        </RequireAuth>
-      }
+      element={<RequireAuth>{withRouteSuspense(<AdminLayoutsPage />)}</RequireAuth>}
     />
     <Route
       path="/admin/layouts/:id"
-      element={
-        <RequireAuth>
-          {withRouteSuspense(<AdminLayoutEditorPage />)}
-        </RequireAuth>
-      }
+      element={<RequireAuth>{withRouteSuspense(<AdminLayoutEditorPage />)}</RequireAuth>}
     />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>

@@ -1,9 +1,6 @@
 import { z } from "zod";
 import { layoutConfigSchema, layoutRecordSchema } from "./layout.js";
-import {
-  photoCollectionFolderSchema,
-  photoCollectionsConfigSchema,
-} from "./modules/photos.js";
+import { photoCollectionFolderSchema, photoCollectionsConfigSchema } from "./modules/photos.js";
 
 export const loginRequestSchema = z.object({
   password: z.string().min(4).max(128),
@@ -58,6 +55,4 @@ export type CreateLayoutRequest = z.infer<typeof createLayoutRequestSchema>;
 export type UpdateLayoutRequest = z.infer<typeof updateLayoutRequestSchema>;
 export type LayoutsQuery = z.infer<typeof layoutsQuerySchema>;
 export type PhotoCollectionsResponse = z.infer<typeof photoCollectionsResponseSchema>;
-export type PhotoLibraryFoldersResponse = z.infer<
-  typeof photoLibraryFoldersResponseSchema
->;
+export type PhotoLibraryFoldersResponse = z.infer<typeof photoLibraryFoldersResponseSchema>;

@@ -7,13 +7,8 @@ import {
   type CalendarModuleEvent,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
-import {
-  ModulePresentationControls,
-} from "../ui/ModulePresentationControls";
-import {
-  resolveModuleConnectivityState,
-  useBrowserOnlineStatus,
-} from "../data/connection-state";
+import { ModulePresentationControls } from "../ui/ModulePresentationControls";
+import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -126,10 +121,7 @@ const toCalendarSourceLabel = (source: string): string => {
   return segments[segments.length - 1] ?? normalizedPath;
 };
 
-const resolveCalendarLabel = (
-  source: string,
-  configuredLabel: string | undefined,
-): string => {
+const resolveCalendarLabel = (source: string, configuredLabel: string | undefined): string => {
   const trimmedLabel = configuredLabel?.trim() ?? "";
   if (trimmedLabel.length > 0) {
     return trimmedLabel;
@@ -196,10 +188,7 @@ const eventStyleForView = (
   return baseStyle ? { ...baseStyle, opacity: 0.52 } : { opacity: 0.52 };
 };
 
-const formatEventTime = (
-  event: CalendarTileEvent,
-  timeFormatter: Intl.DateTimeFormat,
-): string => {
+const formatEventTime = (event: CalendarTileEvent, timeFormatter: Intl.DateTimeFormat): string => {
   if (event.allDay) {
     return "All day";
   }
@@ -214,17 +203,11 @@ const formatEventTime = (
   return `${start} - ${end}`;
 };
 
-const loadCalendarEvents = async (
-  instanceId: string,
-  signal: AbortSignal,
-) => {
-  const response = await fetch(
-    `/api/modules/calendar/${encodeURIComponent(instanceId)}/events`,
-    {
-      method: "GET",
-      signal,
-    },
-  );
+const loadCalendarEvents = async (instanceId: string, signal: AbortSignal) => {
+  const response = await fetch(`/api/modules/calendar/${encodeURIComponent(instanceId)}/events`, {
+    method: "GET",
+    signal,
+  });
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
@@ -288,10 +271,7 @@ export const moduleDefinition = defineModule({
           abortController = new AbortController();
 
           try {
-            const nextPayload = await loadCalendarEvents(
-              instanceId,
-              abortController.signal,
-            );
+            const nextPayload = await loadCalendarEvents(instanceId, abortController.signal);
 
             if (!active) {
               return;
@@ -385,19 +365,14 @@ export const moduleDefinition = defineModule({
       const now = new Date();
       const todayDayStartMs = startOfDay(now).getTime();
       const headerTitle =
-        settings.viewMode === "month"
-          ? monthNameFormatter.format(now)
-          : "Upcoming";
+        settings.viewMode === "month" ? monthNameFormatter.format(now) : "Upcoming";
       const headerViewLabel =
-        settings.viewMode === "month"
-          ? "Month"
-          : settings.viewMode.toUpperCase();
+        settings.viewMode === "month" ? "Month" : settings.viewMode.toUpperCase();
 
       const listDays = useMemo(() => {
         const firstDay = startOfDay(now);
-        return Array.from(
-          { length: settings.daysToShow },
-          (_value, index) => addDays(firstDay, index),
+        return Array.from({ length: settings.daysToShow }, (_value, index) =>
+          addDays(firstDay, index),
         );
       }, [settings.daysToShow, now]);
 
@@ -423,37 +398,24 @@ export const moduleDefinition = defineModule({
           seenSources.add(source);
           entries.push({
             source,
-            label: resolveCalendarLabel(
-              source,
-              settings.calendarLabels[index],
-            ),
+            label: resolveCalendarLabel(source, settings.calendarLabels[index]),
             color:
-              normalizeCalendarColor(settings.calendarColors[index]) ??
-              defaultCalendarColor(index),
+              normalizeCalendarColor(settings.calendarColors[index]) ?? defaultCalendarColor(index),
           });
         }
 
         return entries;
-      }, [
-        settings.calendarColors,
-        settings.calendarLabels,
-        settings.calendars,
-      ]);
+      }, [settings.calendarColors, settings.calendarLabels, settings.calendars]);
 
       const hasListEvents = useMemo(
-        () =>
-          listDays.some((day) =>
-            parsedEvents.some((event) => eventOccursOnDay(event, day)),
-          ),
+        () => listDays.some((day) => parsedEvents.some((event) => eventOccursOnDay(event, day))),
         [listDays, parsedEvents],
       );
 
       if (isEditing) {
         return (
           <div className="flex h-full flex-col justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-3 text-slate-200">
-            <p className="module-copy-title text-slate-100">
-              Calendar preview
-            </p>
+            <p className="module-copy-title text-slate-100">Calendar preview</p>
             <p className="module-copy-meta mt-2 text-slate-300">
               Events load from the active layout on the dashboard.
             </p>
@@ -468,12 +430,8 @@ export const moduleDefinition = defineModule({
         <div className="module-panel-shell relative flex h-full min-h-0 flex-col overflow-hidden p-2 text-slate-100">
           <ModuleConnectionBadge visible={connectivityState.showDisconnected} />
           <header className="mb-2 flex items-center justify-between rounded border border-slate-700/80 bg-slate-900/80 px-3 py-2">
-            <p className="module-copy-title text-slate-100">
-              {headerTitle}
-            </p>
-            <p className="module-copy-label text-slate-400">
-              {headerViewLabel}
-            </p>
+            <p className="module-copy-title text-slate-100">{headerTitle}</p>
+            <p className="module-copy-label text-slate-400">{headerViewLabel}</p>
           </header>
 
           {loading ? (
@@ -523,7 +481,10 @@ export const moduleDefinition = defineModule({
                     }
 
                     return (
-                      <section key={day.toISOString()} className="rounded border border-slate-700/80 bg-slate-900/70 p-2">
+                      <section
+                        key={day.toISOString()}
+                        className="rounded border border-slate-700/80 bg-slate-900/70 p-2"
+                      >
                         <h4 className="module-copy-label mb-2 text-cyan-200">
                           {dayFormatter.format(day)}
                         </h4>
@@ -614,9 +575,7 @@ export const moduleDefinition = defineModule({
                           </article>
                         ))}
                         {dayEvents.length === 0 ? (
-                          <p className="module-copy-meta text-center text-slate-400">
-                            No events
-                          </p>
+                          <p className="module-copy-meta text-center text-slate-400">No events</p>
                         ) : null}
                       </div>
                     </section>
@@ -657,10 +616,7 @@ export const moduleDefinition = defineModule({
                   }}
                 >
                   {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayLabel) => (
-                    <p
-                      key={dayLabel}
-                      className="module-copy-label pb-1 text-center text-slate-400"
-                    >
+                    <p key={dayLabel} className="module-copy-label pb-1 text-center text-slate-400">
                       {dayLabel}
                     </p>
                   ))}
@@ -766,9 +722,7 @@ export const moduleDefinition = defineModule({
 
       const removeCalendarSource = (index: number) => {
         applyPatch({
-          calendars: settings.calendars.filter(
-            (_entry, entryIndex) => entryIndex !== index,
-          ),
+          calendars: settings.calendars.filter((_entry, entryIndex) => entryIndex !== index),
           calendarLabels: settings.calendarLabels.filter(
             (_entry, entryIndex) => entryIndex !== index,
           ),
@@ -808,16 +762,12 @@ export const moduleDefinition = defineModule({
                   className="space-y-2 rounded border border-slate-700/80 bg-slate-900/60 p-2"
                 >
                   <label className="block space-y-1">
-                    <span className="text-[11px] font-medium text-slate-300">
-                      Calendar name
-                    </span>
+                    <span className="text-[11px] font-medium text-slate-300">Calendar name</span>
                     <input
                       className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100"
                       type="text"
                       value={settings.calendarLabels[index] ?? ""}
-                      onChange={(event) =>
-                        updateCalendarLabel(index, event.target.value)
-                      }
+                      onChange={(event) => updateCalendarLabel(index, event.target.value)}
                     />
                   </label>
                   <div className="flex gap-2">

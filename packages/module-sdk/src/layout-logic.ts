@@ -114,10 +114,7 @@ export interface LayoutLogicRegistry extends LayoutLogicRegistryInput {}
 
 const normalizeId = (value: string): string => value.trim();
 
-const assertUniqueIds = (
-  type: string,
-  entries: Array<{ id: string }>,
-): void => {
+const assertUniqueIds = (type: string, entries: Array<{ id: string }>): void => {
   const seen = new Set<string>();
   for (const entry of entries) {
     const id = normalizeId(entry.id);
@@ -137,11 +134,7 @@ const assertNonEmptyLabel = (type: string, id: string, label: string): void => {
   }
 };
 
-const assertNonEmptyDescription = (
-  type: string,
-  id: string,
-  description: string,
-): void => {
+const assertNonEmptyDescription = (type: string, id: string, description: string): void => {
   if (!description.trim()) {
     throw new Error(`${type} '${id}' must define a non-empty description.`);
   }
@@ -158,9 +151,7 @@ const normalizeParamFields = (
       throw new Error(`${ownerType} '${id}' has a param field with an empty key.`);
     }
     if (!field.label.trim()) {
-      throw new Error(
-        `${ownerType} '${id}' param field '${key}' must define a non-empty label.`,
-      );
+      throw new Error(`${ownerType} '${id}' param field '${key}' must define a non-empty label.`);
     }
 
     const normalizedField: LayoutLogicParamFieldDefinition = {
@@ -177,21 +168,15 @@ const normalizeParamFields = (
     if (normalizedField.kind === "select") {
       const options = normalizedField.options ?? [];
       if (options.length === 0) {
-        throw new Error(
-          `${ownerType} '${id}' param field '${key}' is select but has no options.`,
-        );
+        throw new Error(`${ownerType} '${id}' param field '${key}' is select but has no options.`);
       }
 
       normalizedField.options = options.map((option) => {
         if (!option.label.trim()) {
-          throw new Error(
-            `${ownerType} '${id}' param field '${key}' has an empty option label.`,
-          );
+          throw new Error(`${ownerType} '${id}' param field '${key}' has an empty option label.`);
         }
         if (!option.value.trim()) {
-          throw new Error(
-            `${ownerType} '${id}' param field '${key}' has an empty option value.`,
-          );
+          throw new Error(`${ownerType} '${id}' param field '${key}' has an empty option value.`);
         }
         return {
           label: option.label.trim(),
@@ -214,9 +199,7 @@ const normalizeParamFields = (
   const seen = new Set<string>();
   for (const field of normalized) {
     if (seen.has(field.key)) {
-      throw new Error(
-        `${ownerType} '${id}' defines duplicate param field key '${field.key}'.`,
-      );
+      throw new Error(`${ownerType} '${id}' defines duplicate param field key '${field.key}'.`);
     }
     seen.add(field.key);
   }
@@ -306,9 +289,7 @@ const normalizeRuleAction = (
   };
 };
 
-export const createLayoutLogicRegistry = (
-  input: LayoutLogicRegistryInput,
-): LayoutLogicRegistry => {
+export const createLayoutLogicRegistry = (input: LayoutLogicRegistryInput): LayoutLogicRegistry => {
   const conditions = input.conditions.map(normalizeCondition);
   const canvasActions = input.canvasActions.map(normalizeCanvasAction);
   const ruleActions = input.ruleActions.map(normalizeRuleAction);

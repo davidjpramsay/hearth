@@ -1,8 +1,5 @@
 import type { CSSProperties } from "react";
-import {
-  layoutTypographySchema,
-  type LayoutTypography,
-} from "@hearth/shared";
+import { layoutTypographySchema, type LayoutTypography } from "@hearth/shared";
 
 export interface LayoutTypographyControl {
   key: keyof LayoutTypography;
@@ -50,8 +47,7 @@ export const LAYOUT_TYPOGRAPHY_CONTROLS: LayoutTypographyControl[] = [
 
 export const DEFAULT_LAYOUT_TYPOGRAPHY: LayoutTypography = layoutTypographySchema.parse({});
 
-const formatRemValue = (value: number): string =>
-  `${Number(value.toFixed(4)).toString()}rem`;
+const formatRemValue = (value: number): string => `${Number(value.toFixed(4)).toString()}rem`;
 
 export const normalizeLayoutTypography = (
   input: LayoutTypography | null | undefined,
@@ -96,8 +92,7 @@ export const snapLayoutTypographyValue = (
   control: Pick<LayoutTypographyControl, "min" | "max" | "step">,
 ): number => {
   const clamped = Math.min(control.max, Math.max(control.min, value));
-  const stepped =
-    Math.round((clamped - control.min) / control.step) * control.step + control.min;
+  const stepped = Math.round((clamped - control.min) / control.step) * control.step + control.min;
 
   return Number(stepped.toFixed(4));
 };

@@ -44,8 +44,7 @@ const startOfDay = (date: Date): Date =>
 const endOfDay = (date: Date): Date =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
 
-const isRemoteSource = (source: string): boolean =>
-  REMOTE_PROTOCOL_REGEX.test(source);
+const isRemoteSource = (source: string): boolean => REMOTE_PROTOCOL_REGEX.test(source);
 
 const toRemoteFetchUrl = (source: string): string | null => {
   if (!isRemoteSource(source)) {
@@ -210,10 +209,7 @@ export class CalendarFeedService {
     const deduplicatedEvents = Array.from(
       new Map(mergedEvents.map((event) => [event.id, event])).values(),
     )
-      .sort(
-        (left, right) =>
-          new Date(left.start).getTime() - new Date(right.start).getTime(),
-      )
+      .sort((left, right) => new Date(left.start).getTime() - new Date(right.start).getTime())
       .slice(0, MAX_RETURNED_EVENTS);
 
     return {

@@ -259,10 +259,7 @@ test("reportScreenProfile returns the automatic warning layout for warning targe
 
     assert.equal(response.layout?.name, LOCAL_WARNING_AUTO_LAYOUT_LABEL);
     assert.equal(response.layout?.config.modules[0]?.moduleId, LOCAL_WARNING_MODULE_ID);
-    assert.equal(
-      response.layout?.config.modules[0]?.config.locationQuery,
-      "Perth, AU",
-    );
+    assert.equal(response.layout?.config.modules[0]?.config.locationQuery, "Perth, AU");
     assert.equal(response.warningTicker, null);
   } finally {
     configureLayoutLogicRegistry({
@@ -424,16 +421,12 @@ test("managed device updates reject unknown target assignments", () => {
     assert.equal(missingLayout.ok, false);
     assert.equal(missingLayout.message, "Layout not found: Unknown Layout");
 
-    const emptySetSelection =
-      harness.screenProfileService.validateManagedDeviceTargetSelection({
-        kind: "set",
-        setId: null,
-      });
+    const emptySetSelection = harness.screenProfileService.validateManagedDeviceTargetSelection({
+      kind: "set",
+      setId: null,
+    });
     assert.equal(emptySetSelection.ok, false);
-    assert.equal(
-      emptySetSelection.message,
-      "Choose a set.",
-    );
+    assert.equal(emptySetSelection.message, "Choose a set.");
   } finally {
     harness.dispose();
   }

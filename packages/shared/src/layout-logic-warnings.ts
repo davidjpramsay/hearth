@@ -12,13 +12,9 @@ export const localWarningConditionParamsSchema = z.object({
   longitude: z.number().min(-180).max(180).nullable().default(null),
 });
 
-export type LocalWarningConditionParams = z.infer<
-  typeof localWarningConditionParamsSchema
->;
+export type LocalWarningConditionParams = z.infer<typeof localWarningConditionParamsSchema>;
 
-export const parseLocalWarningConditionParams = (
-  input: unknown,
-): LocalWarningConditionParams =>
+export const parseLocalWarningConditionParams = (input: unknown): LocalWarningConditionParams =>
   localWarningConditionParamsSchema.safeParse(input).success
     ? localWarningConditionParamsSchema.parse(input)
     : localWarningConditionParamsSchema.parse({});
