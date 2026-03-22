@@ -108,6 +108,58 @@ test("reportScreenProfile refreshes the last seen ip when the screen checks in a
   }
 });
 
+test("reportScreenProfile stores coarse device info and uses it for new default names", () => {
+  const harness = createHarness();
+
+  try {
+    const first = harness.screenProfileService.reportScreenProfile(
+      {
+        screenSessionId: "device-ipad-1",
+        reportedThemeId: "default",
+        deviceInfo: {
+          label: "iPad",
+          platform: "iPadOS",
+          browser: "Safari",
+          formFactor: "tablet",
+          viewportWidth: 1024,
+          viewportHeight: 1366,
+          pixelRatio: 2,
+          standalone: true,
+        },
+      },
+      { lastSeenIp: "192.168.1.50" },
+    );
+    const second = harness.screenProfileService.reportScreenProfile(
+      {
+        screenSessionId: "device-ipad-2",
+        reportedThemeId: "default",
+        deviceInfo: {
+          label: "iPad",
+          platform: "iPadOS",
+          browser: "Safari",
+          formFactor: "tablet",
+          viewportWidth: 1024,
+          viewportHeight: 1366,
+          pixelRatio: 2,
+          standalone: true,
+        },
+      },
+      { lastSeenIp: "192.168.1.51" },
+    );
+
+    assert.equal(first.device.name, "iPad");
+    assert.equal(second.device.name, "iPad (2)");
+
+    const storedDevice = harness.deviceRepository.getDevice("device-ipad-1");
+    assert.ok(storedDevice);
+    assert.equal(storedDevice.deviceInfo?.label, "iPad");
+    assert.equal(storedDevice.deviceInfo?.browser, "Safari");
+    assert.equal(storedDevice.deviceInfo?.standalone, true);
+  } finally {
+    harness.dispose();
+  }
+});
+
 test("server-managed device settings override later reported local values", () => {
   const harness = createHarness();
 

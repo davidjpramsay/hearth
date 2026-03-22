@@ -18,6 +18,8 @@ import {
   getDashboardDeviceBootstrapStateForDeviceRefresh,
   getInitialDashboardDeviceBootstrapState,
 } from "./dashboard-device-bootstrap";
+import { getDisplayClientInfo } from "../device/display-client-info";
+import { useScreenWakeLock } from "../device/use-screen-wake-lock";
 import { moduleRegistry } from "../registry/module-registry";
 import { applyTheme } from "../theme/theme";
 
@@ -282,6 +284,8 @@ const DashboardWarningTicker = ({ ticker }: { ticker: ReportScreenProfileWarning
 };
 
 export const DashboardPage = () => {
+  useScreenWakeLock(true);
+
   const [activeLayout, setActiveLayout] = useState<LayoutRecord | null>(null);
   const [deviceIdentity, setDeviceIdentity] = useState<DisplayDeviceRuntime | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -326,6 +330,7 @@ export const DashboardPage = () => {
         photoOrientation: orientation,
         reportedThemeId: bootstrapState.reportedThemeId,
         screenSessionId: deviceIdRef.current,
+        deviceInfo: getDisplayClientInfo(),
       });
       if (requestId !== latestResolveRequestIdRef.current) {
         return;

@@ -1,11 +1,13 @@
 import type Database from "better-sqlite3";
 import {
   displayDeviceIdSchema,
+  displayDeviceInfoSchema,
   displayDeviceSchema,
   displayThemeIdSchema,
   reportScreenTargetSelectionSchema,
   updateDisplayDeviceRequestSchema,
   type DisplayDevice,
+  type DisplayDeviceInfo,
   type ReportScreenTargetSelection,
   type UpdateDisplayDeviceRequest,
 } from "@hearth/shared";
@@ -25,6 +27,7 @@ interface DeviceRow {
   updated_at: string;
   last_seen_at: string;
   last_seen_ip: string | null;
+  device_info_json: string | null;
 }
 
 const DEFAULT_THEME_ID = displayThemeIdSchema.parse("default");
@@ -44,6 +47,20 @@ const parseTargetSelection = (rawValue: string | null): ReportScreenTargetSelect
   }
 };
 
+const parseDeviceInfo = (rawValue: string | null): DisplayDeviceInfo | null => {
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue);
+    const result = displayDeviceInfoSchema.safeParse(parsed);
+    return result.success ? result.data : null;
+  } catch {
+    return null;
+  }
+};
+
 export class DeviceRepository {
   constructor(private readonly db: Database.Database) {}
 
@@ -54,6 +71,13 @@ export class DeviceRepository {
 
     const nextValue = value.trim().slice(0, MAX_DEVICE_IP_LENGTH);
     return nextValue.length > 0 ? nextValue : null;
+  }
+
+  private normalizeDeviceInfo(
+    value: DisplayDeviceInfo | null | undefined,
+  ): DisplayDeviceInfo | null {
+    const result = displayDeviceInfoSchema.safeParse(value);
+    return result.success ? result.data : null;
   }
 
   private listUsedDeviceNames(excludeDeviceId?: string): Set<string> {
@@ -93,23 +117,30 @@ export class DeviceRepository {
     return nextName;
   }
 
-  private buildUniqueDefaultName(deviceId: string): string {
-    return toUniqueDeviceName(buildDefaultDeviceName(deviceId), this.listUsedDeviceNames());
+  private buildUniqueDefaultName(deviceId: string, deviceInfo?: DisplayDeviceInfo | null): string {
+    return toUniqueDeviceName(
+      buildDefaultDeviceName(deviceId, deviceInfo?.label ?? null),
+      this.listUsedDeviceNames(),
+    );
   }
 
   private mapRow(row: DeviceRow): DisplayDevice {
     const parsedTheme = displayThemeIdSchema.safeParse(row.theme_id);
+    const parsedDeviceInfo = parseDeviceInfo(row.device_info_json);
 
     return displayDeviceSchema.parse({
       id: row.id,
       name:
-        row.name.trim().length > 0 ? row.name.trim().slice(0, 80) : buildDefaultDeviceName(row.id),
+        row.name.trim().length > 0
+          ? row.name.trim().slice(0, 80)
+          : buildDefaultDeviceName(row.id, parsedDeviceInfo?.label ?? null),
       themeId: parsedTheme.success ? parsedTheme.data : DEFAULT_THEME_ID,
       targetSelection: parseTargetSelection(row.target_selection_json),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       lastSeenAt: row.last_seen_at,
       lastSeenIp: this.normalizeLastSeenIp(row.last_seen_ip),
+      deviceInfo: parsedDeviceInfo,
     });
   }
 
@@ -126,7 +157,8 @@ export class DeviceRepository {
           created_at,
           updated_at,
           last_seen_at,
-          last_seen_ip
+          last_seen_ip,
+          device_info_json
         FROM devices
         WHERE id = @id
         `,
@@ -148,7 +180,8 @@ export class DeviceRepository {
           created_at,
           updated_at,
           last_seen_at,
-          last_seen_ip
+          last_seen_ip,
+          device_info_json
         FROM devices
         ORDER BY last_seen_at DESC, created_at DESC, id ASC
         `,
@@ -163,10 +196,12 @@ export class DeviceRepository {
     reportedTargetSelection: ReportScreenTargetSelection | null;
     reportedThemeId: string | null | undefined;
     lastSeenIp?: string | null;
+    reportedDeviceInfo?: DisplayDeviceInfo | null;
   }): DisplayDevice {
     const normalizedDeviceId = displayDeviceIdSchema.parse(input.deviceId);
     const existing = this.getDevice(normalizedDeviceId);
     const nextLastSeenIp = this.normalizeLastSeenIp(input.lastSeenIp);
+    const nextDeviceInfo = this.normalizeDeviceInfo(input.reportedDeviceInfo);
 
     if (!existing) {
       const themeId = displayThemeIdSchema.safeParse(input.reportedThemeId);
@@ -185,7 +220,8 @@ export class DeviceRepository {
             created_at,
             updated_at,
             last_seen_at,
-            last_seen_ip
+            last_seen_ip,
+            device_info_json
           )
           VALUES (
             @id,
@@ -195,43 +231,47 @@ export class DeviceRepository {
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP,
-            @lastSeenIp
+            @lastSeenIp,
+            @deviceInfoJson
           )
           `,
         )
         .run({
           id: normalizedDeviceId,
-          name: this.buildUniqueDefaultName(normalizedDeviceId),
+          name: this.buildUniqueDefaultName(normalizedDeviceId, nextDeviceInfo),
           themeId: themeId.success ? themeId.data : DEFAULT_THEME_ID,
           targetSelectionJson: targetSelection ? JSON.stringify(targetSelection) : null,
           lastSeenIp: nextLastSeenIp,
+          deviceInfoJson: nextDeviceInfo ? JSON.stringify(nextDeviceInfo) : null,
         });
 
       return this.getDevice(normalizedDeviceId) as DisplayDevice;
     }
 
-    if (nextLastSeenIp === null) {
-      this.db
-        .prepare(
-          `
-          UPDATE devices
-          SET last_seen_at = CURRENT_TIMESTAMP
-          WHERE id = @id
-          `,
-        )
-        .run({ id: normalizedDeviceId });
-    } else {
-      this.db
-        .prepare(
-          `
-          UPDATE devices
-          SET last_seen_at = CURRENT_TIMESTAMP,
-              last_seen_ip = @lastSeenIp
-          WHERE id = @id
-          `,
-        )
-        .run({ id: normalizedDeviceId, lastSeenIp: nextLastSeenIp });
+    const updates = ["last_seen_at = CURRENT_TIMESTAMP"];
+    const statementParams: Record<string, string | null> = {
+      id: normalizedDeviceId,
+    };
+
+    if (nextLastSeenIp !== null) {
+      updates.push("last_seen_ip = @lastSeenIp");
+      statementParams.lastSeenIp = nextLastSeenIp;
     }
+
+    if (nextDeviceInfo !== null) {
+      updates.push("device_info_json = @deviceInfoJson");
+      statementParams.deviceInfoJson = JSON.stringify(nextDeviceInfo);
+    }
+
+    this.db
+      .prepare(
+        `
+        UPDATE devices
+        SET ${updates.join(",\n            ")}
+        WHERE id = @id
+        `,
+      )
+      .run(statementParams);
 
     return this.getDevice(normalizedDeviceId) as DisplayDevice;
   }

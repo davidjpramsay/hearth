@@ -8,6 +8,10 @@ export class DuplicateDeviceNameError extends Error {
 }
 
 export const normalizeDeviceName = (value: string): string => value.trim().toLowerCase();
+const normalizeGeneratedDeviceLabel = (value: string | null | undefined): string | null => {
+  const normalized = (value ?? "").replace(/\s+/g, " ").trim();
+  return normalized.length > 0 ? normalized.slice(0, MAX_DEVICE_NAME_LENGTH) : null;
+};
 
 const formatDeviceCode = (deviceId: string): string => {
   const compact = deviceId
@@ -26,7 +30,11 @@ const formatDeviceCode = (deviceId: string): string => {
   return "DEVICE";
 };
 
-export const buildDefaultDeviceName = (deviceId: string): string =>
+export const buildDefaultDeviceName = (
+  deviceId: string,
+  preferredLabel?: string | null,
+): string =>
+  normalizeGeneratedDeviceLabel(preferredLabel) ??
   `Display ${formatDeviceCode(deviceId)}`.slice(0, MAX_DEVICE_NAME_LENGTH);
 
 export const toUniqueDeviceName = (baseName: string, usedNames: Set<string>): string => {

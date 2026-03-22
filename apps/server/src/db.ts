@@ -92,7 +92,8 @@ CREATE TABLE IF NOT EXISTS devices (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  last_seen_ip TEXT
+  last_seen_ip TEXT,
+  device_info_json TEXT
 );
 `;
 
@@ -625,6 +626,12 @@ export const createDatabase = (filePath: string): Database.Database => {
     "devices",
     "last_seen_ip",
     "ALTER TABLE devices ADD COLUMN last_seen_ip TEXT",
+  );
+  ensureColumnExists(
+    db,
+    "devices",
+    "device_info_json",
+    "ALTER TABLE devices ADD COLUMN device_info_json TEXT",
   );
 
   ensureUniqueLayoutNames(db);

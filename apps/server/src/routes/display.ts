@@ -8,6 +8,7 @@ import {
   updateDisplayDeviceRequestSchema,
 } from "@hearth/shared";
 import { readdir } from "node:fs/promises";
+import { isIP } from "node:net";
 import { isAbsolute, relative, resolve } from "node:path";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -23,19 +24,84 @@ const displayDeviceParamsSchema = z.object({
   id: z.string().trim().min(1).max(128),
 });
 
+const normalizeIpLiteral = (value: string): string | null => {
+  let candidate = value.trim().slice(0, MAX_DEVICE_IP_LENGTH);
+  if (candidate.length === 0) {
+    return null;
+  }
+
+  if (candidate.startsWith('"') && candidate.endsWith('"')) {
+    candidate = candidate.slice(1, -1).trim();
+  }
+
+  if (candidate.startsWith("[")) {
+    const closingIndex = candidate.indexOf("]");
+    candidate = closingIndex >= 0 ? candidate.slice(1, closingIndex) : "";
+  } else if (
+    candidate.includes(".") &&
+    candidate.includes(":") &&
+    candidate.indexOf(":") === candidate.lastIndexOf(":")
+  ) {
+    candidate = candidate.slice(0, candidate.lastIndexOf(":"));
+  }
+
+  if (candidate.startsWith("::ffff:")) {
+    const mappedIpv4 = candidate.slice("::ffff:".length);
+    if (isIP(mappedIpv4) === 4) {
+      candidate = mappedIpv4;
+    }
+  }
+
+  return isIP(candidate) > 0 ? candidate : null;
+};
+
 const normalizeRequestIp = (value: string | string[] | undefined): string | null => {
   const rawValue = Array.isArray(value) ? value[0] : value;
   if (typeof rawValue !== "string") {
     return null;
   }
 
-  const candidate = rawValue.split(",")[0]?.trim().slice(0, MAX_DEVICE_IP_LENGTH) ?? "";
-  return candidate.length > 0 ? candidate : null;
+  for (const entry of rawValue.split(",")) {
+    const candidate = normalizeIpLiteral(entry);
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return null;
+};
+
+const normalizeForwardedHeaderIp = (value: string | string[] | undefined): string | null => {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  if (typeof rawValue !== "string") {
+    return null;
+  }
+
+  for (const forwardedEntry of rawValue.split(",")) {
+    for (const token of forwardedEntry.split(";")) {
+      const trimmedToken = token.trim();
+      if (!trimmedToken.toLowerCase().startsWith("for=")) {
+        continue;
+      }
+
+      const candidate = normalizeIpLiteral(trimmedToken.slice(4));
+      if (candidate) {
+        return candidate;
+      }
+    }
+  }
+
+  return null;
 };
 
 const getRequestDeviceIp = (request: FastifyRequest): string | null =>
-  normalizeRequestIp(request.headers["x-forwarded-for"]) ??
+  normalizeRequestIp(request.headers["cf-connecting-ip"]) ??
+  normalizeRequestIp(request.headers["true-client-ip"]) ??
   normalizeRequestIp(request.headers["x-real-ip"]) ??
+  normalizeRequestIp(request.headers["x-client-ip"]) ??
+  normalizeRequestIp(request.headers["x-original-forwarded-for"]) ??
+  normalizeForwardedHeaderIp(request.headers.forwarded) ??
+  normalizeRequestIp(request.headers["x-forwarded-for"]) ??
   normalizeRequestIp(request.ip);
 
 const toRelativeFolderPath = (absolutePath: string): string | null => {

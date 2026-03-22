@@ -2505,6 +2505,17 @@ export const displayThemeIdSchema = z.enum(["default", "nord", "solarized", "mon
 export const displayDeviceIdSchema = z.string().trim().min(1).max(128);
 export const displayDeviceNameSchema = z.string().trim().min(1).max(80);
 export const displayDeviceIpSchema = z.string().trim().min(1).max(255);
+export const displayDeviceFormFactorSchema = z.enum(["desktop", "tablet", "phone", "other"]);
+export const displayDeviceInfoSchema = z.object({
+  label: displayDeviceNameSchema.nullable().default(null),
+  platform: z.string().trim().min(1).max(40).nullable().default(null),
+  browser: z.string().trim().min(1).max(40).nullable().default(null),
+  formFactor: displayDeviceFormFactorSchema.nullable().default(null),
+  viewportWidth: z.number().int().min(1).max(16384).nullable().default(null),
+  viewportHeight: z.number().int().min(1).max(16384).nullable().default(null),
+  pixelRatio: z.number().positive().max(8).nullable().default(null),
+  standalone: z.boolean().default(false),
+});
 
 export const displayDeviceRuntimeSchema = z.object({
   id: displayDeviceIdSchema,
@@ -2518,6 +2529,7 @@ export const displayDeviceSchema = displayDeviceRuntimeSchema.extend({
   updatedAt: z.string(),
   lastSeenAt: z.string(),
   lastSeenIp: displayDeviceIpSchema.nullable().default(null),
+  deviceInfo: displayDeviceInfoSchema.nullable().default(null),
 });
 
 export const displayDevicesResponseSchema = z.object({
@@ -2538,6 +2550,7 @@ export const reportScreenProfileRequestSchema = z.object({
   photoEventToken: z.number().int().min(0).optional(),
   reportedThemeId: displayThemeIdSchema.optional(),
   screenSessionId: z.string().trim().min(1).max(128).optional().default("default"),
+  deviceInfo: displayDeviceInfoSchema.nullable().optional().default(null),
 });
 
 export const reportScreenProfileReasonSchema = z.enum([
@@ -2589,6 +2602,8 @@ export type ReportScreenTargetSelection = z.infer<typeof reportScreenTargetSelec
 export type DisplayThemeId = z.infer<typeof displayThemeIdSchema>;
 export type DisplayDeviceId = z.infer<typeof displayDeviceIdSchema>;
 export type DisplayDeviceName = z.infer<typeof displayDeviceNameSchema>;
+export type DisplayDeviceFormFactor = z.infer<typeof displayDeviceFormFactorSchema>;
+export type DisplayDeviceInfo = z.infer<typeof displayDeviceInfoSchema>;
 export type DisplayDeviceRuntime = z.infer<typeof displayDeviceRuntimeSchema>;
 export type DisplayDevice = z.infer<typeof displayDeviceSchema>;
 export type DisplayDevicesResponse = z.infer<typeof displayDevicesResponseSchema>;

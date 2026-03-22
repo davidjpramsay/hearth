@@ -81,6 +81,67 @@ test("screen-profile report stores the last seen ip from the request headers", a
   }
 });
 
+test("screen-profile report parses client ip from the Forwarded header", async () => {
+  const harness = await createHarness();
+
+  try {
+    const response = await harness.app.inject({
+      method: "POST",
+      url: "/display/screen-profile/report",
+      headers: {
+        forwarded: 'for="192.168.1.46:4312";proto=https;by=172.20.0.1',
+      },
+      payload: {
+        screenSessionId: "device-ip-route-forwarded-1",
+        reportedThemeId: "default",
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const storedDevice = harness.deviceRepository.getDevice("device-ip-route-forwarded-1");
+    assert.ok(storedDevice);
+    assert.equal(storedDevice.lastSeenIp, "192.168.1.46");
+  } finally {
+    await harness.dispose();
+  }
+});
+
+test("screen-profile report stores the reported device info", async () => {
+  const harness = await createHarness();
+
+  try {
+    const response = await harness.app.inject({
+      method: "POST",
+      url: "/display/screen-profile/report",
+      payload: {
+        screenSessionId: "device-info-route-1",
+        reportedThemeId: "default",
+        deviceInfo: {
+          label: "Windows PC",
+          platform: "Windows",
+          browser: "Chrome",
+          formFactor: "desktop",
+          viewportWidth: 1920,
+          viewportHeight: 1080,
+          pixelRatio: 1,
+          standalone: false,
+        },
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const storedDevice = harness.deviceRepository.getDevice("device-info-route-1");
+    assert.ok(storedDevice);
+    assert.equal(storedDevice.name, "Windows PC");
+    assert.equal(storedDevice.deviceInfo?.browser, "Chrome");
+    assert.equal(storedDevice.deviceInfo?.viewportWidth, 1920);
+  } finally {
+    await harness.dispose();
+  }
+});
+
 test("delete display device removes the saved device record", async () => {
   const harness = await createHarness();
 

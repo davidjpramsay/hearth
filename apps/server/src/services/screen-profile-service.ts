@@ -272,6 +272,7 @@ export class ScreenProfileService {
             reportedTargetSelection: requestedTargetSelection,
             reportedThemeId: payload.reportedThemeId,
             lastSeenIp: options?.lastSeenIp ?? null,
+            reportedDeviceInfo: payload.deviceInfo,
           })
         : {
             id: payload.screenSessionId,

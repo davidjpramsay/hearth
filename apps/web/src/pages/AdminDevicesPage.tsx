@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   screenProfileLayoutsSchema,
   type DisplayDevice,
+  type DisplayDeviceInfo,
   type ReportScreenTargetSelection,
   type ScreenProfileLayouts,
 } from "@hearth/shared";
@@ -180,6 +181,33 @@ const formatFingerprint = (value: string | null): string => {
   return value.slice(0, 12);
 };
 
+const formatDeviceEnvironment = (value: DisplayDeviceInfo | null): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  const parts = [
+    value.platform,
+    value.browser,
+    value.standalone ? "Installed app" : "Browser tab",
+  ].filter((part): part is string => Boolean(part));
+
+  return parts.length > 0 ? parts.join(" · ") : null;
+};
+
+const formatViewport = (value: DisplayDeviceInfo | null): string | null => {
+  if (!value?.viewportWidth || !value.viewportHeight) {
+    return null;
+  }
+
+  const base = `${value.viewportWidth} x ${value.viewportHeight}`;
+  if (!value.pixelRatio) {
+    return base;
+  }
+
+  return `${base} @ ${Number(value.pixelRatio.toFixed(2))}x`;
+};
+
 const hasValidRoutingTarget = (draft: DeviceDraft): boolean => {
   if (draft.routingMode === "set") {
     return draft.setId.trim().length > 0;
@@ -218,6 +246,19 @@ export const AdminDevicesPage = () => {
   const availableLayoutNames = useMemo(() => new Set(layoutNames), [layoutNames]);
   const firstAvailableSetId = availableSetOptions[0]?.id ?? "";
   const firstAvailableLayoutName = layoutNames[0] ?? "";
+  const sharedIpCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const device of devices) {
+      if (!device.lastSeenIp) {
+        continue;
+      }
+
+      counts.set(device.lastSeenIp, (counts.get(device.lastSeenIp) ?? 0) + 1);
+    }
+
+    return counts;
+  }, [devices]);
 
   const loadData = useCallback(async () => {
     const token = getAuthToken();
@@ -475,7 +516,8 @@ export const AdminDevicesPage = () => {
             <h2 className="text-lg font-semibold text-slate-100">Connected displays</h2>
             <p className="mt-1 text-sm text-slate-400">
               Devices appear here after they open the display page once. Give each one a custom name
-              so it is easy to tell your screens apart.
+              so it is easy to tell your screens apart. If multiple screens share the same bridge or
+              proxy IP, the detected device details below are a better identifier than `Last seen IP`.
             </p>
           </div>
           <button
@@ -520,6 +562,10 @@ export const AdminDevicesPage = () => {
             const isBusy = busyDeviceState?.deviceId === device.id;
             const isSaving = isBusy && busyDeviceState?.action === "save";
             const isDeleting = isBusy && busyDeviceState?.action === "delete";
+            const isSharedIp =
+              device.lastSeenIp !== null && (sharedIpCounts.get(device.lastSeenIp) ?? 0) > 1;
+            const detectedEnvironment = formatDeviceEnvironment(device.deviceInfo);
+            const detectedViewport = formatViewport(device.deviceInfo);
 
             return (
               <article
@@ -530,8 +576,22 @@ export const AdminDevicesPage = () => {
                   <div>
                     <h2 className="text-lg font-semibold text-slate-100">{device.name}</h2>
                     <p className="mt-1 text-xs text-slate-400">ID: {device.id}</p>
+                    {device.deviceInfo?.label ? (
+                      <p className="mt-1 text-xs text-slate-400">
+                        Detected: {device.deviceInfo.label}
+                      </p>
+                    ) : null}
+                    {detectedEnvironment ? (
+                      <p className="mt-1 text-xs text-slate-400">
+                        Environment: {detectedEnvironment}
+                      </p>
+                    ) : null}
+                    {detectedViewport ? (
+                      <p className="mt-1 text-xs text-slate-400">Viewport: {detectedViewport}</p>
+                    ) : null}
                     <p className="mt-1 text-xs text-slate-400">
                       Last seen IP: {device.lastSeenIp ?? "Unavailable"}
+                      {isSharedIp ? " (shared/proxied)" : ""}
                     </p>
                     <p className="mt-1 text-xs text-slate-400">
                       Last seen: {formatLastSeen(device.lastSeenAt)}
