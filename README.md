@@ -195,7 +195,7 @@ Recommended setup by device:
   - Share -> `Add to Home Screen`.
   - Launch from the new Home Screen icon (not from a Safari tab).
   - Result: standalone fullscreen with safe-area handling.
-  - Hearth requests a screen wake lock on the display route so the screen stays awake while the dashboard is visible. This works reliably for Home Screen web apps on iPadOS 18.4 and later.
+  - If you want the iPad screen to stay on indefinitely, use iPad kiosk settings such as Guided Access / Auto-Lock rather than relying on the web app.
 - Android (Chrome):
   - Menu -> `Install app` (or `Add to Home screen`).
   - Launch from the installed app icon for standalone fullscreen.
@@ -210,7 +210,6 @@ Notes:
 
 - For non-local networks, serve Hearth over HTTPS for reliable install behavior.
 - iPad standalone mode only applies when launched from Home Screen, not from an open browser tab.
-- Older iPadOS releases may still let installed web apps sleep because Apple did not fully support Home Screen wake lock before iPadOS 18.4.
 
 ## Display + Layout Modes
 
