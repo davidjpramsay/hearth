@@ -30,10 +30,7 @@ const formatDeviceCode = (deviceId: string): string => {
   return "DEVICE";
 };
 
-export const buildDefaultDeviceName = (
-  deviceId: string,
-  preferredLabel?: string | null,
-): string =>
+export const buildDefaultDeviceName = (deviceId: string, preferredLabel?: string | null): string =>
   normalizeGeneratedDeviceLabel(preferredLabel) ??
   `Display ${formatDeviceCode(deviceId)}`.slice(0, MAX_DEVICE_NAME_LENGTH);
 

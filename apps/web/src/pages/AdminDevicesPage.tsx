@@ -517,7 +517,8 @@ export const AdminDevicesPage = () => {
             <p className="mt-1 text-sm text-slate-400">
               Devices appear here after they open the display page once. Give each one a custom name
               so it is easy to tell your screens apart. If multiple screens share the same bridge or
-              proxy IP, the detected device details below are a better identifier than `Last seen IP`.
+              proxy IP, the detected device details below are a better identifier than `Last seen
+              IP`.
             </p>
           </div>
           <button
