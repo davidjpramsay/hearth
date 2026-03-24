@@ -229,6 +229,11 @@ const validateManagedDeviceTargetSelection = (input: {
 
 export class ScreenProfileService {
   private readonly sessionCycles = new Map<string, SessionCycleState>();
+  private cachedTargetCatalog: {
+    layoutNamesKey: string;
+    mappingKey: string;
+    value: DeviceTargetCatalog;
+  } | null = null;
 
   constructor(
     private readonly layoutRepository: LayoutRepository,
@@ -242,7 +247,7 @@ export class ScreenProfileService {
   ): ValidateManagedDeviceTargetSelectionResult {
     return validateManagedDeviceTargetSelection({
       targetSelection,
-      targetCatalog: this.getDeviceTargetCatalog(),
+      targetCatalog: this.getDeviceTargetCatalog(this.settingsRepository.getScreenProfileLayouts()),
     });
   }
 
@@ -254,11 +259,7 @@ export class ScreenProfileService {
     const nowMs = Date.now();
     this.pruneStaleSessions(nowMs);
     const mapping = this.settingsRepository.getScreenProfileLayouts();
-    const layoutNames = this.layoutRepository.listLayouts(false).map((layout) => layout.name);
-    const targetCatalog = createDeviceTargetCatalog({
-      mapping,
-      layoutNames,
-    });
+    const targetCatalog = this.getDeviceTargetCatalog(mapping);
     const { availableSets, availableLayouts } = targetCatalog;
     const requestedTargetSelection = normalizeConfiguredTargetSelection({
       targetSelection: toRequestedTargetSelection(payload),
@@ -446,14 +447,27 @@ export class ScreenProfileService {
     });
   }
 
-  private getDeviceTargetCatalog(): DeviceTargetCatalog {
-    const mapping = this.settingsRepository.getScreenProfileLayouts();
-    const layoutNames = this.layoutRepository.listLayouts(false).map((layout) => layout.name);
+  private getDeviceTargetCatalog(mapping: ScreenProfileLayouts): DeviceTargetCatalog {
+    const layoutNames = this.layoutRepository.listLayoutNames(false);
+    const layoutNamesKey = layoutNames.join("\u0000");
+    const mappingKey = JSON.stringify(mapping);
+    const cached = this.cachedTargetCatalog;
 
-    return createDeviceTargetCatalog({
+    if (cached && cached.layoutNamesKey === layoutNamesKey && cached.mappingKey === mappingKey) {
+      return cached.value;
+    }
+
+    const value = createDeviceTargetCatalog({
       mapping,
       layoutNames,
     });
+    this.cachedTargetCatalog = {
+      layoutNamesKey,
+      mappingKey,
+      value,
+    };
+
+    return value;
   }
 
   private pruneStaleSessions(nowMs: number): void {

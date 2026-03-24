@@ -4,6 +4,7 @@ import {
   choreRecordSchema,
   choresBoardQuerySchema,
   choresBoardResponseSchema,
+  choresDashboardResponseSchema,
   choresPayoutConfigSchema,
   createChoreMemberRequestSchema,
   createChoreRequestSchema,
@@ -27,7 +28,68 @@ const publishChoreEvent = (
   services.layoutEventBus.publish(payload);
 };
 
+const parseIsoDate = (value: string): Date => new Date(`${value}T00:00:00.000Z`);
+
+const addDays = (date: Date, days: number): Date => {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+};
+
+const toIsoDate = (date: Date): string => date.toISOString().slice(0, 10);
+
+const getWeekRangeForPayday = (
+  referenceDate: string,
+  paydayDayOfWeek: number,
+): { startDate: string; endDate: string } => {
+  const reference = parseIsoDate(referenceDate);
+  const dayOfWeek = reference.getUTCDay();
+  const weekStartDayOfWeek = (paydayDayOfWeek + 1) % 7;
+  const offsetFromStart = (dayOfWeek - weekStartDayOfWeek + 7) % 7;
+  const startDate = toIsoDate(addDays(reference, -offsetFromStart));
+
+  return {
+    startDate,
+    endDate: toIsoDate(addDays(parseIsoDate(startDate), 6)),
+  };
+};
+
+const buildChoresDashboardResponse = (services: AppServices, siteTodayOverride?: string) => {
+  const payoutConfig = services.settingsRepository.getChoresPayoutConfig();
+  const siteToday =
+    siteTodayOverride ?? toCalendarDateInTimeZone(new Date(), payoutConfig.siteTimezone);
+  const weekRange = getWeekRangeForPayday(siteToday, payoutConfig.paydayDayOfWeek);
+  const board = services.choresRepository.getBoard({
+    startDate: weekRange.startDate,
+    days: 7,
+    enableMoneyTracking: true,
+    payoutConfig,
+    siteTimezone: payoutConfig.siteTimezone,
+  });
+
+  return choresDashboardResponseSchema.parse({
+    siteToday,
+    selectableWeekRange: {
+      startDate: weekRange.startDate,
+      endDate: weekRange.endDate < siteToday ? weekRange.endDate : siteToday,
+    },
+    payoutConfig,
+    members: services.choresRepository.listMembers(),
+    chores: services.choresRepository.listChores(payoutConfig.siteTimezone),
+    board,
+  });
+};
+
 export const registerChoresRoutes = (app: FastifyInstance, services: AppServices): void => {
+  app.get("/chores/dashboard", async (request, reply) => {
+    await app.authenticate(request, reply);
+    if (reply.sent) {
+      return;
+    }
+
+    return reply.send(buildChoresDashboardResponse(services));
+  });
+
   app.get("/chores/board", async (request, reply) => {
     await app.authenticate(request, reply);
     if (reply.sent) {
@@ -340,6 +402,6 @@ export const registerChoresRoutes = (app: FastifyInstance, services: AppServices
       date: body.data.date,
     });
 
-    return reply.code(204).send();
+    return reply.send(buildChoresDashboardResponse(services));
   });
 };

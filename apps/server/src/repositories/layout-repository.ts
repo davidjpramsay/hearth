@@ -216,6 +216,15 @@ export class LayoutRepository {
     return rows.map((row) => this.toLayoutRecord(row));
   }
 
+  listLayoutNames(activeOnly = false): string[] {
+    const sql = activeOnly
+      ? "SELECT name FROM layouts WHERE active = 1 ORDER BY id ASC"
+      : "SELECT name FROM layouts ORDER BY id ASC";
+
+    const rows = this.db.prepare<[], { name: string }>(sql).all();
+    return rows.map((row) => row.name);
+  }
+
   getById(id: number): LayoutRecord | null {
     const row = this.db
       .prepare<{ id: number }, LayoutRow>("SELECT * FROM layouts WHERE id = @id")

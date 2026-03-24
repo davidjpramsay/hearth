@@ -445,38 +445,58 @@ export class ChoresRepository {
 
     const rangeStart = input.startDate;
     const rangeEnd = toDateString(addDays(parseDate(input.startDate), input.days - 1));
-    const completions = this.listCompletionsInRange(rangeStart, rangeEnd);
+    const weekStart = startOfWeek(input.startDate, payoutConfig.paydayDayOfWeek);
+    const weekEnd = toDateString(addDays(parseDate(weekStart), 6));
     const completionKey = (choreId: number, date: string): string => `${choreId}:${date}`;
+    const combinedRangeStart = weekStart < rangeStart ? weekStart : rangeStart;
+    const combinedRangeEnd = weekEnd > rangeEnd ? weekEnd : rangeEnd;
+    const completions = this.listCompletionsInRange(combinedRangeStart, combinedRangeEnd);
     const completionMap = new Map(
       completions.map((completion) => [
         completionKey(completion.choreId, completion.date),
         completion,
       ]),
     );
+    const scheduledChoresByDate = new Map<string, ChoreRecord[]>();
+    const datesToEvaluate = Array.from(
+      {
+        length:
+          Math.floor(
+            (parseDate(combinedRangeEnd).getTime() - parseDate(combinedRangeStart).getTime()) /
+              (24 * 60 * 60 * 1000),
+          ) + 1,
+      },
+      (_entry, index) => toDateString(addDays(parseDate(combinedRangeStart), index)),
+    );
+
+    for (const date of datesToEvaluate) {
+      scheduledChoresByDate.set(
+        date,
+        chores.filter((chore) => {
+          const choreStartDate = choreStartDateById.get(chore.id) ?? date;
+          return date >= choreStartDate && isScheduledOnDate(chore.schedule, date);
+        }),
+      );
+    }
 
     const board = Array.from({ length: input.days }, (_entry, dayOffset) => {
       const date = toDateString(addDays(parseDate(input.startDate), dayOffset));
-      const items = chores
-        .filter((chore) => {
-          const choreStartDate = choreStartDateById.get(chore.id) ?? date;
-          return date >= choreStartDate && isScheduledOnDate(chore.schedule, date);
-        })
-        .map((chore) => {
-          const member = memberById.get(chore.memberId);
-          const completion = completionMap.get(completionKey(chore.id, date));
+      const items = (scheduledChoresByDate.get(date) ?? []).map((chore) => {
+        const member = memberById.get(chore.memberId);
+        const completion = completionMap.get(completionKey(chore.id, date));
 
-          return {
-            date,
-            choreId: chore.id,
-            choreName: chore.name,
-            memberId: chore.memberId,
-            memberName: member?.name ?? "Unknown member",
-            memberAvatarUrl: member?.avatarUrl ?? null,
-            schedule: chore.schedule,
-            valueAmount: chore.valueAmount,
-            completed: Boolean(completion),
-          };
-        });
+        return {
+          date,
+          choreId: chore.id,
+          choreName: chore.name,
+          memberId: chore.memberId,
+          memberName: member?.name ?? "Unknown member",
+          memberAvatarUrl: member?.avatarUrl ?? null,
+          schedule: chore.schedule,
+          valueAmount: chore.valueAmount,
+          completed: Boolean(completion),
+        };
+      });
 
       return {
         date,
@@ -488,9 +508,9 @@ export class ChoresRepository {
     const todayCompleted = todayItems.filter((item) => item.completed).length;
     const dailyCompletionRate = todayItems.length === 0 ? 0 : todayCompleted / todayItems.length;
 
-    const weekStart = startOfWeek(input.startDate, payoutConfig.paydayDayOfWeek);
-    const weekEnd = toDateString(addDays(parseDate(weekStart), 6));
-    const weeklyCompletions = this.listCompletionsInRange(weekStart, weekEnd);
+    const weeklyCompletions = completions.filter(
+      (completion) => completion.date >= weekStart && completion.date <= weekEnd,
+    );
     const weeklyCompletionSet = new Set(
       weeklyCompletions.map((completion) => completionKey(completion.choreId, completion.date)),
     );
@@ -535,12 +555,7 @@ export class ChoresRepository {
     );
 
     for (const date of datesInWeek) {
-      for (const chore of chores) {
-        const choreStartDate = choreStartDateById.get(chore.id) ?? date;
-        if (date < choreStartDate || !isScheduledOnDate(chore.schedule, date)) {
-          continue;
-        }
-
+      for (const chore of scheduledChoresByDate.get(date) ?? []) {
         const member = memberById.get(chore.memberId);
         const current = weeklyByMemberMap.get(chore.memberId) ?? {
           memberId: chore.memberId,

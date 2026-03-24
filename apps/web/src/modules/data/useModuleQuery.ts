@@ -27,6 +27,7 @@ export interface UseModuleQueryResult<TData> {
 }
 
 const queryCache = new Map<string, ModuleQueryCacheEntry<unknown>>();
+const inFlightQueries = new Map<string, Promise<ModuleQueryCacheEntry<unknown>>>();
 
 const readCachedEntry = <TData,>(key: string): ModuleQueryCacheEntry<TData> | null => {
   const cached = queryCache.get(key);
@@ -77,14 +78,28 @@ export const useModuleQuery = <TData,>(
     }
 
     try {
-      const next = await queryFnRef.current();
-      const updatedAtMs = Date.now();
-      queryCache.set(key, {
-        data: next,
-        updatedAtMs,
-      });
-      setData(next);
-      setLastUpdatedMs(updatedAtMs);
+      let requestPromise = inFlightQueries.get(key) as Promise<ModuleQueryCacheEntry<TData>> | undefined;
+      if (!requestPromise) {
+        requestPromise = queryFnRef.current()
+          .then((next) => {
+            const entry = {
+              data: next,
+              updatedAtMs: Date.now(),
+            };
+            queryCache.set(key, entry);
+            return entry;
+          })
+          .finally(() => {
+            if (inFlightQueries.get(key) === requestPromise) {
+              inFlightQueries.delete(key);
+            }
+          });
+        inFlightQueries.set(key, requestPromise as Promise<ModuleQueryCacheEntry<unknown>>);
+      }
+
+      const nextEntry = await requestPromise;
+      setData(nextEntry.data);
+      setLastUpdatedMs(nextEntry.updatedAtMs);
       setRequestError(null);
     } catch (requestError) {
       setRequestError(
@@ -116,12 +131,59 @@ export const useModuleQuery = <TData,>(
       void revalidate();
     }
 
-    const timer = window.setInterval(() => {
+    let timer: number | null = null;
+    const startTimer = () => {
+      if (timer !== null) {
+        return;
+      }
+
+      timer = window.setInterval(() => {
+        void revalidate();
+      }, Math.max(2000, intervalMs));
+    };
+    const stopTimer = () => {
+      if (timer === null) {
+        return;
+      }
+
+      window.clearInterval(timer);
+      timer = null;
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void revalidate();
+        startTimer();
+        return;
+      }
+
+      stopTimer();
+    };
+    const handlePageShow = () => {
       void revalidate();
-    }, Math.max(2000, intervalMs));
+      startTimer();
+    };
+    const handleWindowFocus = () => {
+      void revalidate();
+      startTimer();
+    };
+
+    if (typeof document === "undefined" || document.visibilityState === "visible") {
+      startTimer();
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("focus", handleWindowFocus);
 
     return () => {
-      window.clearInterval(timer);
+      stopTimer();
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      }
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("focus", handleWindowFocus);
     };
   }, [enabled, intervalMs, key, revalidate, staleMs]);
 

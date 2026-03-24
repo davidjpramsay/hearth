@@ -10,6 +10,44 @@ import type { FastifyInstance } from "fastify";
 import type { AppServices } from "../types.js";
 
 export const registerChoresModuleRoutes = (app: FastifyInstance, services: AppServices): void => {
+  const resolveSummary = (instanceId: string, startDate?: string) => {
+    const payoutConfig = services.settingsRepository.getChoresPayoutConfig();
+    const resolvedStartDate =
+      startDate ?? toCalendarDateInTimeZone(new Date(), payoutConfig.siteTimezone);
+    const moduleInstance = services.layoutRepository.findModuleInstance(instanceId, "chores");
+
+    if (!moduleInstance) {
+      return choresBoardResponseSchema.parse({
+        generatedAt: new Date().toISOString(),
+        startDate: resolvedStartDate,
+        days: 1,
+        payoutConfig,
+        members: [],
+        chores: [],
+        board: [{ date: resolvedStartDate, items: [] }],
+        stats: {
+          dailyCompletionRate: 0,
+          weeklyCompletedCount: 0,
+          weeklyTotalValue: 0,
+          weeklyByMember: [],
+        },
+      });
+    }
+
+    const parsedConfig = choresModuleConfigSchema.safeParse(moduleInstance.module.config);
+    const config = parsedConfig.success ? parsedConfig.data : choresModuleConfigSchema.parse({});
+
+    return choresBoardResponseSchema.parse(
+      services.choresRepository.getBoard({
+        startDate: resolvedStartDate,
+        days: 1,
+        enableMoneyTracking: config.enableMoneyTracking,
+        payoutConfig,
+        siteTimezone: payoutConfig.siteTimezone,
+      }),
+    );
+  };
+
   app.get("/modules/chores/:instanceId/summary", async (request, reply) => {
     const params = choresModuleParamsSchema.safeParse(request.params);
     if (!params.success) {
@@ -21,45 +59,8 @@ export const registerChoresModuleRoutes = (app: FastifyInstance, services: AppSe
       return reply.code(400).send({ message: query.error.message });
     }
 
-    const payoutConfig = services.settingsRepository.getChoresPayoutConfig();
-    const startDate =
-      query.data.startDate ?? toCalendarDateInTimeZone(new Date(), payoutConfig.siteTimezone);
     reply.header("cache-control", "no-store");
-    const moduleInstance = services.layoutRepository.findModuleInstance(
-      params.data.instanceId,
-      "chores",
-    );
-    if (!moduleInstance) {
-      return reply.send(
-        choresBoardResponseSchema.parse({
-          generatedAt: new Date().toISOString(),
-          startDate,
-          days: 1,
-          payoutConfig,
-          members: [],
-          chores: [],
-          board: [{ date: startDate, items: [] }],
-          stats: {
-            dailyCompletionRate: 0,
-            weeklyCompletedCount: 0,
-            weeklyTotalValue: 0,
-            weeklyByMember: [],
-          },
-        }),
-      );
-    }
-
-    const parsedConfig = choresModuleConfigSchema.safeParse(moduleInstance.module.config);
-    const config = parsedConfig.success ? parsedConfig.data : choresModuleConfigSchema.parse({});
-    const board = services.choresRepository.getBoard({
-      startDate,
-      days: 1,
-      enableMoneyTracking: config.enableMoneyTracking,
-      payoutConfig,
-      siteTimezone: payoutConfig.siteTimezone,
-    });
-
-    return reply.send(choresBoardResponseSchema.parse(board));
+    return reply.send(resolveSummary(params.data.instanceId, query.data.startDate));
   });
 
   app.put("/modules/chores/:instanceId/completions", async (request, reply) => {
@@ -105,6 +106,7 @@ export const registerChoresModuleRoutes = (app: FastifyInstance, services: AppSe
       date: body.data.date,
     });
 
-    return reply.code(204).send();
+    reply.header("cache-control", "no-store");
+    return reply.send(resolveSummary(params.data.instanceId, body.data.date));
   });
 };

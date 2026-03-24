@@ -85,6 +85,11 @@ export const choreBoardDaySchema = z.object({
   items: z.array(choreBoardItemSchema),
 });
 
+export const choresWeekRangeSchema = z.object({
+  startDate: isoDateSchema,
+  endDate: isoDateSchema,
+});
+
 export const choreWeeklyMemberTotalSchema = z.object({
   memberId: z.number().int().positive(),
   memberName: z.string().min(1),
@@ -116,6 +121,15 @@ export const choresBoardResponseSchema = z.object({
   chores: z.array(choreRecordSchema),
   board: z.array(choreBoardDaySchema),
   stats: choresStatsSchema,
+});
+
+export const choresDashboardResponseSchema = z.object({
+  siteToday: isoDateSchema,
+  selectableWeekRange: choresWeekRangeSchema,
+  payoutConfig: choresPayoutConfigSchema,
+  members: z.array(choreMemberSchema),
+  chores: z.array(choreRecordSchema),
+  board: choresBoardResponseSchema,
 });
 
 export const choresBoardQuerySchema = z.object({
@@ -201,8 +215,10 @@ export type ChoreRecord = z.infer<typeof choreRecordSchema>;
 export type ChoreCompletion = z.infer<typeof choreCompletionSchema>;
 export type ChoreBoardItem = z.infer<typeof choreBoardItemSchema>;
 export type ChoreBoardDay = z.infer<typeof choreBoardDaySchema>;
+export type ChoresWeekRange = z.infer<typeof choresWeekRangeSchema>;
 export type ChoresStats = z.infer<typeof choresStatsSchema>;
 export type ChoresBoardResponse = z.infer<typeof choresBoardResponseSchema>;
+export type ChoresDashboardResponse = z.infer<typeof choresDashboardResponseSchema>;
 export type ChoresBoardQuery = z.infer<typeof choresBoardQuerySchema>;
 export type ChoresModuleSummaryQuery = z.infer<typeof choresModuleSummaryQuerySchema>;
 export type CreateChoreMemberRequest = z.infer<typeof createChoreMemberRequestSchema>;

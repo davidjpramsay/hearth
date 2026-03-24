@@ -157,3 +157,93 @@ test("chores summary route defaults startDate using the household timezone", asy
     await app.close();
   }
 });
+
+test("chores completion route returns the refreshed summary payload for the updated day", async () => {
+  let requestedStartDate: string | null = null;
+  let setCompletionCalled = false;
+
+  const app = Fastify();
+  registerChoresModuleRoutes(app, {
+    layoutRepository: {
+      findModuleInstance: () => ({
+        module: {
+          config: {
+            enableMoneyTracking: true,
+          },
+        },
+      }),
+    },
+    settingsRepository: {
+      getChoresPayoutConfig: () => ({
+        mode: "all-or-nothing",
+        oneOffBonusEnabled: true,
+        paydayDayOfWeek: 6,
+        siteTimezone: "Australia/Perth",
+      }),
+    },
+    choresRepository: {
+      getChoreById: () => ({
+        id: 2,
+        name: "Bins",
+        memberId: 1,
+        schedule: { type: "daily" },
+        startsOn: "2026-03-01",
+        valueAmount: null,
+        active: true,
+        createdAt: "",
+        updatedAt: "",
+      }),
+      setCompletion: () => {
+        setCompletionCalled = true;
+      },
+      getBoard: (input: { startDate: string; days: number }) => {
+        requestedStartDate = input.startDate;
+        return {
+          generatedAt: new Date().toISOString(),
+          startDate: input.startDate,
+          days: input.days,
+          payoutConfig: {
+            mode: "all-or-nothing",
+            oneOffBonusEnabled: true,
+            paydayDayOfWeek: 6,
+            siteTimezone: "Australia/Perth",
+          },
+          members: [],
+          chores: [],
+          board: [{ date: input.startDate, items: [] }],
+          stats: {
+            dailyCompletionRate: 0,
+            weeklyCompletedCount: 0,
+            weeklyTotalValue: 0,
+            weeklyByMember: [],
+          },
+        };
+      },
+    },
+    layoutEventBus: {
+      publish: () => undefined,
+    },
+  } as unknown as AppServices);
+
+  try {
+    const response = await app.inject({
+      method: "PUT",
+      url: "/modules/chores/test-instance/completions",
+      payload: {
+        choreId: 2,
+        date: "2026-03-24",
+        completed: true,
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(setCompletionCalled, true);
+    assert.equal(requestedStartDate, "2026-03-24");
+
+    const payload = response.json();
+    assert.equal(payload.startDate, "2026-03-24");
+    assert.deepEqual(payload.board, [{ date: "2026-03-24", items: [] }]);
+  } finally {
+    await app.close();
+  }
+});

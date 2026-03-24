@@ -18,6 +18,15 @@ import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 const localIsoDate = (date: Date = new Date()): string =>
   toCalendarDateInTimeZone(date, getRuntimeTimeZone());
 
+const compareChoreItems = (left: ChoreBoardItem, right: ChoreBoardItem): number => {
+  if (left.completed !== right.completed) {
+    return Number(left.completed) - Number(right.completed);
+  }
+
+  return left.choreName.localeCompare(right.choreName);
+};
+const FALLBACK_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
 const emptyBoard = (): ChoresBoardResponse =>
   choresBoardResponseSchema.parse({
     generatedAt: new Date().toISOString(),
@@ -71,7 +80,7 @@ const fetchSummary = async (
 const setCompletion = async (
   instanceId: string,
   input: { choreId: number; date: string; completed: boolean },
-): Promise<void> => {
+): Promise<ChoresBoardResponse> => {
   const response = await fetch(
     `/api/modules/chores/${encodeURIComponent(instanceId)}/completions`,
     {
@@ -91,6 +100,8 @@ const setCompletion = async (
         : `Request failed (${response.status})`;
     throw new Error(message);
   }
+
+  return choresBoardResponseSchema.parse(await response.json());
 };
 
 export const moduleDefinition = defineModule({
@@ -157,16 +168,33 @@ export const moduleDefinition = defineModule({
         const onChoresUpdated = () => {
           void load();
         };
+        const onVisibilityChange = () => {
+          if (document.visibilityState === "visible") {
+            void load();
+          }
+        };
+        const onPageShow = () => {
+          void load();
+        };
+        const onWindowFocus = () => {
+          void load();
+        };
 
         void load();
         window.addEventListener("hearth:chores-updated", onChoresUpdated);
+        document.addEventListener("visibilitychange", onVisibilityChange);
+        window.addEventListener("pageshow", onPageShow);
+        window.addEventListener("focus", onWindowFocus);
         const timer = window.setInterval(() => {
           void load();
-        }, 60_000);
+        }, FALLBACK_REFRESH_INTERVAL_MS);
 
         return () => {
           active = false;
           window.removeEventListener("hearth:chores-updated", onChoresUpdated);
+          document.removeEventListener("visibilitychange", onVisibilityChange);
+          window.removeEventListener("pageshow", onPageShow);
+          window.removeEventListener("focus", onWindowFocus);
           window.clearInterval(timer);
         };
       }, [instanceId, isEditing]);
@@ -195,6 +223,9 @@ export const moduleDefinition = defineModule({
         const existing = todayItemsByMember.get(item.memberId) ?? [];
         existing.push(item);
         todayItemsByMember.set(item.memberId, existing);
+      }
+      for (const [memberId, items] of todayItemsByMember) {
+        todayItemsByMember.set(memberId, [...items].sort(compareChoreItems));
       }
 
       const memberRows =
@@ -241,12 +272,11 @@ export const moduleDefinition = defineModule({
         }));
 
         try {
-          await setCompletion(instanceId, {
+          const summary = await setCompletion(instanceId, {
             choreId: item.choreId,
             date: item.date,
             completed,
           });
-          const summary = await fetchSummary(instanceId);
           setBoard(summary);
           setLastUpdatedMs(Date.now());
         } catch (toggleError) {
@@ -287,7 +317,6 @@ export const moduleDefinition = defineModule({
               {memberRows.map((member) => {
                 const memberItems = todayItemsByMember.get(member.memberId) ?? [];
                 const completionPercent = Math.round(member.completionRatio * 100);
-                const basePayEarned = member.baseAllowance * member.completionRatio;
 
                 return (
                   <section
@@ -296,21 +325,24 @@ export const moduleDefinition = defineModule({
                   >
                     <header className="flex items-center justify-between border-b border-slate-700 px-2 py-1.5">
                       <p className="module-copy-title text-slate-100">{member.memberName}</p>
-                      <div className="module-copy-label flex items-center gap-2 text-slate-300">
-                        <span className="rounded border border-cyan-500/40 bg-cyan-500/10 px-1.5 py-0.5 text-cyan-200">
-                          Week {completionPercent}%
-                        </span>
-                        {settings.enableMoneyTracking ? (
-                          <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
-                            Pay ${basePayEarned.toFixed(2)} / ${member.baseAllowance.toFixed(2)}
+                      {settings.showStats ? (
+                        <div className="module-copy-label flex items-center gap-2 text-slate-300">
+                          <span className="rounded border border-cyan-500/40 bg-cyan-500/10 px-1.5 py-0.5 text-cyan-200">
+                            Week {completionPercent}%
                           </span>
-                        ) : null}
-                        {settings.enableMoneyTracking && member.bonusPayout > 0 ? (
-                          <span className="rounded border border-emerald-500/30 bg-emerald-500/5 px-1.5 py-0.5 text-emerald-100">
-                            +${member.bonusPayout.toFixed(2)} bonus
-                          </span>
-                        ) : null}
-                      </div>
+                          {settings.enableMoneyTracking ? (
+                            <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
+                              Pay ${member.basePayout.toFixed(2)} / $
+                              {member.baseAllowance.toFixed(2)}
+                            </span>
+                          ) : null}
+                          {settings.enableMoneyTracking && member.bonusPayout > 0 ? (
+                            <span className="rounded border border-emerald-500/30 bg-emerald-500/5 px-1.5 py-0.5 text-emerald-100">
+                              +${member.bonusPayout.toFixed(2)} bonus
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </header>
 
                     <div className="space-y-1 px-2 py-1.5">

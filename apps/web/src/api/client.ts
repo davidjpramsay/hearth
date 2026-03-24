@@ -3,6 +3,7 @@ import {
   choreRecordSchema,
   choresBoardQuerySchema,
   choresBoardResponseSchema,
+  choresDashboardResponseSchema,
   choresPayoutConfigSchema,
   createChoreMemberRequestSchema,
   createChoreRequestSchema,
@@ -22,6 +23,7 @@ import {
   type ChoreMember,
   type ChoreRecord,
   type ChoresBoardResponse,
+  type ChoresDashboardResponse,
   type ChoresPayoutConfig,
   type CreateChoreMemberRequest,
   type CreateChoreRequest,
@@ -282,6 +284,16 @@ export const getChoreBoard = async (
   );
 };
 
+export const getChoresDashboard = async (token: string): Promise<ChoresDashboardResponse> =>
+  request(
+    "/chores/dashboard",
+    {
+      method: "GET",
+      headers: withAuth(token),
+    },
+    (payload) => choresDashboardResponseSchema.parse(payload),
+  );
+
 export const getChoreMembers = async (token: string): Promise<ChoreMember[]> =>
   request(
     "/chores/members",
@@ -385,17 +397,16 @@ export const deleteChoreItem = async (token: string, id: number): Promise<void> 
 export const setChoreCompletion = async (
   token: string,
   payload: SetChoreCompletionRequest,
-): Promise<void> => {
-  await request(
+): Promise<ChoresDashboardResponse> =>
+  request(
     "/chores/completions",
     {
       method: "PUT",
       headers: withAuth(token),
       body: JSON.stringify(setChoreCompletionRequestSchema.parse(payload)),
     },
-    () => undefined,
+    (body) => choresDashboardResponseSchema.parse(body),
   );
-};
 
 export const getChoresPayoutConfig = async (token: string): Promise<ChoresPayoutConfig> =>
   request(

@@ -4,10 +4,7 @@ import {
   createChoreMember,
   deleteChoreItem,
   deleteChoreMember,
-  getChoreBoard,
-  getChoreItems,
-  getChoreMembers,
-  getChoresPayoutConfig,
+  getChoresDashboard,
   setChoreCompletion,
   updateChoresPayoutConfig,
   updateChoreItem,
@@ -24,6 +21,7 @@ import {
   type ChoreRecord,
   type ChoreSchedule,
   type ChoresBoardResponse,
+  type ChoresDashboardResponse,
   type ChoresPayoutConfig,
 } from "@hearth/shared";
 
@@ -53,6 +51,7 @@ const todayDate = (timeZone = getRuntimeTimeZone()): string =>
   toCalendarDateInTimeZone(new Date(), timeZone);
 
 const dayLabels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const FALLBACK_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 const parseIsoDate = (value: string): Date => new Date(`${value}T00:00:00Z`);
 
@@ -165,43 +164,40 @@ export const AdminChoresPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const loadData = useCallback(async () => {
-    if (!token) {
-      navigate("/admin/login", { replace: true });
-      return;
-    }
+  const applyDashboardState = useCallback((snapshot: ChoresDashboardResponse) => {
+    setMembers(snapshot.members);
+    setChores(snapshot.chores);
+    setPayoutConfig(snapshot.payoutConfig);
+    setSiteTimezoneDraft(snapshot.payoutConfig.siteTimezone);
+    setSiteToday(snapshot.siteToday);
+    setBoard(snapshot.board);
+    setSelectedDate((current) => clampIsoDateToRange(current, snapshot.selectableWeekRange));
+  }, []);
 
-    setLoading(true);
-    setError(null);
+  const loadData = useCallback(
+    async (options?: { background?: boolean }) => {
+      if (!token) {
+        navigate("/admin/login", { replace: true });
+        return;
+      }
 
-    try {
-      const [nextMembers, nextChores, nextPayoutConfig, currentDayBoard] = await Promise.all([
-        getChoreMembers(token),
-        getChoreItems(token),
-        getChoresPayoutConfig(token),
-        getChoreBoard(token, { days: 1 }),
-      ]);
-      const nextSiteToday = currentDayBoard.startDate;
-      const weekRange = getWeekRangeForPayday(nextSiteToday, nextPayoutConfig.paydayDayOfWeek);
-      const nextBoard = await getChoreBoard(token, { startDate: weekRange.startDate, days: 7 });
-      const nextSelectableRange = {
-        startDate: weekRange.startDate,
-        endDate: weekRange.endDate < nextSiteToday ? weekRange.endDate : nextSiteToday,
-      };
+      if (!options?.background) {
+        setLoading(true);
+      }
+      setError(null);
 
-      setMembers(nextMembers);
-      setChores(nextChores);
-      setPayoutConfig(nextPayoutConfig);
-      setSiteTimezoneDraft(nextPayoutConfig.siteTimezone);
-      setSiteToday(nextSiteToday);
-      setBoard(nextBoard);
-      setSelectedDate((current) => clampIsoDateToRange(current, nextSelectableRange));
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load chores");
-    } finally {
-      setLoading(false);
-    }
-  }, [navigate, token]);
+      try {
+        applyDashboardState(await getChoresDashboard(token));
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : "Failed to load chores");
+      } finally {
+        if (!options?.background) {
+          setLoading(false);
+        }
+      }
+    },
+    [applyDashboardState, navigate, token],
+  );
 
   useEffect(() => {
     void loadData();
@@ -227,11 +223,35 @@ export const AdminChoresPage = () => {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      void loadData();
-    }, 60_000);
+      void loadData({ background: true });
+    }, FALLBACK_REFRESH_INTERVAL_MS);
 
     return () => {
       window.clearInterval(timer);
+    };
+  }, [loadData]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadData({ background: true });
+      }
+    };
+    const handlePageShow = () => {
+      void loadData({ background: true });
+    };
+    const handleWindowFocus = () => {
+      void loadData({ background: true });
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("focus", handleWindowFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("focus", handleWindowFocus);
     };
   }, [loadData]);
 
@@ -438,12 +458,13 @@ export const AdminChoresPage = () => {
     setError(null);
 
     try {
-      await setChoreCompletion(token, {
-        choreId,
-        date: activeSelectedDate,
-        completed,
-      });
-      await loadData();
+      applyDashboardState(
+        await setChoreCompletion(token, {
+          choreId,
+          date: activeSelectedDate,
+          completed,
+        }),
+      );
     } catch (toggleError) {
       setError(toggleError instanceof Error ? toggleError.message : "Failed to update completion");
     } finally {
