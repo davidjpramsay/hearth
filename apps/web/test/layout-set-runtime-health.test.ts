@@ -157,3 +157,58 @@ test("applies edge override to runtime resolution", () => {
 
   assert.equal(portraitSequence[0]?.layoutName, "Fallback");
 });
+
+test("accepts time gate condition nodes in runtime analysis", () => {
+  const graph = {
+    version: 1,
+    entryNodeId: "start",
+    nodes: [
+      { id: "start", type: "start" },
+      {
+        id: "if-time:morning:gate-1",
+        type: "if-time",
+        conditionType: "time.window.site-local",
+        conditionParams: {
+          startTime: "09:00",
+          endTime: "10:00",
+        },
+      },
+      {
+        id: "display-match",
+        type: "display",
+        layoutName: "Morning",
+        cycleSeconds: 20,
+        actionType: "layout.display",
+        actionParams: {},
+        conditionType: null,
+        conditionParams: {},
+      },
+      {
+        id: "display-fallback",
+        type: "display",
+        layoutName: "Else",
+        cycleSeconds: 20,
+        actionType: "layout.display",
+        actionParams: {},
+        conditionType: null,
+        conditionParams: {},
+      },
+      { id: "return", type: "return" },
+    ],
+    edges: [
+      { id: "edge-start-time", from: "start", to: "if-time:morning:gate-1", when: "always" },
+      { id: "edge-time-yes", from: "if-time:morning:gate-1", to: "display-match", when: "yes" },
+      { id: "edge-time-no", from: "if-time:morning:gate-1", to: "display-fallback", when: "no" },
+      { id: "edge-match-return", from: "display-match", to: "return", when: "always" },
+      { id: "edge-fallback-return", from: "display-fallback", to: "return", when: "always" },
+    ],
+  } satisfies LayoutSetLogicGraph;
+
+  const health = analyzeSetRuntimeHealth({
+    graph,
+    knownLayoutNames: new Set(["Morning", "Else"]),
+  });
+
+  assert.equal(health.status, "ok");
+  assert.equal(health.issues.length, 0);
+});

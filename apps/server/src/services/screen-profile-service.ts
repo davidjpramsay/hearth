@@ -259,6 +259,7 @@ export class ScreenProfileService {
     const nowMs = Date.now();
     this.pruneStaleSessions(nowMs);
     const mapping = this.settingsRepository.getScreenProfileLayouts();
+    const siteTimeZone = this.settingsRepository.getSiteTimeConfig().siteTimezone;
     const targetCatalog = this.getDeviceTargetCatalog(mapping);
     const { availableSets, availableLayouts } = targetCatalog;
     const requestedTargetSelection = normalizeConfiguredTargetSelection({
@@ -322,6 +323,7 @@ export class ScreenProfileService {
             familyTargets,
             appliedPhotoOrientation,
             nowMs,
+            siteTimeZone,
             screenSessionId: payload.screenSessionId,
           });
     const warningTicker =
@@ -539,6 +541,7 @@ export class ScreenProfileService {
     familyTargets: ScreenFamilyLayoutTarget;
     appliedPhotoOrientation: "portrait" | "landscape" | null;
     nowMs: number;
+    siteTimeZone: string;
     screenSessionId: string;
   }): {
     layoutName: string | null;
@@ -557,6 +560,8 @@ export class ScreenProfileService {
     const sequence = resolveDisplaySequenceFromLogicGraph({
       graph: effectiveLogicGraph,
       orientation: input.appliedPhotoOrientation,
+      now: input.nowMs,
+      siteTimeZone: input.siteTimeZone,
       includeActivePhotoCollectionInActionParams: true,
       evaluateCondition: resolveLayoutLogicCondition,
       resolveAction: resolveLayoutLogicAction,

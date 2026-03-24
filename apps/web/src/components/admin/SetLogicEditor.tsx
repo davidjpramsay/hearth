@@ -32,10 +32,15 @@ import {
 } from "@xyflow/react";
 import {
   DEFAULT_LANDSCAPE_LAYOUT_LOGIC_CONDITION_TYPE,
+  formatClockTimeFromMinutes,
+  formatPhotoRouterTimeGateWindow,
+  getLayoutSetAuthoringValidationIssues,
+  getPhotoRouterTimeGateNodeValidationIssues,
   LOCAL_WARNING_CANVAS_ACTION_TYPE,
   LOCAL_WARNING_CONDITION_TYPE,
   DEFAULT_PORTRAIT_LAYOUT_LOGIC_CONDITION_TYPE,
   PHOTO_COLLECTION_ACTION_PARAM_KEY,
+  parseClockTimeToMinutes,
   getPrimaryPhotoRouterBlock,
   setPrimaryPhotoRouterBlock,
   weatherLocationSearchResponseSchema,
@@ -45,6 +50,8 @@ import {
   type PhotoRouterGraphNode,
   type PhotoRouterLayoutNode,
   type PhotoRouterPhotoOrientationNode,
+  type PhotoRouterTimeGate,
+  type PhotoRouterTimeGateNode,
 } from "@hearth/shared";
 import type { RuntimeHealthReport } from "../../pages/layout-set-runtime-health";
 import {
@@ -81,8 +88,8 @@ interface SetLogicEditorProps {
 }
 
 type ConditionalTrigger = "portrait-photo";
-type BranchKey = "fallback" | "portrait";
 type ActionNodeKind = "photo" | "warning";
+type RouterNodeKind = ActionNodeKind | "time";
 type StepNodeType = Node<LayoutNodeData, "layoutNode">;
 type RouterNodeType = Node<RouterNodeData, "routerNode">;
 type TerminalNodeType = Node<TerminalNodeData, "terminalNode">;
@@ -94,11 +101,14 @@ interface RouterNodeData extends Record<string, unknown> {
   sourceLabel: string | null;
   onRemove?: () => void;
   routes: Array<{
-    key: BranchKey;
+    key: string;
     label: string;
     count: number;
     enabled: boolean;
     connectable?: boolean;
+    color: string;
+    bgClassName: string;
+    borderClassName: string;
   }>;
 }
 
@@ -118,7 +128,8 @@ const GRAPH_NODE_DRAG_TYPE = "application/hearth-graph-node";
 const START_NODE_ID = "__start__";
 const END_NODE_ID = "__end__";
 const ROUTER_NODE_WIDTH = 360;
-const ROUTER_NODE_HEIGHT = 200;
+const ROUTER_NODE_BASE_HEIGHT = 144;
+const ROUTER_NODE_ROUTE_ROW_HEIGHT = 68;
 const LAYOUT_NODE_WIDTH = 260;
 const LAYOUT_NODE_HEIGHT = 92;
 const TERMINAL_NODE_SIZE = 96;
@@ -128,11 +139,34 @@ const DEFAULT_ROUTER_POSITION = { x: 420, y: 48 };
 const DEFAULT_DETACHED_ORIGIN = { x: 96, y: 980 };
 const DEFAULT_DETACHED_X_GAP = 332;
 const DEFAULT_DETACHED_Y_GAP = 168;
-const ROUTER_ROUTE_ORDER: BranchKey[] = ["portrait", "fallback"];
+const ROUTER_ROUTE_ORDER = ["portrait", "fallback"] as const;
 const EDGE_DASH_PATTERN = "8 12";
+const DEFAULT_TIME_GATE_DURATION_MINUTES = 60;
+const TIME_GATE_ROUTE_PALETTE = [
+  {
+    color: "#38bdf8",
+    bgClassName: "bg-sky-500/10 text-sky-100",
+    borderClassName: "border-sky-400/50",
+  },
+  {
+    color: "#34d399",
+    bgClassName: "bg-emerald-500/10 text-emerald-100",
+    borderClassName: "border-emerald-400/50",
+  },
+  {
+    color: "#f97316",
+    bgClassName: "bg-orange-500/10 text-orange-100",
+    borderClassName: "border-orange-400/50",
+  },
+  {
+    color: "#f43f5e",
+    bgClassName: "bg-rose-500/10 text-rose-100",
+    borderClassName: "border-rose-400/50",
+  },
+];
 
 const BRANCH_META: Record<
-  BranchKey,
+  "portrait" | "fallback",
   {
     color: string;
     bgClassName: string;
@@ -184,6 +218,54 @@ const getConditionBranchCopy = (conditionType: string | null | undefined) => {
     fallbackLabel: "Otherwise",
   };
 };
+
+const getTimeGateRouteMeta = (index: number) =>
+  TIME_GATE_ROUTE_PALETTE[index % TIME_GATE_ROUTE_PALETTE.length] ?? TIME_GATE_ROUTE_PALETTE[0]!;
+
+const isTimeGateNode = (node: PhotoRouterGraphNode): node is PhotoRouterTimeGateNode =>
+  node.nodeType === "time-gate";
+
+const getRouterNodeKind = (
+  node: PhotoRouterPhotoOrientationNode | PhotoRouterTimeGateNode,
+): RouterNodeKind => (isTimeGateNode(node) ? "time" : getActionNodeKind(node.photoActionType));
+
+const getRouterNodeKindLabel = (kind: RouterNodeKind): string => {
+  if (kind === "warning") {
+    return "Warning";
+  }
+  if (kind === "time") {
+    return "Time Gate";
+  }
+  return "Photo Orientation";
+};
+
+const getDefaultRouterNodeTitle = (kind: RouterNodeKind, existingCount: number): string => {
+  const baseTitle =
+    kind === "warning"
+      ? "Warning Node"
+      : kind === "time"
+        ? "Time Gate Node"
+        : "Photo Orientation Node";
+  return existingCount === 0 ? baseTitle : `${baseTitle} ${existingCount + 1}`;
+};
+
+const getRouterNodeRouteCount = (
+  node: PhotoRouterPhotoOrientationNode | PhotoRouterTimeGateNode,
+): number => {
+  if (isTimeGateNode(node)) {
+    return node.gates.length + 1;
+  }
+  if (getActionNodeKind(node.photoActionType) === "warning") {
+    return 1;
+  }
+  return 2;
+};
+
+const getRouterNodeHeight = (
+  node: PhotoRouterPhotoOrientationNode | PhotoRouterTimeGateNode,
+): number =>
+  ROUTER_NODE_BASE_HEIGHT +
+  Math.max(1, Math.ceil(getRouterNodeRouteCount(node) / 2)) * ROUTER_NODE_ROUTE_ROW_HEIGHT;
 
 const clampCycleSeconds = (value: number): number => Math.max(3, Math.min(3600, Math.round(value)));
 
@@ -515,6 +597,53 @@ const createActionNodeId = (): string => {
   return `action-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 };
 
+const createTimeGateWindowId = (): string => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `time-window-${crypto.randomUUID()}`;
+  }
+
+  return `time-window-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+};
+
+const doesTimeWindowOverlap = (
+  gates: PhotoRouterTimeGate[],
+  candidate: PhotoRouterTimeGate,
+  excludeGateId?: string,
+): boolean => {
+  const candidateStart = parseClockTimeToMinutes(candidate.startTime);
+  const candidateEnd = parseClockTimeToMinutes(candidate.endTime);
+  if (candidateEnd <= candidateStart) {
+    return true;
+  }
+
+  return gates.some((gate) => {
+    if (gate.id === excludeGateId) {
+      return false;
+    }
+    const start = parseClockTimeToMinutes(gate.startTime);
+    const end = parseClockTimeToMinutes(gate.endTime);
+    return candidateStart < end && candidateEnd > start;
+  });
+};
+
+const getNextTimeGateWindow = (gates: PhotoRouterTimeGate[]): PhotoRouterTimeGate | null => {
+  for (let startMinutes = 0; startMinutes + DEFAULT_TIME_GATE_DURATION_MINUTES <= 24 * 60; ) {
+    const candidate = {
+      id: createTimeGateWindowId(),
+      startTime: formatClockTimeFromMinutes(startMinutes),
+      endTime: formatClockTimeFromMinutes(startMinutes + DEFAULT_TIME_GATE_DURATION_MINUTES),
+    } satisfies PhotoRouterTimeGate;
+
+    if (!doesTimeWindowOverlap(gates, candidate)) {
+      return candidate;
+    }
+
+    startMinutes += 30;
+  }
+
+  return null;
+};
+
 const toConnectionId = (input: {
   source: string;
   sourceHandle?: string | null;
@@ -576,16 +705,19 @@ const getNormalizedConditionTypeForNodeKind = (
   return availableConditionTypes[0]?.id ?? getDefaultConditionTypeForTrigger(trigger);
 };
 
-const getActionNodeKindLabel = (kind: ActionNodeKind): string =>
-  kind === "warning" ? "Warning" : "Photo Orientation";
+const getConnectableSourceHandles = (node: PhotoRouterGraphNode): string[] => {
+  if (isLayoutGraphNode(node)) {
+    return ["next"];
+  }
 
-const getDefaultActionNodeTitle = (kind: ActionNodeKind, existingCount: number): string => {
-  const baseTitle = kind === "warning" ? "Warning Node" : "Photo Orientation Node";
-  return existingCount === 0 ? baseTitle : `${baseTitle} ${existingCount + 1}`;
+  if (isTimeGateNode(node)) {
+    return [...node.gates.map((gate) => gate.id), "fallback"];
+  }
+
+  return getActionNodeKind(node.photoActionType) === "warning"
+    ? ["fallback"]
+    : [...ROUTER_ROUTE_ORDER];
 };
-
-const isBranchKey = (value: string | null | undefined): value is BranchKey =>
-  value === "portrait" || value === "fallback";
 
 const getGraphNodeById = (
   block: PhotoRouterBlock,
@@ -803,7 +935,7 @@ const RouterNode = ({ data, selected }: NodeProps<RouterNodeType>) => (
       {data.routes.map((route) => (
         <div
           key={route.key}
-          className={`relative rounded-lg border px-3 py-2 text-sm ${BRANCH_META[route.key].borderClassName} ${BRANCH_META[route.key].bgClassName}`}
+          className={`relative rounded-lg border px-3 py-2 text-sm ${route.borderClassName} ${route.bgClassName}`}
         >
           {route.connectable !== false ? (
             <Handle
@@ -815,7 +947,7 @@ const RouterNode = ({ data, selected }: NodeProps<RouterNodeType>) => (
                 bottom: -7,
                 left: "50%",
                 transform: "translateX(-50%)",
-                backgroundColor: BRANCH_META[route.key].color,
+                backgroundColor: route.color,
               }}
             />
           ) : null}
@@ -1054,7 +1186,7 @@ const getDefaultGraphNodePosition = (input: {
   node: PhotoRouterGraphNode;
   index: number;
 }): { x: number; y: number } =>
-  isPhotoOrientationNode(input.node)
+  isPhotoOrientationNode(input.node) || isTimeGateNode(input.node)
     ? {
         x: DEFAULT_ROUTER_POSITION.x + (input.index % 2) * 420,
         y: DEFAULT_ROUTER_POSITION.y + Math.floor(input.index / 2) * 260,
@@ -1067,10 +1199,10 @@ const getDefaultGraphNodePosition = (input: {
 const getGraphNodeSize = (
   node: PhotoRouterGraphNode | null | undefined,
 ): { width: number; height: number } =>
-  node && isPhotoOrientationNode(node)
+  node && (isPhotoOrientationNode(node) || isTimeGateNode(node))
     ? {
         width: ROUTER_NODE_WIDTH,
-        height: ROUTER_NODE_HEIGHT,
+        height: getRouterNodeHeight(node),
       }
     : {
         width: LAYOUT_NODE_WIDTH,
@@ -1084,15 +1216,16 @@ const buildFlowGraph = (input: {
   onRemoveNode: (nodeId: string) => void;
   isCanvasInteractive: boolean;
 }): { nodes: Node[]; edges: Edge[] } => {
-  const actionNodes = input.block.nodes.filter((node): node is PhotoRouterPhotoOrientationNode =>
-    isPhotoOrientationNode(node),
+  const routerNodes = input.block.nodes.filter(
+    (node): node is PhotoRouterPhotoOrientationNode | PhotoRouterTimeGateNode =>
+      isPhotoOrientationNode(node) || isTimeGateNode(node),
   );
   const layoutNodes = input.block.nodes.filter((node): node is PhotoRouterLayoutNode =>
     isLayoutGraphNode(node),
   );
   const hiddenWarningPortraitSources = new Set(
-    actionNodes
-      .filter((node) => getActionNodeKind(node.photoActionType) === "warning")
+    routerNodes
+      .filter((node) => isPhotoOrientationNode(node) && getActionNodeKind(node.photoActionType) === "warning")
       .map((node) => `${node.id}::portrait`),
   );
   const visibleConnections = input.block.connections.filter(
@@ -1153,15 +1286,65 @@ const buildFlowGraph = (input: {
     },
   } satisfies TerminalNodeType);
 
-  actionNodes.forEach((node, index) => {
-    const actionNodeKind = getActionNodeKind(node.photoActionType);
-    const conditionBranchCopy = getConditionBranchCopy(
-      getNormalizedConditionTypeForNodeKind(
-        actionNodeKind,
-        "portrait-photo",
-        node.portrait.conditionType,
-      ),
-    );
+  routerNodes.forEach((node, index) => {
+    const routerNodeKind = getRouterNodeKind(node);
+    const isTimeGate = isTimeGateNode(node);
+    const conditionBranchCopy =
+      isPhotoOrientationNode(node)
+        ? getConditionBranchCopy(
+            getNormalizedConditionTypeForNodeKind(
+              getActionNodeKind(node.photoActionType),
+              "portrait-photo",
+              node.portrait.conditionType,
+            ),
+          )
+        : null;
+    const routerHeight = getRouterNodeHeight(node);
+    const routes =
+      isTimeGate
+        ? [
+            ...node.gates.map((gate, gateIndex) => {
+              const meta = getTimeGateRouteMeta(gateIndex);
+              return {
+                key: gate.id,
+                label: formatPhotoRouterTimeGateWindow(gate),
+                count: connectionBySourceHandle.has(`${node.id}::${gate.id}`) ? 1 : 0,
+                enabled: true,
+                connectable: true,
+                ...meta,
+              };
+            }),
+            {
+              key: "fallback",
+              label: "Else",
+              count: connectionBySourceHandle.has(`${node.id}::fallback`) ? 1 : 0,
+              enabled: true,
+              connectable: true,
+              ...BRANCH_META.fallback,
+            },
+          ]
+        : routerNodeKind === "warning"
+          ? [
+              {
+                key: "fallback",
+                label: conditionBranchCopy?.fallbackLabel ?? "Otherwise",
+                count: connectionBySourceHandle.has(`${node.id}::fallback`) ? 1 : 0,
+                enabled: true,
+                connectable: true,
+                ...BRANCH_META.fallback,
+              },
+            ]
+          : ROUTER_ROUTE_ORDER.map((branchKey) => ({
+              key: branchKey,
+              label:
+                branchKey === "portrait"
+                  ? conditionBranchCopy?.matchedLabel ?? "Matches"
+                  : conditionBranchCopy?.fallbackLabel ?? "Otherwise",
+              count: connectionBySourceHandle.has(`${node.id}::${branchKey}`) ? 1 : 0,
+              enabled: true,
+              connectable: true,
+              ...(branchKey === "portrait" ? BRANCH_META.portrait : BRANCH_META.fallback),
+            }));
 
     nodes.push({
       id: node.id,
@@ -1172,39 +1355,24 @@ const buildFlowGraph = (input: {
       deletable: true,
       style: {
         width: ROUTER_NODE_WIDTH,
-        minHeight: ROUTER_NODE_HEIGHT,
+        minHeight: routerHeight,
       },
       selected: input.selectedNodeId === node.id,
       data: {
         title: node.title,
-        kindLabel: getActionNodeKindLabel(actionNodeKind),
-        actionSummary: getCanvasActionTypeById(node.photoActionType).description,
+        kindLabel: getRouterNodeKindLabel(routerNodeKind),
+        actionSummary:
+          isTimeGate
+            ? "Routes to different paths based on the household time window."
+            : getCanvasActionTypeById(node.photoActionType).description,
         sourceLabel:
-          actionNodeKind === "warning"
+          routerNodeKind === "warning"
             ? null
-            : toPhotoSourceLabel(node.photoActionCollectionId, input.photoCollectionOptions),
+            : isTimeGate
+              ? "Household timezone"
+              : toPhotoSourceLabel(node.photoActionCollectionId, input.photoCollectionOptions),
         onRemove: () => input.onRemoveNode(node.id),
-        routes:
-          actionNodeKind === "warning"
-            ? [
-                {
-                  key: "fallback" as const,
-                  label: conditionBranchCopy.fallbackLabel,
-                  count: connectionBySourceHandle.has(`${node.id}::fallback`) ? 1 : 0,
-                  enabled: true,
-                  connectable: true,
-                },
-              ]
-            : ROUTER_ROUTE_ORDER.map((branchKey) => ({
-                key: branchKey,
-                label:
-                  branchKey === "portrait"
-                    ? conditionBranchCopy.matchedLabel
-                    : conditionBranchCopy.fallbackLabel,
-                count: connectionBySourceHandle.has(`${node.id}::${branchKey}`) ? 1 : 0,
-                enabled: true,
-                connectable: true,
-              })),
+        routes,
       },
     } satisfies RouterNodeType);
   });
@@ -1221,7 +1389,7 @@ const buildFlowGraph = (input: {
         input.block.nodePositions[node.id] ??
         getDefaultGraphNodePosition({
           node,
-          index: actionNodes.length + index,
+          index: routerNodes.length + index,
         }),
       draggable: input.isCanvasInteractive,
       selectable: true,
@@ -1290,12 +1458,21 @@ const buildFlowGraph = (input: {
 
   const edges = visibleConnections.map((connection) => {
     const sourceNode = getGraphNodeById(input.block, connection.source);
-    const branchKey = isBranchKey(connection.sourceHandle) ? connection.sourceHandle : null;
-    const stroke = branchKey
-      ? BRANCH_META[branchKey].color
-      : sourceNode && isPhotoOrientationNode(sourceNode)
-        ? "#94a3b8"
-        : "#94a3b8";
+    const stroke =
+      sourceNode && isTimeGateNode(sourceNode)
+        ? connection.sourceHandle?.trim() === "fallback"
+          ? BRANCH_META.fallback.color
+          : getTimeGateRouteMeta(
+              Math.max(
+                0,
+                sourceNode.gates.findIndex((gate) => gate.id === connection.sourceHandle?.trim()),
+              ),
+            ).color
+        : connection.sourceHandle?.trim() === "portrait"
+          ? BRANCH_META.portrait.color
+          : connection.sourceHandle?.trim() === "fallback"
+            ? BRANCH_META.fallback.color
+            : "#94a3b8";
     const dashed = false;
 
     return createEdge({
@@ -1323,6 +1500,7 @@ export const SetLogicEditor = ({
   const latestBlockRef = useRef(block);
   const selectedNodeIdRef = useRef<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [editorError, setEditorError] = useState<string | null>(null);
   const [isCanvasInteractive, setIsCanvasInteractive] = useState(true);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<Node, Edge> | null>(
     null,
@@ -1341,14 +1519,27 @@ export const SetLogicEditor = ({
     (updater: (current: PhotoRouterBlock) => PhotoRouterBlock) => {
       const currentAuthoring = latestAuthoringRef.current;
       const currentBlock = latestBlockRef.current;
-      const nextBlock = updater(currentBlock);
-      const nextAuthoring = setPrimaryPhotoRouterBlock({
-        authoring: currentAuthoring,
-        block: nextBlock,
-      });
-      latestAuthoringRef.current = nextAuthoring;
-      latestBlockRef.current = getPrimaryPhotoRouterBlock(nextAuthoring);
-      onChange(nextAuthoring);
+      try {
+        const nextBlock = updater(currentBlock);
+        const nextAuthoring = setPrimaryPhotoRouterBlock({
+          authoring: currentAuthoring,
+          block: nextBlock,
+        });
+        const validationIssue = getLayoutSetAuthoringValidationIssues(nextAuthoring)[0] ?? null;
+        if (validationIssue) {
+          setEditorError(validationIssue.message);
+          return;
+        }
+
+        latestAuthoringRef.current = nextAuthoring;
+        latestBlockRef.current = getPrimaryPhotoRouterBlock(nextAuthoring);
+        setEditorError(null);
+        onChange(nextAuthoring);
+      } catch (error) {
+        setEditorError(
+          error instanceof Error ? error.message : "Unable to apply this graph edit.",
+        );
+      }
     },
     [onChange],
   );
@@ -1402,7 +1593,7 @@ export const SetLogicEditor = ({
       const nextActionNode: PhotoRouterPhotoOrientationNode = {
         id: createActionNodeId(),
         nodeType: "photo-orientation",
-        title: getDefaultActionNodeTitle(kind, existingActionCount),
+        title: getDefaultRouterNodeTitle(kind, existingActionCount),
         photoActionType:
           kind === "warning" ? LOCAL_WARNING_CANVAS_ACTION_TYPE : getDefaultCanvasActionTypeId(),
         photoActionCollectionId: null,
@@ -1425,6 +1616,43 @@ export const SetLogicEditor = ({
         nodePositions: {
           ...current.nodePositions,
           [nextActionNode.id]: {
+            x: roundPosition(position.x),
+            y: roundPosition(position.y),
+          },
+        },
+      }));
+    },
+    [block.nodes, updateBlock],
+  );
+
+  const addTimeGateNodeAtPosition = useCallback(
+    (position: { x: number; y: number }) => {
+      const existingTimeGateCount = block.nodes.filter((node) => isTimeGateNode(node)).length;
+      const initialGate =
+        getNextTimeGateWindow(
+          block.nodes
+            .filter((node): node is PhotoRouterTimeGateNode => isTimeGateNode(node))
+            .flatMap((node) => node.gates),
+        ) ??
+        ({
+          id: createTimeGateWindowId(),
+          startTime: "09:00",
+          endTime: "10:00",
+        } satisfies PhotoRouterTimeGate);
+      const nextTimeGateNode: PhotoRouterTimeGateNode = {
+        id: createActionNodeId(),
+        nodeType: "time-gate",
+        title: getDefaultRouterNodeTitle("time", existingTimeGateCount),
+        gates: [initialGate],
+      };
+
+      setSelectedNodeId(nextTimeGateNode.id);
+      updateBlock((current) => ({
+        ...current,
+        nodes: [...current.nodes, nextTimeGateNode],
+        nodePositions: {
+          ...current.nodePositions,
+          [nextTimeGateNode.id]: {
             x: roundPosition(position.x),
             y: roundPosition(position.y),
           },
@@ -1565,15 +1793,8 @@ export const SetLogicEditor = ({
       return !wouldCreateGraphCycle(block, source, target);
     }
 
-    if (
-      getActionNodeKind(sourceNode.photoActionType) === "warning" &&
-      (candidate.sourceHandle?.trim() ?? null) === "portrait"
-    ) {
-      return false;
-    }
-
     return (
-      isBranchKey(candidate.sourceHandle?.trim() ?? null) &&
+      getConnectableSourceHandles(sourceNode).includes(candidate.sourceHandle?.trim() ?? "") &&
       !wouldCreateGraphCycle(block, source, target)
     );
   };
@@ -1668,7 +1889,12 @@ export const SetLogicEditor = ({
     }
 
     const blockType = event.dataTransfer.getData(GRAPH_NODE_DRAG_TYPE);
-    if (blockType !== "layout-node" && blockType !== "photo-node" && blockType !== "warning-node") {
+    if (
+      blockType !== "layout-node" &&
+      blockType !== "photo-node" &&
+      blockType !== "warning-node" &&
+      blockType !== "time-node"
+    ) {
       return;
     }
 
@@ -1684,6 +1910,11 @@ export const SetLogicEditor = ({
 
     if (blockType === "warning-node") {
       addActionNodeAtPosition("warning", position);
+      return;
+    }
+
+    if (blockType === "time-node") {
+      addTimeGateNodeAtPosition(position);
       return;
     }
 
@@ -1711,6 +1942,11 @@ export const SetLogicEditor = ({
           node.id === selectedNodeId && isPhotoOrientationNode(node),
       ) ?? null)
     : null;
+  const selectedTimeGateNode = selectedNodeId
+    ? (block.nodes.find(
+        (node): node is PhotoRouterTimeGateNode => node.id === selectedNodeId && isTimeGateNode(node),
+      ) ?? null)
+    : null;
   const selectedActionKind = selectedActionNode
     ? getActionNodeKind(selectedActionNode.photoActionType)
     : null;
@@ -1718,6 +1954,12 @@ export const SetLogicEditor = ({
     selectedActionNode?.photoActionType || getDefaultCanvasActionTypeId(),
   );
   const selectedActionUsesPhotoSource = selectedActionKind === "photo";
+  const selectedTimeGateIssues = selectedTimeGateNode
+    ? getPhotoRouterTimeGateNodeValidationIssues(selectedTimeGateNode)
+    : [];
+  const nextAvailableTimeGateWindow = selectedTimeGateNode
+    ? getNextTimeGateWindow(selectedTimeGateNode.gates)
+    : null;
   const runtimeStatusMeta = useMemo(() => {
     if (!runtimeHealth) {
       return null;
@@ -1772,6 +2014,22 @@ export const SetLogicEditor = ({
       ...current,
       nodes: current.nodes.map((node) =>
         node.id === targetNodeId && isPhotoOrientationNode(node) ? updater(node) : node,
+      ),
+    }));
+  };
+
+  const updateSelectedTimeGateNode = (
+    updater: (current: PhotoRouterTimeGateNode) => PhotoRouterTimeGateNode,
+  ) => {
+    const targetNodeId = selectedNodeIdRef.current;
+    if (!targetNodeId) {
+      return;
+    }
+
+    updateBlock((current) => ({
+      ...current,
+      nodes: current.nodes.map((node) =>
+        node.id === targetNodeId && isTimeGateNode(node) ? updater(node) : node,
       ),
     }));
   };
@@ -1992,6 +2250,23 @@ export const SetLogicEditor = ({
             >
               <span className="block text-sm font-semibold">Warning Node</span>
             </button>
+            <button
+              type="button"
+              draggable
+              className="mt-3 flex w-full items-center justify-between rounded-xl border border-sky-500/50 bg-sky-500/10 px-3 py-3 text-left text-sky-100 transition hover:bg-sky-500/20"
+              onDragStart={(event) => {
+                event.dataTransfer.setData(GRAPH_NODE_DRAG_TYPE, "time-node");
+                event.dataTransfer.effectAllowed = "copy";
+              }}
+              onClick={() =>
+                addTimeGateNodeAtPosition({
+                  x: DEFAULT_ROUTER_POSITION.x + 96,
+                  y: DEFAULT_ROUTER_POSITION.y + 96,
+                })
+              }
+            >
+              <span className="block text-sm font-semibold">Time Gate Node</span>
+            </button>
           </div>
         </aside>
 
@@ -2106,9 +2381,17 @@ export const SetLogicEditor = ({
                 ? "Edit the selected layout node."
                 : selectedActionNode
                   ? `Edit the selected ${selectedActionKind === "warning" ? "warning" : "photo orientation"} node settings.`
-                  : "Select a photo orientation, warning, or layout node to edit it."}
+                  : selectedTimeGateNode
+                    ? "Edit the selected time gate node settings."
+                    : "Select a photo orientation, warning, time gate, or layout node to edit it."}
             </p>
           </div>
+
+          {editorError ? (
+            <p className="rounded border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
+              {editorError}
+            </p>
+          ) : null}
 
           {selectedLayoutNode ? (
             <>
@@ -2303,7 +2586,157 @@ export const SetLogicEditor = ({
                     ...current,
                     portrait: updater(current.portrait),
                   })),
-              )}
+                )}
+            </>
+          ) : selectedTimeGateNode ? (
+            <>
+              <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4">
+                <p className="text-base font-semibold text-slate-100">Time gate node settings</p>
+                <div className="mt-4 space-y-3">
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      Node name
+                    </span>
+                    <input
+                      type="text"
+                      value={selectedTimeGateNode.title}
+                      className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+                      onChange={(event) =>
+                        updateSelectedTimeGateNode((current) => ({
+                          ...current,
+                          title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+                <p className="mt-3 text-xs text-slate-400">
+                  Uses the household timezone. Windows are start-inclusive and end-exclusive, and
+                  the Else route runs when no window matches.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-100">Time windows</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Add non-overlapping windows in the order you want them checked.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!nextAvailableTimeGateWindow}
+                    className="rounded border border-sky-500/60 px-3 py-1.5 text-xs font-semibold text-sky-100 hover:bg-sky-500/10 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500"
+                    onClick={() => {
+                      if (!nextAvailableTimeGateWindow) {
+                        return;
+                      }
+                      updateSelectedTimeGateNode((current) => ({
+                        ...current,
+                        gates: [...current.gates, nextAvailableTimeGateWindow],
+                      }));
+                    }}
+                  >
+                    Add window
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {selectedTimeGateNode.gates.map((gate, gateIndex) => {
+                    const gateMeta = getTimeGateRouteMeta(gateIndex);
+                    return (
+                      <div
+                        key={gate.id}
+                        className={`rounded-xl border p-3 ${gateMeta.borderClassName} ${gateMeta.bgClassName}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold">Gate {gateIndex + 1}</p>
+                            <p className="mt-1 text-xs opacity-80">
+                              Connect this output to the path for {formatPhotoRouterTimeGateWindow(gate)}.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={selectedTimeGateNode.gates.length <= 1}
+                            className="rounded border border-rose-400/70 px-2.5 py-1.5 text-xs font-semibold text-rose-100 hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500"
+                            onClick={() =>
+                              updateSelectedTimeGateNode((current) => ({
+                                ...current,
+                                gates: current.gates.filter((entry) => entry.id !== gate.id),
+                              }))
+                            }
+                          >
+                            Remove
+                          </button>
+                        </div>
+
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <label className="block">
+                            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                              Start
+                            </span>
+                            <input
+                              type="time"
+                              value={gate.startTime}
+                              className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+                              onChange={(event) =>
+                                updateSelectedTimeGateNode((current) => ({
+                                  ...current,
+                                  gates: current.gates.map((entry) =>
+                                    entry.id === gate.id
+                                      ? { ...entry, startTime: event.target.value || entry.startTime }
+                                      : entry,
+                                  ),
+                                }))
+                              }
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                              End
+                            </span>
+                            <input
+                              type="time"
+                              value={gate.endTime}
+                              className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+                              onChange={(event) =>
+                                updateSelectedTimeGateNode((current) => ({
+                                  ...current,
+                                  gates: current.gates.map((entry) =>
+                                    entry.id === gate.id
+                                      ? { ...entry, endTime: event.target.value || entry.endTime }
+                                      : entry,
+                                  ),
+                                }))
+                              }
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                  Else route: use this output when the current household time does not match any
+                  gate above.
+                </div>
+
+                {selectedTimeGateIssues.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    {selectedTimeGateIssues.map((issue) => (
+                      <p
+                        key={`${issue.nodeId}:${issue.gateId ?? "node"}:${issue.message}`}
+                        className="rounded border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-xs text-rose-100"
+                      >
+                        {issue.message}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </>
           ) : null}
         </aside>

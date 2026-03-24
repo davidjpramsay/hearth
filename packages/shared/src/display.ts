@@ -1,11 +1,17 @@
 import { z } from "zod";
 import { layoutRecordSchema } from "./layout.js";
 import {
+  clockTimeSchema,
+  formatClockTimeFromMinutes,
+  parseClockTimeToMinutes,
+} from "./time.js";
+import {
   LOCAL_WARNING_AUTO_LAYOUT_NAME,
   LOCAL_WARNING_CANVAS_ACTION_TYPE,
 } from "./layout-logic-warnings.js";
 import { localWarningItemSchema } from "./modules/local-warnings.js";
 import { photoCollectionIdSchema, photosOrientationSchema } from "./modules/photos.js";
+import { SITE_TIME_WINDOW_LAYOUT_LOGIC_CONDITION_TYPE } from "./layout-logic-registry.js";
 
 const DEFAULT_TARGET_CYCLE_SECONDS = 20;
 const DEFAULT_ACTION_TYPE = "layout.display";
@@ -18,6 +24,7 @@ const PHOTO_ROUTER_END_NODE_ID = "__end__";
 const PHOTO_COLLECTION_ACTION_PARAM_KEY = "photoCollectionId";
 const PORTRAIT_CONDITION_TYPE = "photo.orientation.portrait";
 const LANDSCAPE_CONDITION_TYPE = "photo.orientation.landscape";
+const DEFAULT_TIME_GATE_TITLE = "Time Gate";
 
 const layoutNameSchema = z.string().trim().min(1).max(80);
 const screenSetIdSchema = z.string().trim().min(1).max(80);
@@ -41,6 +48,7 @@ export const autoLayoutTargetTriggerSchema = z.enum([
   "always",
   "portrait-photo",
   "landscape-photo",
+  "time-window",
 ]);
 
 export const autoLayoutTargetSchema = z.object({
@@ -58,6 +66,7 @@ export const layoutSetLogicNodeTypeSchema = z.enum([
   "select-photo",
   "if-portrait",
   "if-landscape",
+  "if-time",
   "else",
   "display",
   "return",
@@ -140,6 +149,12 @@ export const photoRouterActionRouteSchema = z.object({
   conditionParams: layoutLogicParamsSchema.default({}),
 });
 
+export const photoRouterTimeGateSchema = z.object({
+  id: logicHandleIdSchema,
+  startTime: clockTimeSchema.default("09:00"),
+  endTime: clockTimeSchema.default("10:00"),
+});
+
 export const photoRouterLayoutNodeSchema = z.object({
   id: logicNodeIdSchema,
   nodeType: z.literal("layout"),
@@ -167,9 +182,23 @@ export const photoRouterPhotoOrientationNodeSchema = z.object({
   }),
 });
 
+export const photoRouterTimeGateNodeSchema = z.object({
+  id: logicNodeIdSchema,
+  nodeType: z.literal("time-gate"),
+  title: screenSetNameSchema.default(DEFAULT_TIME_GATE_TITLE),
+  gates: z.array(photoRouterTimeGateSchema).min(1).max(24).default([
+    {
+      id: "time-gate-1",
+      startTime: "09:00",
+      endTime: "10:00",
+    },
+  ]),
+});
+
 export const photoRouterGraphNodeSchema = z.discriminatedUnion("nodeType", [
   photoRouterLayoutNodeSchema,
   photoRouterPhotoOrientationNodeSchema,
+  photoRouterTimeGateNodeSchema,
 ]);
 
 export const photoRouterBlockSchema = z.object({
@@ -243,13 +272,97 @@ export type PhotoRouterStep = z.infer<typeof photoRouterStepSchema>;
 export type PhotoRouterFallbackBranch = z.infer<typeof photoRouterFallbackBranchSchema>;
 export type PhotoRouterConditionalBranch = z.infer<typeof photoRouterConditionalBranchSchema>;
 export type PhotoRouterActionRoute = z.infer<typeof photoRouterActionRouteSchema>;
+export type PhotoRouterTimeGate = z.infer<typeof photoRouterTimeGateSchema>;
 export type PhotoRouterLayoutNode = z.infer<typeof photoRouterLayoutNodeSchema>;
 export type PhotoRouterPhotoOrientationNode = z.infer<typeof photoRouterPhotoOrientationNodeSchema>;
+export type PhotoRouterTimeGateNode = z.infer<typeof photoRouterTimeGateNodeSchema>;
 export type PhotoRouterGraphNode = z.infer<typeof photoRouterGraphNodeSchema>;
 export type PhotoRouterConnection = z.infer<typeof photoRouterConnectionSchema>;
 export type PhotoRouterBlock = z.infer<typeof photoRouterBlockSchema>;
 export type LayoutSetLogicBlock = z.infer<typeof layoutSetLogicBlockSchema>;
 export type LayoutSetAuthoring = z.infer<typeof layoutSetAuthoringSchema>;
+
+export interface LayoutSetAuthoringValidationIssue {
+  nodeId: string;
+  gateId?: string;
+  message: string;
+}
+
+export const formatPhotoRouterTimeGateWindow = (gate: PhotoRouterTimeGate): string =>
+  `${formatClockTimeFromMinutes(parseClockTimeToMinutes(gate.startTime))} - ${formatClockTimeFromMinutes(parseClockTimeToMinutes(gate.endTime))}`;
+
+export const getPhotoRouterTimeGateNodeValidationIssues = (
+  node: PhotoRouterTimeGateNode,
+): LayoutSetAuthoringValidationIssue[] => {
+  const issues: LayoutSetAuthoringValidationIssue[] = [];
+  const seenGateIds = new Set<string>();
+  const normalizedGates = node.gates.map((gate) => ({
+    ...gate,
+    startMinutes: parseClockTimeToMinutes(gate.startTime),
+    endMinutes: parseClockTimeToMinutes(gate.endTime),
+  }));
+
+  for (const gate of normalizedGates) {
+    if (seenGateIds.has(gate.id)) {
+      issues.push({
+        nodeId: node.id,
+        gateId: gate.id,
+        message: `Time gate "${node.title}" has a duplicate window id.`,
+      });
+      continue;
+    }
+
+    seenGateIds.add(gate.id);
+    if (gate.endMinutes <= gate.startMinutes) {
+      issues.push({
+        nodeId: node.id,
+        gateId: gate.id,
+        message: `Time gate "${node.title}" uses an invalid window (${formatPhotoRouterTimeGateWindow(gate)}). End time must be after start time.`,
+      });
+    }
+  }
+
+  const sortedGates = [...normalizedGates].sort(
+    (left, right) => left.startMinutes - right.startMinutes || left.endMinutes - right.endMinutes,
+  );
+
+  for (let index = 1; index < sortedGates.length; index += 1) {
+    const previous = sortedGates[index - 1];
+    const current = sortedGates[index];
+    if (current.startMinutes >= previous.endMinutes) {
+      continue;
+    }
+
+    issues.push({
+      nodeId: node.id,
+      gateId: current.id,
+      message: `Time gate "${node.title}" has overlapping windows (${formatPhotoRouterTimeGateWindow(previous)} and ${formatPhotoRouterTimeGateWindow(current)}).`,
+    });
+  }
+
+  return issues;
+};
+
+export const getLayoutSetAuthoringValidationIssues = (
+  input: LayoutSetAuthoring | null | undefined,
+): LayoutSetAuthoringValidationIssue[] => {
+  const parsed = layoutSetAuthoringSchema.parse(input ?? {});
+  const issues: LayoutSetAuthoringValidationIssue[] = [];
+
+  for (const block of parsed.blocks) {
+    if (block.type !== "photo-router") {
+      continue;
+    }
+
+    for (const node of block.nodes) {
+      if (node.nodeType === "time-gate") {
+        issues.push(...getPhotoRouterTimeGateNodeValidationIssues(node));
+      }
+    }
+  }
+
+  return issues;
+};
 
 export const getDefaultLayoutSetLogicGraph = (): LayoutSetLogicGraph =>
   layoutSetLogicGraphSchema.parse(createDefaultLayoutSetLogicGraphInput());
@@ -624,6 +737,10 @@ function isPhotoRouterPhotoOrientationNode(
   return node.nodeType === "photo-orientation";
 }
 
+function isPhotoRouterTimeGateNode(node: PhotoRouterGraphNode): node is PhotoRouterTimeGateNode {
+  return node.nodeType === "time-gate";
+}
+
 function normalizePhotoRouterActionRoute(input: {
   route: PhotoRouterActionRoute;
   defaultConditionType: string;
@@ -669,10 +786,38 @@ function normalizePhotoRouterPhotoOrientationGraphNode(
   });
 }
 
+function normalizePhotoRouterTimeGateGraphNode(
+  input: PhotoRouterTimeGateNode,
+): PhotoRouterTimeGateNode {
+  const normalizedGates = [...input.gates]
+    .map((gate) =>
+      photoRouterTimeGateSchema.parse({
+        id: gate.id.trim(),
+        startTime: gate.startTime,
+        endTime: gate.endTime,
+      }),
+    )
+    .sort(
+      (left, right) =>
+        parseClockTimeToMinutes(left.startTime) - parseClockTimeToMinutes(right.startTime),
+    );
+
+  return photoRouterTimeGateNodeSchema.parse({
+    ...input,
+    id: input.id.trim(),
+    title: input.title?.trim() || DEFAULT_TIME_GATE_TITLE,
+    gates: normalizedGates,
+  });
+}
+
 function normalizePhotoRouterGraphNode(input: PhotoRouterGraphNode): PhotoRouterGraphNode {
-  return isPhotoRouterLayoutGraphNode(input)
-    ? normalizePhotoRouterLayoutGraphNode(input)
-    : normalizePhotoRouterPhotoOrientationGraphNode(input);
+  if (isPhotoRouterLayoutGraphNode(input)) {
+    return normalizePhotoRouterLayoutGraphNode(input);
+  }
+  if (isPhotoRouterPhotoOrientationNode(input)) {
+    return normalizePhotoRouterPhotoOrientationGraphNode(input);
+  }
+  return normalizePhotoRouterTimeGateGraphNode(input);
 }
 
 function toPhotoRouterLayoutGraphNode(input: PhotoRouterStep): PhotoRouterLayoutNode {
@@ -730,6 +875,10 @@ function getPhotoRouterSourceHandles(node: PhotoRouterGraphNode): string[] {
 
   if (isPhotoRouterPhotoOrientationNode(node)) {
     return ["portrait", "fallback"];
+  }
+
+  if (isPhotoRouterTimeGateNode(node)) {
+    return [...node.gates.map((gate) => gate.id), "fallback"];
   }
 
   return [];
@@ -1350,7 +1499,11 @@ const toAutoTargetFromPhotoRouterStep = (input: {
     input.trigger === "always"
       ? null
       : input.conditionType?.trim() ||
-        (input.trigger === "portrait-photo" ? PORTRAIT_CONDITION_TYPE : LANDSCAPE_CONDITION_TYPE),
+        (input.trigger === "portrait-photo"
+          ? PORTRAIT_CONDITION_TYPE
+          : input.trigger === "landscape-photo"
+            ? LANDSCAPE_CONDITION_TYPE
+            : SITE_TIME_WINDOW_LAYOUT_LOGIC_CONDITION_TYPE),
   conditionParams: input.trigger === "always" ? {} : toLogicParams(input.conditionParams),
 });
 
@@ -1481,6 +1634,61 @@ function compilePhotoRouterGraphToLogicGraph(input: PhotoRouterBlock): LayoutSet
       compiledEntries.set(graphNodeId, runtimeId);
       compilingNodeIds.delete(graphNodeId);
       return runtimeId;
+    }
+
+    if (isPhotoRouterTimeGateNode(graphNode)) {
+      const fallbackTarget = compileTarget(
+        getPhotoRouterConnectionTarget({
+          connectionsBySourceHandle,
+          source: graphNode.id,
+          sourceHandle: "fallback",
+        }),
+      );
+
+      let entryNodeId = fallbackTarget;
+
+      for (let index = graphNode.gates.length - 1; index >= 0; index -= 1) {
+        const gate = graphNode.gates[index];
+        const conditionNodeId = `if-time:${graphNode.id}:${gate.id}`;
+        appendNode({
+          id: conditionNodeId,
+          type: "if-time",
+          conditionType: SITE_TIME_WINDOW_LAYOUT_LOGIC_CONDITION_TYPE,
+          conditionParams: toLogicParams({
+            startTime: gate.startTime,
+            endTime: gate.endTime,
+          }),
+        });
+
+        const matchedTargetId = getPhotoRouterConnectionTarget({
+          connectionsBySourceHandle,
+          source: graphNode.id,
+          sourceHandle: gate.id,
+        });
+
+        appendEdge(
+          toEdge({
+            id: `edge-${conditionNodeId}-yes`,
+            from: conditionNodeId,
+            to: matchedTargetId ? compileTarget(matchedTargetId) : fallbackTarget,
+            when: "yes",
+          }),
+        );
+        appendEdge(
+          toEdge({
+            id: `edge-${conditionNodeId}-no`,
+            from: conditionNodeId,
+            to: entryNodeId,
+            when: "no",
+          }),
+        );
+
+        entryNodeId = conditionNodeId;
+      }
+
+      compiledEntries.set(graphNodeId, entryNodeId);
+      compilingNodeIds.delete(graphNodeId);
+      return entryNodeId;
     }
 
     const selectId = `select-photo:${graphNode.id}`;
@@ -1752,6 +1960,8 @@ const toCanonicalRule = (
       ? PORTRAIT_CONDITION_TYPE
       : expectedTrigger === "landscape-photo"
         ? LANDSCAPE_CONDITION_TYPE
+        : expectedTrigger === "time-window"
+          ? SITE_TIME_WINDOW_LAYOUT_LOGIC_CONDITION_TYPE
         : null;
 
   return {
@@ -1808,7 +2018,11 @@ const extractRulesFromPrefix = (
         trigger === "always"
           ? null
           : node.conditionType?.trim() ||
-            (trigger === "portrait-photo" ? PORTRAIT_CONDITION_TYPE : LANDSCAPE_CONDITION_TYPE),
+            (trigger === "portrait-photo"
+              ? PORTRAIT_CONDITION_TYPE
+              : trigger === "landscape-photo"
+                ? LANDSCAPE_CONDITION_TYPE
+                : SITE_TIME_WINDOW_LAYOUT_LOGIC_CONDITION_TYPE),
       conditionParams: trigger === "always" ? {} : toLogicParams(node.conditionParams),
     }))
     .filter((rule) => rule.layoutName.length > 0);
@@ -1961,6 +2175,8 @@ export const createLayoutSetLogicGraphFromBranches = (
               ? PORTRAIT_CONDITION_TYPE
               : rule.trigger === "landscape-photo"
                 ? LANDSCAPE_CONDITION_TYPE
+                : rule.trigger === "time-window"
+                  ? SITE_TIME_WINDOW_LAYOUT_LOGIC_CONDITION_TYPE
                 : null),
           conditionParams: rule.conditionParams ?? {},
         }),
@@ -2227,6 +2443,8 @@ export interface LayoutLogicConditionEvaluationInput {
   conditionParams: Record<string, unknown>;
   trigger: Exclude<AutoLayoutTargetTrigger, "always">;
   orientation: "portrait" | "landscape" | null;
+  now?: Date | string | number;
+  siteTimeZone?: string | null;
 }
 
 export interface LayoutLogicActionResolutionInput {
@@ -2255,11 +2473,17 @@ const resolveConditionTrigger = (
   if (normalizedConditionType === LANDSCAPE_CONDITION_TYPE) {
     return "landscape-photo";
   }
+  if (normalizedConditionType === SITE_TIME_WINDOW_LAYOUT_LOGIC_CONDITION_TYPE) {
+    return "time-window";
+  }
   if (nodeType === "if-portrait") {
     return "portrait-photo";
   }
   if (nodeType === "if-landscape") {
     return "landscape-photo";
+  }
+  if (nodeType === "if-time") {
+    return "time-window";
   }
   return null;
 };
@@ -2268,20 +2492,32 @@ const chooseNextEdge = (input: {
   node: LayoutSetLogicNode;
   outgoing: LayoutSetLogicEdge[];
   orientation: "portrait" | "landscape" | null;
+  now?: Date | string | number;
+  siteTimeZone?: string | null;
   evaluateCondition?: (input: LayoutLogicConditionEvaluationInput) => boolean | null | undefined;
 }): LayoutSetLogicEdge | null => {
   if (input.outgoing.length === 0) {
     return null;
   }
 
-  if (input.node.type === "if-portrait" || input.node.type === "if-landscape") {
+  if (
+    input.node.type === "if-portrait" ||
+    input.node.type === "if-landscape" ||
+    input.node.type === "if-time"
+  ) {
     const trigger = resolveConditionTrigger(input.node.type, input.node.conditionType);
     const fallbackExpected =
       trigger === "landscape-photo"
         ? input.orientation === "landscape"
-        : input.orientation === "portrait";
+        : trigger === "portrait-photo"
+          ? input.orientation === "portrait"
+          : false;
     const defaultConditionType =
-      trigger === "landscape-photo" ? LANDSCAPE_CONDITION_TYPE : PORTRAIT_CONDITION_TYPE;
+      trigger === "landscape-photo"
+        ? LANDSCAPE_CONDITION_TYPE
+        : trigger === "time-window"
+          ? SITE_TIME_WINDOW_LAYOUT_LOGIC_CONDITION_TYPE
+          : PORTRAIT_CONDITION_TYPE;
     const evaluated =
       trigger && input.evaluateCondition
         ? input.evaluateCondition({
@@ -2289,6 +2525,8 @@ const chooseNextEdge = (input: {
             conditionParams: toLogicParams(input.node.conditionParams),
             trigger,
             orientation: input.orientation,
+            now: input.now,
+            siteTimeZone: input.siteTimeZone,
           })
         : null;
     const expected =
@@ -2326,6 +2564,8 @@ const normalizeResolvedTarget = (
 export const resolveDisplaySequenceFromLogicGraph = (input: {
   graph: LayoutSetLogicGraph;
   orientation: "portrait" | "landscape" | null;
+  now?: Date | string | number;
+  siteTimeZone?: string | null;
   includeActivePhotoCollectionInActionParams?: boolean;
   evaluateCondition?: (input: LayoutLogicConditionEvaluationInput) => boolean | null | undefined;
   resolveAction?: (
@@ -2418,6 +2658,8 @@ export const resolveDisplaySequenceFromLogicGraph = (input: {
       node: currentNode,
       outgoing: outgoingByNode.get(currentNodeId) ?? [],
       orientation: input.orientation,
+      now: input.now,
+      siteTimeZone: input.siteTimeZone,
       evaluateCondition: input.evaluateCondition,
     });
     if (!nextEdge) {

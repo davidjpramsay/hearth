@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type {
   AutoLayoutTargetTrigger,
   LayoutLogicActionResolutionInput,
@@ -5,6 +6,12 @@ import type {
   LayoutLogicResolvedTarget,
 } from "./display.js";
 import { photoCollectionIdSchema } from "./modules/photos.js";
+import {
+  clockTimeSchema,
+  getMinutesSinceMidnightInTimeZone,
+  getRuntimeTimeZone,
+  parseClockTimeToMinutes,
+} from "./time.js";
 
 const DEFAULT_TARGET_CYCLE_SECONDS = 20;
 
@@ -14,6 +21,12 @@ export const DEFAULT_LAYOUT_LOGIC_PHOTO_ACTION_TYPE = "photo.select-next";
 export const PHOTO_COLLECTION_ACTION_PARAM_KEY = "photoCollectionId";
 export const DEFAULT_PORTRAIT_LAYOUT_LOGIC_CONDITION_TYPE = "photo.orientation.portrait";
 export const DEFAULT_LANDSCAPE_LAYOUT_LOGIC_CONDITION_TYPE = "photo.orientation.landscape";
+export const SITE_TIME_WINDOW_LAYOUT_LOGIC_CONDITION_TYPE = "time.window.site-local";
+
+export const siteTimeWindowConditionParamsSchema = z.object({
+  startTime: clockTimeSchema.default("09:00"),
+  endTime: clockTimeSchema.default("10:00"),
+});
 
 type LayoutLogicConditionTrigger = Exclude<AutoLayoutTargetTrigger, "always">;
 
@@ -59,6 +72,41 @@ export const BUILTIN_LAYOUT_LOGIC_CONDITIONS: BuiltinLayoutLogicConditionDefinit
     trigger: "landscape-photo",
     evaluate: ({ orientation }) => orientation === "landscape",
   },
+  {
+    id: SITE_TIME_WINDOW_LAYOUT_LOGIC_CONDITION_TYPE,
+    label: "Time is within window",
+    description: "Run when the household timezone time falls within the configured window.",
+    trigger: "time-window",
+    evaluate: (input) => {
+      const parsedParams = siteTimeWindowConditionParamsSchema.safeParse(input.conditionParams);
+      if (!parsedParams.success) {
+        return null;
+      }
+
+      const startMinutes = parseClockTimeToMinutes(parsedParams.data.startTime);
+      const endMinutes = parseClockTimeToMinutes(parsedParams.data.endTime);
+      if (endMinutes <= startMinutes) {
+        return false;
+      }
+
+      const currentDate =
+        input.now instanceof Date
+          ? input.now
+          : typeof input.now === "number"
+            ? new Date(input.now)
+            : typeof input.now === "string"
+              ? new Date(input.now)
+              : new Date();
+
+      if (Number.isNaN(currentDate.getTime())) {
+        return null;
+      }
+
+      const siteTimeZone = input.siteTimeZone?.trim() || getRuntimeTimeZone();
+      const currentMinutes = getMinutesSinceMidnightInTimeZone(currentDate, siteTimeZone);
+      return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+    },
+  },
 ];
 
 export const BUILTIN_LAYOUT_LOGIC_CANVAS_ACTIONS: BuiltinLayoutLogicCanvasActionDefinition[] = [
@@ -102,7 +150,9 @@ export const getDefaultLayoutLogicConditionTypeForTrigger = (
 ): string =>
   trigger === "portrait-photo"
     ? DEFAULT_PORTRAIT_LAYOUT_LOGIC_CONDITION_TYPE
-    : DEFAULT_LANDSCAPE_LAYOUT_LOGIC_CONDITION_TYPE;
+    : trigger === "landscape-photo"
+      ? DEFAULT_LANDSCAPE_LAYOUT_LOGIC_CONDITION_TYPE
+      : SITE_TIME_WINDOW_LAYOUT_LOGIC_CONDITION_TYPE;
 
 export const resolveBuiltinLayoutLogicCondition = (
   input: LayoutLogicConditionEvaluationInput,

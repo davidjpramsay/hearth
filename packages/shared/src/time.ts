@@ -2,8 +2,12 @@ import { z } from "zod";
 
 const FALLBACK_TIME_ZONE = "UTC";
 const CALENDAR_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const CLOCK_TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 export const moduleTimeModeSchema = z.enum(["device-local", "site-local", "source-local"]);
+export const clockTimeSchema = z.string().trim().regex(CLOCK_TIME_REGEX, {
+  message: "Invalid time, expected HH:MM",
+});
 
 export const isValidIanaTimeZone = (value: string): boolean => {
   const candidate = value.trim();
@@ -75,6 +79,42 @@ export const getDayOfYearFromCalendarDate = (value: string): number => {
 
 export const getDayOfYearInTimeZone = (date: Date, timeZone: string): number =>
   getDayOfYearFromCalendarDate(toCalendarDateInTimeZone(date, timeZone));
+
+export const parseClockTimeToMinutes = (value: string): number => {
+  const normalized = clockTimeSchema.parse(value);
+  const [hourPart, minutePart] = normalized.split(":");
+  const hour = Number.parseInt(hourPart, 10);
+  const minute = Number.parseInt(minutePart, 10);
+
+  return hour * 60 + minute;
+};
+
+export const formatClockTimeFromMinutes = (value: number): string => {
+  const clamped = Math.max(0, Math.min(23 * 60 + 59, Math.round(value)));
+  const hour = Math.floor(clamped / 60);
+  const minute = clamped % 60;
+
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+};
+
+export const getMinutesSinceMidnightInTimeZone = (date: Date, timeZone: string): number => {
+  const normalizedTimeZone = ianaTimeZoneSchema.parse(timeZone);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: normalizedTimeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const hourPart = parts.find((part) => part.type === "hour")?.value;
+  const minutePart = parts.find((part) => part.type === "minute")?.value;
+
+  if (!hourPart || !minutePart) {
+    throw new Error(`Unable to format clock time for time zone: ${normalizedTimeZone}`);
+  }
+
+  return Number.parseInt(hourPart, 10) * 60 + Number.parseInt(minutePart, 10);
+};
 
 export type ModuleTimeMode = z.infer<typeof moduleTimeModeSchema>;
 export type SiteTimeConfig = z.infer<typeof siteTimeConfigSchema>;

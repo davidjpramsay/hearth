@@ -208,7 +208,10 @@ export const getDefaultConditionTypeForTrigger = (trigger: LogicBranchTrigger): 
   if (trigger === "portrait-photo") {
     return fromRegistry || DEFAULT_CONDITION_PORTRAIT;
   }
-  return fromRegistry || DEFAULT_CONDITION_LANDSCAPE;
+  if (trigger === "landscape-photo") {
+    return fromRegistry || DEFAULT_CONDITION_LANDSCAPE;
+  }
+  return fromRegistry;
 };
 
 export const getDefaultActionTypeId = (): string => DEFAULT_ACTION_TYPE;
@@ -292,6 +295,8 @@ export const evaluateConditionById = (input: {
   conditionParams?: unknown;
   trigger: Exclude<LogicBranchTrigger, "always">;
   orientation: "portrait" | "landscape" | null;
+  now?: Date | string | number;
+  siteTimeZone?: string | null;
 }): boolean | null => {
   const condition =
     LOGIC_CONDITION_TYPES.find(
@@ -303,6 +308,13 @@ export const evaluateConditionById = (input: {
   return condition.evaluate(
     {
       orientation: input.orientation,
+      now:
+        input.now instanceof Date
+          ? input.now
+          : input.now
+            ? new Date(input.now)
+            : undefined,
+      siteTimeZone: input.siteTimeZone ?? null,
     },
     parseConditionParamsByType(input.conditionType, input.conditionParams),
   );
@@ -315,5 +327,8 @@ export const getTriggerLabel = (trigger: LogicBranchTrigger): string => {
   if (trigger === "portrait-photo") {
     return "Portrait photo";
   }
-  return "Landscape photo";
+  if (trigger === "landscape-photo") {
+    return "Landscape photo";
+  }
+  return "Time window";
 };

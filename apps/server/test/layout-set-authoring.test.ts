@@ -4,11 +4,13 @@ import {
   compileLayoutSetAuthoringToLogicGraph,
   createLayoutSetLogicGraphFromBranches,
   deriveLayoutSetAuthoringFromLogicGraph,
+  getLayoutSetAuthoringValidationIssues,
   getPrimaryPhotoRouterBlock,
   LOCAL_WARNING_AUTO_LAYOUT_NAME,
   LOCAL_WARNING_CANVAS_ACTION_TYPE,
   LOCAL_WARNING_CONDITION_TYPE,
   normalizeScreenProfileLayoutsConfig,
+  resolveBuiltinLayoutLogicCondition,
   resolveDisplaySequenceFromLogicGraph,
   setPrimaryPhotoRouterBlock,
   toAutoLayoutTargetsFromLogicGraph,
@@ -740,4 +742,220 @@ test("photo-router action nodes can match landscape photos without an enabled to
     landscapeSequence.map((target) => target.layoutName),
     ["Landscape layout"],
   );
+});
+
+test("time gate nodes resolve the matching window or else branch in the household timezone", () => {
+  const authoring = setPrimaryPhotoRouterBlock({
+    authoring: {
+      version: 1,
+      blocks: [],
+    },
+    block: {
+      id: "photo-router",
+      type: "photo-router",
+      nodes: [
+        {
+          id: "time-a",
+          nodeType: "time-gate",
+          title: "Morning schedule",
+          gates: [
+            {
+              id: "gate-1",
+              startTime: "09:00",
+              endTime: "10:00",
+            },
+            {
+              id: "gate-2",
+              startTime: "10:00",
+              endTime: "11:00",
+            },
+          ],
+        },
+        {
+          id: "layout-gate-1",
+          nodeType: "layout",
+          layoutName: "Nine AM layout",
+          cycleSeconds: 15,
+          actionType: "layout.display",
+          actionParams: {},
+        },
+        {
+          id: "layout-gate-2",
+          nodeType: "layout",
+          layoutName: "Ten AM layout",
+          cycleSeconds: 15,
+          actionType: "layout.display",
+          actionParams: {},
+        },
+        {
+          id: "layout-fallback",
+          nodeType: "layout",
+          layoutName: "Else layout",
+          cycleSeconds: 15,
+          actionType: "layout.display",
+          actionParams: {},
+        },
+      ],
+      layoutNodes: [],
+      title: "Photo Orientation",
+      photoActionType: "photo.select-next",
+      photoActionCollectionId: null,
+      connections: [
+        {
+          id: "__start__::default::time-a",
+          source: "__start__",
+          target: "time-a",
+        },
+        {
+          id: "time-a::gate-1::layout-gate-1",
+          source: "time-a",
+          sourceHandle: "gate-1",
+          target: "layout-gate-1",
+        },
+        {
+          id: "time-a::gate-2::layout-gate-2",
+          source: "time-a",
+          sourceHandle: "gate-2",
+          target: "layout-gate-2",
+        },
+        {
+          id: "time-a::fallback::layout-fallback",
+          source: "time-a",
+          sourceHandle: "fallback",
+          target: "layout-fallback",
+        },
+        {
+          id: "layout-gate-1::next::__end__",
+          source: "layout-gate-1",
+          sourceHandle: "next",
+          target: "__end__",
+        },
+        {
+          id: "layout-gate-2::next::__end__",
+          source: "layout-gate-2",
+          sourceHandle: "next",
+          target: "__end__",
+        },
+        {
+          id: "layout-fallback::next::__end__",
+          source: "layout-fallback",
+          sourceHandle: "next",
+          target: "__end__",
+        },
+      ],
+      nodePositions: {},
+      fallback: {
+        steps: [],
+      },
+      portrait: {
+        enabled: false,
+        conditionType: "photo.orientation.portrait",
+        conditionParams: {},
+        steps: [],
+      },
+      landscape: {
+        enabled: false,
+        conditionType: "photo.orientation.landscape",
+        conditionParams: {},
+        steps: [],
+      },
+    },
+  });
+
+  const logicGraph = compileLayoutSetAuthoringToLogicGraph(authoring);
+
+  assert.equal(
+    logicGraph.nodes.some((node) => node.type === "if-time"),
+    true,
+  );
+
+  const firstGateSequence = resolveDisplaySequenceFromLogicGraph({
+    graph: logicGraph,
+    orientation: null,
+    now: "2026-03-24T09:30:00.000Z",
+    siteTimeZone: "UTC",
+    evaluateCondition: resolveBuiltinLayoutLogicCondition,
+  });
+  const secondGateSequence = resolveDisplaySequenceFromLogicGraph({
+    graph: logicGraph,
+    orientation: null,
+    now: "2026-03-24T10:30:00.000Z",
+    siteTimeZone: "UTC",
+    evaluateCondition: resolveBuiltinLayoutLogicCondition,
+  });
+  const fallbackSequence = resolveDisplaySequenceFromLogicGraph({
+    graph: logicGraph,
+    orientation: null,
+    now: "2026-03-24T11:30:00.000Z",
+    siteTimeZone: "UTC",
+    evaluateCondition: resolveBuiltinLayoutLogicCondition,
+  });
+
+  assert.deepEqual(firstGateSequence.map((target) => target.layoutName), ["Nine AM layout"]);
+  assert.deepEqual(secondGateSequence.map((target) => target.layoutName), ["Ten AM layout"]);
+  assert.deepEqual(fallbackSequence.map((target) => target.layoutName), ["Else layout"]);
+});
+
+test("time gate validation reports overlapping windows", () => {
+  const authoring = setPrimaryPhotoRouterBlock({
+    authoring: {
+      version: 1,
+      blocks: [],
+    },
+    block: {
+      id: "photo-router",
+      type: "photo-router",
+      nodes: [
+        {
+          id: "time-overlap",
+          nodeType: "time-gate",
+          title: "Overlapping schedule",
+          gates: [
+            {
+              id: "gate-1",
+              startTime: "09:00",
+              endTime: "10:00",
+            },
+            {
+              id: "gate-2",
+              startTime: "09:30",
+              endTime: "10:30",
+            },
+          ],
+        },
+      ],
+      layoutNodes: [],
+      title: "Photo Orientation",
+      photoActionType: "photo.select-next",
+      photoActionCollectionId: null,
+      connections: [
+        {
+          id: "__start__::default::time-overlap",
+          source: "__start__",
+          target: "time-overlap",
+        },
+      ],
+      nodePositions: {},
+      fallback: {
+        steps: [],
+      },
+      portrait: {
+        enabled: false,
+        conditionType: "photo.orientation.portrait",
+        conditionParams: {},
+        steps: [],
+      },
+      landscape: {
+        enabled: false,
+        conditionType: "photo.orientation.landscape",
+        conditionParams: {},
+        steps: [],
+      },
+    },
+  });
+
+  const issues = getLayoutSetAuthoringValidationIssues(authoring);
+
+  assert.equal(issues.length, 1);
+  assert.match(issues[0]?.message ?? "", /overlapping windows/i);
 });

@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-export type LayoutLogicBranchTrigger = "always" | "portrait-photo" | "landscape-photo";
+export type LayoutLogicBranchTrigger =
+  | "always"
+  | "portrait-photo"
+  | "landscape-photo"
+  | "time-window";
 export type LayoutLogicConditionTrigger = Exclude<LayoutLogicBranchTrigger, "always">;
 
 export type LayoutLogicParamValue = string | number | boolean | null;
@@ -24,6 +28,8 @@ export interface LayoutLogicRuleSummaryInput {
 
 export interface LayoutLogicContext {
   orientation: "portrait" | "landscape" | null;
+  now?: Date;
+  siteTimeZone?: string | null;
 }
 
 export interface LayoutLogicResolvedTarget {

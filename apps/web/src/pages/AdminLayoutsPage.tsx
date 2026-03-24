@@ -29,6 +29,7 @@ import { buildDuplicateLayoutName } from "./layout-name-utils";
 import { analyzeSetRuntimeHealth, type RuntimeHealthReport } from "./layout-set-runtime-health";
 import {
   compileLayoutSetAuthoringToLogicGraph,
+  getLayoutSetAuthoringValidationIssues,
   getLayoutSetLogicBranches,
   getDefaultLayoutSetAuthoring,
   getPrimaryPhotoRouterBlock,
@@ -272,7 +273,7 @@ const removeCollectionFromAuthoring = (
           };
         }
 
-        if (node.photoActionCollectionId === collectionId) {
+        if (node.nodeType === "photo-orientation" && node.photoActionCollectionId === collectionId) {
           return {
             ...node,
             photoActionCollectionId: null,
@@ -833,11 +834,23 @@ export const AdminLayoutsPage = () => {
       return;
     }
 
-    const nextConfig = buildSetConfigFromAuthoring({
-      current: currentSetConfig,
-      nextAuthoring: nextAuthoringRaw,
-      knownLayoutNames,
-    });
+    const validationIssue = getLayoutSetAuthoringValidationIssues(nextAuthoringRaw)[0] ?? null;
+    if (validationIssue) {
+      setError(`Set logic error: ${validationIssue.message}`);
+      return;
+    }
+
+    let nextConfig: ScreenFamilyLayoutConfig;
+    try {
+      nextConfig = buildSetConfigFromAuthoring({
+        current: currentSetConfig,
+        nextAuthoring: nextAuthoringRaw,
+        knownLayoutNames,
+      });
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to build set routing");
+      return;
+    }
     const runtimeHealth = analyzeSetRuntimeHealth({
       graph: nextConfig.logicGraph,
       knownLayoutNames,
