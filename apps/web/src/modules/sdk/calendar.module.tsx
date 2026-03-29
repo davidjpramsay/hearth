@@ -1,12 +1,16 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type DragEvent } from "react";
 import {
+  type CalendarFeed,
   calendarModuleConfigSchema,
   calendarModuleEventsResponseSchema,
   parseCalendarEventBoundary,
   type CalendarModuleConfig,
   type CalendarModuleEvent,
+  type CalendarModuleSource,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import { getCalendarFeeds } from "../../api/client";
+import { getAuthToken } from "../../auth/storage";
 import {
   readPersistedModuleSnapshot,
   writePersistedModuleSnapshot,
@@ -28,10 +32,6 @@ const CALENDAR_FALLBACK_COLORS = [
   "#F97316",
   "#38BDF8",
 ];
-const REMOTE_PROTOCOL_REGEX = /^(https?|webcals?):\/\//i;
-const WEB_CAL_DOUBLE_SLASH_REGEX = /^webcals?:\/\//i;
-const WEB_CAL_SINGLE_SLASH_REGEX = /^webcals?:\/(?!\/)/i;
-
 type CalendarTileEvent = CalendarModuleEvent & {
   startDate: Date;
   endDate: Date | null;
@@ -100,39 +100,21 @@ const normalizeCalendarColor = (value: string | undefined): string | null => {
   return trimmed.toUpperCase();
 };
 
-const toCalendarSourceLabel = (source: string): string => {
-  const trimmed = source.trim();
-  if (trimmed.length === 0) {
-    return "Calendar";
+const buildCalendarFeedOptionMap = (feeds: CalendarFeed[]): Map<string, CalendarFeed> =>
+  new Map(feeds.map((feed) => [feed.id, feed]));
+
+const loadCalendarFeedOptions = async (): Promise<CalendarFeed[]> => {
+  const token = getAuthToken();
+  if (!token) {
+    return [];
   }
 
-  if (REMOTE_PROTOCOL_REGEX.test(trimmed)) {
-    const normalizedUrl = WEB_CAL_DOUBLE_SLASH_REGEX.test(trimmed)
-      ? trimmed.replace(WEB_CAL_DOUBLE_SLASH_REGEX, "https://")
-      : WEB_CAL_SINGLE_SLASH_REGEX.test(trimmed)
-        ? trimmed.replace(WEB_CAL_SINGLE_SLASH_REGEX, "https://")
-        : trimmed;
-
-    try {
-      const url = new URL(normalizedUrl);
-      return `${url.hostname}${url.pathname === "/" ? "" : url.pathname}`;
-    } catch {
-      return trimmed;
-    }
+  try {
+    const response = await getCalendarFeeds(token);
+    return response.feeds;
+  } catch {
+    return [];
   }
-
-  const normalizedPath = trimmed.replace(/\\/g, "/");
-  const segments = normalizedPath.split("/").filter((entry) => entry.length > 0);
-  return segments[segments.length - 1] ?? normalizedPath;
-};
-
-const resolveCalendarLabel = (source: string, configuredLabel: string | undefined): string => {
-  const trimmedLabel = configuredLabel?.trim() ?? "";
-  if (trimmedLabel.length > 0) {
-    return trimmedLabel;
-  }
-
-  return toCalendarSourceLabel(source);
 };
 
 const alphaHex = (color: string, alpha: number): string => {
@@ -210,12 +192,11 @@ const formatEventTime = (event: CalendarTileEvent, timeFormatter: Intl.DateTimeF
 
 const buildCalendarSnapshotKey = (
   instanceId: string,
-  settings: Pick<CalendarModuleConfig, "calendars" | "calendarLabels" | "calendarColors">,
+  settings: Pick<CalendarModuleConfig, "feedSelections" | "legacyCalendars">,
 ): string =>
   `calendar:${instanceId}:${JSON.stringify({
-    calendars: settings.calendars,
-    calendarLabels: settings.calendarLabels,
-    calendarColors: settings.calendarColors,
+    feedSelections: settings.feedSelections,
+    legacyCalendars: settings.legacyCalendars,
   })}`;
 
 const loadCalendarEvents = async (instanceId: string, signal: AbortSignal) => {
@@ -256,7 +237,7 @@ export const moduleDefinition = defineModule({
     Component: ({ instanceId, settings, isEditing }) => {
       const snapshotKey = useMemo(
         () => buildCalendarSnapshotKey(instanceId, settings),
-        [instanceId, settings.calendarColors, settings.calendarLabels, settings.calendars],
+        [instanceId, settings.feedSelections, settings.legacyCalendars],
       );
       const initialSnapshot = useMemo(
         () =>
@@ -272,6 +253,7 @@ export const moduleDefinition = defineModule({
           initialSnapshot?.data ??
           calendarModuleEventsResponseSchema.parse({
             generatedAt: new Date().toISOString(),
+            sources: [],
             events: [],
             warnings: [],
           }),
@@ -431,25 +413,19 @@ export const moduleDefinition = defineModule({
 
       const calendarLegendEntries = useMemo(() => {
         const seenSources = new Set<string>();
-        const entries: Array<{ source: string; label: string; color: string }> = [];
+        const entries: CalendarModuleSource[] = [];
 
-        for (let index = 0; index < settings.calendars.length; index += 1) {
-          const source = settings.calendars[index]?.trim() ?? "";
-          if (source.length === 0 || seenSources.has(source)) {
+        for (const source of payload.sources) {
+          if (seenSources.has(source.id)) {
             continue;
           }
 
-          seenSources.add(source);
-          entries.push({
-            source,
-            label: resolveCalendarLabel(source, settings.calendarLabels[index]),
-            color:
-              normalizeCalendarColor(settings.calendarColors[index]) ?? defaultCalendarColor(index),
-          });
+          seenSources.add(source.id);
+          entries.push(source);
         }
 
         return entries;
-      }, [settings.calendarColors, settings.calendarLabels, settings.calendars]);
+      }, [payload.sources]);
 
       const hasListEvents = useMemo(
         () => listDays.some((day) => parsedEvents.some((event) => eventOccursOnDay(event, day))),
@@ -464,7 +440,8 @@ export const moduleDefinition = defineModule({
               Events load from the active layout on the dashboard.
             </p>
             <p className="module-copy-meta mt-3 text-slate-400">
-              View: {settings.viewMode} | Sources: {settings.calendars.length}
+              View: {settings.viewMode} | Sources:{" "}
+              {settings.feedSelections.length + settings.legacyCalendars.length}
             </p>
           </div>
         );
@@ -496,7 +473,7 @@ export const moduleDefinition = defineModule({
                 <div className="mb-2 flex flex-wrap gap-1.5 pr-1">
                   {calendarLegendEntries.map((entry) => (
                     <span
-                      key={entry.source}
+                      key={entry.id}
                       title={entry.label}
                       className="module-copy-label inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-slate-200"
                     >
@@ -572,7 +549,7 @@ export const moduleDefinition = defineModule({
                 <div className="mb-2 flex min-w-[680px] flex-wrap gap-1.5">
                   {calendarLegendEntries.map((entry) => (
                     <span
-                      key={entry.source}
+                      key={entry.id}
                       title={entry.label}
                       className="module-copy-label inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-slate-200"
                     >
@@ -635,7 +612,7 @@ export const moduleDefinition = defineModule({
                 <div className="mb-2 flex min-w-[680px] flex-wrap gap-1.5 pr-1">
                   {calendarLegendEntries.map((entry) => (
                     <span
-                      key={entry.source}
+                      key={entry.id}
                       title={entry.label}
                       className="module-copy-label inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-slate-200"
                     >
@@ -729,6 +706,23 @@ export const moduleDefinition = defineModule({
   },
   admin: {
     SettingsPanel: ({ settings, onChange }) => {
+      const [availableFeeds, setAvailableFeeds] = useState<CalendarFeed[]>([]);
+      const [draggedSelectionIndex, setDraggedSelectionIndex] = useState<number | null>(null);
+
+      useEffect(() => {
+        let active = true;
+        void loadCalendarFeedOptions().then((feeds) => {
+          if (!active) {
+            return;
+          }
+
+          setAvailableFeeds(feeds);
+        });
+        return () => {
+          active = false;
+        };
+      }, []);
+
       const applyPatch = (patch: Partial<CalendarModuleConfig>) => {
         onChange({
           ...settings,
@@ -736,44 +730,128 @@ export const moduleDefinition = defineModule({
         });
       };
 
-      const calendarColorAt = (index: number): string =>
-        normalizeCalendarColor(settings.calendarColors[index]) ?? defaultCalendarColor(index);
+      const availableFeedMap = useMemo(
+        () => buildCalendarFeedOptionMap(availableFeeds),
+        [availableFeeds],
+      );
+      const selectedFeedIds = useMemo(
+        () => new Set(settings.feedSelections.map((selection) => selection.feedId)),
+        [settings.feedSelections],
+      );
+      const selectedFeedEntries = useMemo(
+        () =>
+          settings.feedSelections.map((selection, index) => {
+            const feed = availableFeedMap.get(selection.feedId) ?? null;
+            const effectiveLabel =
+              selection.labelOverride?.trim() || feed?.name || `Missing feed: ${selection.feedId}`;
+            const effectiveColor =
+              normalizeCalendarColor(selection.colorOverride ?? undefined) ??
+              normalizeCalendarColor(feed?.color) ??
+              defaultCalendarColor(index);
 
-      const updateCalendarSource = (index: number, nextValue: string) => {
+            return {
+              selection,
+              index,
+              feed,
+              effectiveLabel,
+              effectiveColor,
+            };
+          }),
+        [availableFeedMap, settings.feedSelections],
+      );
+
+      const moveFeedSelection = (fromIndex: number, toIndex: number) => {
+        if (
+          fromIndex === toIndex ||
+          fromIndex < 0 ||
+          toIndex < 0 ||
+          fromIndex >= settings.feedSelections.length ||
+          toIndex >= settings.feedSelections.length
+        ) {
+          return;
+        }
+
+        const nextSelections = [...settings.feedSelections];
+        const [movedSelection] = nextSelections.splice(fromIndex, 1);
+        if (!movedSelection) {
+          return;
+        }
+
+        nextSelections.splice(toIndex, 0, movedSelection);
         applyPatch({
-          calendars: settings.calendars.map((entry, entryIndex) =>
-            entryIndex === index ? nextValue : entry,
+          feedSelections: nextSelections,
+        });
+      };
+
+      const updateFeedSelection = (
+        index: number,
+        patch: Partial<CalendarModuleConfig["feedSelections"][number]>,
+      ) => {
+        applyPatch({
+          feedSelections: settings.feedSelections.map((selection, selectionIndex) =>
+            selectionIndex === index ? { ...selection, ...patch } : selection,
           ),
         });
       };
 
-      const updateCalendarLabel = (index: number, nextValue: string) => {
-        const nextLabels = [...settings.calendarLabels];
-        nextLabels[index] = nextValue;
+      const toggleFeedSelection = (feedId: string, selected: boolean) => {
+        if (selected) {
+          if (selectedFeedIds.has(feedId)) {
+            return;
+          }
+
+          applyPatch({
+            feedSelections: [
+              ...settings.feedSelections,
+              {
+                feedId,
+                labelOverride: null,
+                colorOverride: null,
+              },
+            ],
+          });
+          return;
+        }
+
         applyPatch({
-          calendarLabels: nextLabels,
+          feedSelections: settings.feedSelections.filter(
+            (selection) => selection.feedId !== feedId,
+          ),
         });
       };
 
-      const updateCalendarColor = (index: number, nextColor: string) => {
-        const color = normalizeCalendarColor(nextColor) ?? defaultCalendarColor(index);
-        const nextColors = [...settings.calendarColors];
-        nextColors[index] = color;
+      const updateLegacyCalendar = (
+        index: number,
+        patch: Partial<CalendarModuleConfig["legacyCalendars"][number]>,
+      ) => {
         applyPatch({
-          calendarColors: nextColors,
+          legacyCalendars: settings.legacyCalendars.map((entry, entryIndex) =>
+            entryIndex === index ? { ...entry, ...patch } : entry,
+          ),
         });
       };
 
-      const removeCalendarSource = (index: number) => {
+      const removeLegacyCalendar = (index: number) => {
         applyPatch({
-          calendars: settings.calendars.filter((_entry, entryIndex) => entryIndex !== index),
-          calendarLabels: settings.calendarLabels.filter(
+          legacyCalendars: settings.legacyCalendars.filter(
             (_entry, entryIndex) => entryIndex !== index,
           ),
-          calendarColors: settings.calendarColors.filter(
-            (_entry, entryIndex) => entryIndex !== index,
-          ),
         });
+      };
+
+      const onDragStart = (index: number) => (event: DragEvent<HTMLDivElement>) => {
+        setDraggedSelectionIndex(index);
+        event.dataTransfer.effectAllowed = "move";
+      };
+
+      const onDrop = (index: number) => (event: DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        if (draggedSelectionIndex === null) {
+          return;
+        }
+
+        moveFeedSelection(draggedSelectionIndex, index);
+        setDraggedSelectionIndex(null);
       };
 
       return (
@@ -798,65 +876,264 @@ export const moduleDefinition = defineModule({
           </label>
 
           <div className="space-y-2">
-            <p className="font-medium text-slate-100">Calendars (.ics URL or file path)</p>
-            <div className="space-y-2">
-              {settings.calendars.map((source, index) => (
-                <div
-                  key={`${source}-${index}`}
-                  className="space-y-2 rounded border border-slate-700/80 bg-slate-900/60 p-2"
-                >
-                  <label className="block space-y-1">
-                    <span className="text-[11px] font-medium text-slate-300">Calendar name</span>
-                    <input
-                      className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100"
-                      type="text"
-                      value={settings.calendarLabels[index] ?? ""}
-                      onChange={(event) => updateCalendarLabel(index, event.target.value)}
-                    />
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      className="h-9 w-12 cursor-pointer rounded border border-slate-600 bg-slate-800 p-1"
-                      type="color"
-                      value={calendarColorAt(index)}
-                      title={`Calendar color ${index + 1}`}
-                      onChange={(event) => updateCalendarColor(index, event.target.value)}
-                    />
-                    <input
-                      className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100"
-                      type="text"
-                      value={source}
-                      placeholder="https://calendar.example.com/family.ics or /data/family.ics"
-                      onChange={(event) => updateCalendarSource(index, event.target.value)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeCalendarSource(index)}
-                      className="rounded border border-rose-400/70 px-2 py-1 text-xs text-rose-100 hover:bg-rose-500/20"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium text-slate-100">Saved calendar feeds</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Feed URLs live in Admin &gt; Devices. This module stores feed IDs and optional
+                  per-layout label and color overrides.
+                </p>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() =>
-                applyPatch({
-                  calendars: [...settings.calendars, ""],
-                  calendarLabels: [...settings.calendarLabels, ""],
-                  calendarColors: [
-                    ...settings.calendarColors,
-                    defaultCalendarColor(settings.calendars.length),
-                  ],
+            <div className="space-y-2 rounded border border-slate-700/80 bg-slate-900/60 p-3">
+              {availableFeeds.length === 0 ? (
+                <p className="text-xs text-slate-400">
+                  No saved feeds yet. Add them from Admin &gt; Devices &gt; Calendar feeds.
+                </p>
+              ) : (
+                availableFeeds.map((feed) => {
+                  const selected = selectedFeedIds.has(feed.id);
+                  return (
+                    <label
+                      key={feed.id}
+                      className="flex items-center justify-between gap-3 rounded border border-slate-800 bg-slate-950/60 px-3 py-2"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          disabled={!feed.enabled && !selected}
+                          onChange={(event) => toggleFeedSelection(feed.id, event.target.checked)}
+                        />
+                        <span
+                          className="inline-block h-3 w-3 shrink-0 rounded-full"
+                          style={{
+                            backgroundColor: normalizeCalendarColor(feed.color) ?? "#22D3EE",
+                          }}
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-slate-100">{feed.name}</p>
+                          <p className="truncate font-mono text-[11px] text-slate-400">{feed.id}</p>
+                        </div>
+                      </div>
+                      {!feed.enabled ? (
+                        <span className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-200">
+                          Disabled
+                        </span>
+                      ) : null}
+                    </label>
+                  );
                 })
-              }
-              className="rounded border border-slate-500 px-3 py-1.5 text-xs font-semibold text-slate-100 hover:border-slate-300"
-            >
-              Add calendar source
-            </button>
+              )}
+            </div>
           </div>
+
+          <div className="space-y-2">
+            <p className="font-medium text-slate-100">Selected feeds</p>
+            {selectedFeedEntries.length === 0 ? (
+              <p className="rounded border border-slate-700/80 bg-slate-900/60 px-3 py-2 text-xs text-slate-400">
+                Select one or more saved feeds above.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {selectedFeedEntries.map((entry) => (
+                  <div
+                    key={`${entry.selection.feedId}-${entry.index}`}
+                    draggable={selectedFeedEntries.length > 1}
+                    onDragStart={onDragStart(entry.index)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDragEnd={() => setDraggedSelectionIndex(null)}
+                    onDrop={onDrop(entry.index)}
+                    className={`space-y-3 rounded border p-3 ${
+                      draggedSelectionIndex === entry.index
+                        ? "border-cyan-400 bg-cyan-500/10"
+                        : "border-slate-700/80 bg-slate-900/60"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-block h-3 w-3 rounded-full"
+                            style={{ backgroundColor: entry.effectiveColor }}
+                          />
+                          <p className="truncate font-medium text-slate-100">
+                            {entry.effectiveLabel}
+                          </p>
+                        </div>
+                        <p className="mt-1 font-mono text-[11px] text-slate-400">
+                          {entry.selection.feedId}
+                        </p>
+                        {!entry.feed ? (
+                          <p className="mt-1 text-xs text-rose-200">
+                            This saved feed no longer exists. Remove it or relink the layout.
+                          </p>
+                        ) : null}
+                        {entry.feed && !entry.feed.enabled ? (
+                          <p className="mt-1 text-xs text-amber-200">
+                            This saved feed is disabled globally.
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={entry.index === 0}
+                          onClick={() => moveFeedSelection(entry.index, entry.index - 1)}
+                          className="rounded border border-slate-600 px-2 py-1 text-xs text-slate-100 hover:border-slate-400 disabled:opacity-50"
+                        >
+                          Up
+                        </button>
+                        <button
+                          type="button"
+                          disabled={entry.index === selectedFeedEntries.length - 1}
+                          onClick={() => moveFeedSelection(entry.index, entry.index + 1)}
+                          className="rounded border border-slate-600 px-2 py-1 text-xs text-slate-100 hover:border-slate-400 disabled:opacity-50"
+                        >
+                          Down
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleFeedSelection(entry.selection.feedId, false)}
+                          className="rounded border border-rose-400/70 px-2 py-1 text-xs text-rose-100 hover:bg-rose-500/20"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+
+                    <label className="flex items-center justify-between">
+                      <span>Use default label</span>
+                      <input
+                        type="checkbox"
+                        checked={entry.selection.labelOverride === null}
+                        onChange={(event) =>
+                          updateFeedSelection(entry.index, {
+                            labelOverride: event.target.checked ? null : (entry.feed?.name ?? ""),
+                          })
+                        }
+                      />
+                    </label>
+                    {entry.selection.labelOverride !== null ? (
+                      <label className="block space-y-1">
+                        <span className="text-[11px] font-medium text-slate-300">
+                          Label override
+                        </span>
+                        <input
+                          className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100"
+                          type="text"
+                          value={entry.selection.labelOverride}
+                          onChange={(event) =>
+                            updateFeedSelection(entry.index, {
+                              labelOverride: event.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                    ) : null}
+
+                    <label className="flex items-center justify-between">
+                      <span>Use default color</span>
+                      <input
+                        type="checkbox"
+                        checked={entry.selection.colorOverride === null}
+                        onChange={(event) =>
+                          updateFeedSelection(entry.index, {
+                            colorOverride: event.target.checked ? null : entry.effectiveColor,
+                          })
+                        }
+                      />
+                    </label>
+                    {entry.selection.colorOverride !== null ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          className="h-9 w-12 cursor-pointer rounded border border-slate-600 bg-slate-800 p-1"
+                          type="color"
+                          value={entry.effectiveColor}
+                          onChange={(event) =>
+                            updateFeedSelection(entry.index, {
+                              colorOverride:
+                                normalizeCalendarColor(event.target.value) ?? entry.effectiveColor,
+                            })
+                          }
+                        />
+                        <p className="text-xs text-slate-400">
+                          Default: {entry.feed?.color ?? "not available"}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {settings.legacyCalendars.length > 0 ? (
+            <div className="space-y-2">
+              <p className="font-medium text-slate-100">Legacy per-layout sources</p>
+              <p className="text-xs text-amber-200">
+                These old per-layout calendar URLs still work, but saved feeds are preferred so one
+                admin change updates every layout.
+              </p>
+              <div className="space-y-2">
+                {settings.legacyCalendars.map((entry, index) => {
+                  const effectiveColor =
+                    normalizeCalendarColor(entry.color ?? undefined) ?? defaultCalendarColor(index);
+
+                  return (
+                    <div
+                      key={`${entry.source}-${index}`}
+                      className="space-y-2 rounded border border-slate-700/80 bg-slate-900/60 p-3"
+                    >
+                      <label className="block space-y-1">
+                        <span className="text-[11px] font-medium text-slate-300">Legacy name</span>
+                        <input
+                          className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100"
+                          type="text"
+                          value={entry.label ?? ""}
+                          onChange={(event) =>
+                            updateLegacyCalendar(index, {
+                              label: event.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          className="h-9 w-12 cursor-pointer rounded border border-slate-600 bg-slate-800 p-1"
+                          type="color"
+                          value={effectiveColor}
+                          onChange={(event) =>
+                            updateLegacyCalendar(index, {
+                              color: normalizeCalendarColor(event.target.value) ?? effectiveColor,
+                            })
+                          }
+                        />
+                        <input
+                          className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100"
+                          type="text"
+                          value={entry.source}
+                          placeholder="https://calendar.example.com/family.ics or /data/family.ics"
+                          onChange={(event) =>
+                            updateLegacyCalendar(index, {
+                              source: event.target.value,
+                            })
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeLegacyCalendar(index)}
+                          className="rounded border border-rose-400/70 px-2 py-1 text-xs text-rose-100 hover:bg-rose-500/20"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
           <label className="block space-y-2">
             <span>Days to show (list view)</span>

@@ -1,4 +1,5 @@
 import {
+  calendarFeedsResponseSchema,
   choreMemberSchema,
   choreRecordSchema,
   choresBoardQuerySchema,
@@ -18,8 +19,10 @@ import {
   reportScreenProfileResponseSchema,
   screenProfileLayoutsSchema,
   setChoreCompletionRequestSchema,
+  siteTimeConfigSchema,
   updateDisplayDeviceRequestSchema,
   updateChoresPayoutConfigRequestSchema,
+  type CalendarFeedsResponse,
   type ChoreMember,
   type ChoreRecord,
   type ChoresBoardResponse,
@@ -38,6 +41,7 @@ import {
   type ReportScreenProfileResponse,
   type ScreenProfileLayouts,
   type SetChoreCompletionRequest,
+  type SiteTimeConfig,
   type UpdateDisplayDeviceRequest,
   type UpdateChoreMemberRequest,
   type UpdateChoreRequest,
@@ -239,6 +243,30 @@ export const updatePhotoCollections = async (
     (body) => photoCollectionsResponseSchema.parse(body),
   );
 
+export const getCalendarFeeds = async (token: string): Promise<CalendarFeedsResponse> =>
+  request(
+    "/display/calendar-feeds",
+    {
+      method: "GET",
+      headers: withAuth(token),
+    },
+    (payload) => calendarFeedsResponseSchema.parse(payload),
+  );
+
+export const updateCalendarFeeds = async (
+  token: string,
+  payload: CalendarFeedsResponse,
+): Promise<CalendarFeedsResponse> =>
+  request(
+    "/display/calendar-feeds",
+    {
+      method: "PUT",
+      headers: withAuth(token),
+      body: JSON.stringify(calendarFeedsResponseSchema.parse(payload)),
+    },
+    (body) => calendarFeedsResponseSchema.parse(body),
+  );
+
 export const getPhotoLibraryFolders = async (token: string): Promise<PhotoLibraryFoldersResponse> =>
   request(
     "/display/photo-library-folders",
@@ -259,6 +287,30 @@ export const reportScreenProfile = async (
       body: JSON.stringify(reportScreenProfileRequestSchema.parse(payload)),
     },
     (body) => reportScreenProfileResponseSchema.parse(body),
+  );
+
+export const getSiteTimeConfig = async (token: string): Promise<SiteTimeConfig> =>
+  request(
+    "/site-time",
+    {
+      method: "GET",
+      headers: withAuth(token),
+    },
+    (payload) => siteTimeConfigSchema.parse(payload),
+  );
+
+export const updateSiteTimeConfig = async (
+  token: string,
+  payload: SiteTimeConfig,
+): Promise<SiteTimeConfig> =>
+  request(
+    "/site-time",
+    {
+      method: "PUT",
+      headers: withAuth(token),
+      body: JSON.stringify(siteTimeConfigSchema.parse(payload)),
+    },
+    (body) => siteTimeConfigSchema.parse(body),
   );
 
 export const getChoreBoard = async (

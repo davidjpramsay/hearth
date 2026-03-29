@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import type { ModuleStateRepository } from "../src/repositories/module-state-repository.js";
+import type { SettingsRepository } from "../src/repositories/settings-repository.js";
 import { CalendarFeedService } from "../src/services/calendar-feed-service.js";
 
 const toIcsDate = (date: Date): string =>
@@ -61,11 +62,24 @@ test("CalendarFeedService serializes all-day events as calendar days", async (t)
 
   const service = new CalendarFeedService();
   const result = await service.getUpcomingEvents({
-    calendars: [icsPath],
+    legacyCalendars: [
+      {
+        source: icsPath,
+        label: "Family",
+        color: "#22D3EE",
+      },
+    ],
     refreshIntervalSeconds: 300,
   });
 
   assert.deepEqual(result.warnings, []);
+  assert.deepEqual(result.sources, [
+    {
+      id: result.sources[0]?.id,
+      label: "Family",
+      color: "#22D3EE",
+    },
+  ]);
 
   const event = result.events.find((entry) => entry.title === "Timezone-safe all day");
   assert.ok(event);
@@ -115,7 +129,13 @@ test("CalendarFeedService falls back to a persisted response after a cold-start 
   const moduleStateRepository = createModuleStateRepositoryStub();
   const initialService = new CalendarFeedService(moduleStateRepository);
   const initialResult = await initialService.getUpcomingEvents({
-    calendars: [icsPath],
+    legacyCalendars: [
+      {
+        source: icsPath,
+        label: "Planning",
+        color: "#22D3EE",
+      },
+    ],
     refreshIntervalSeconds: 300,
   });
 
@@ -127,14 +147,97 @@ test("CalendarFeedService falls back to a persisted response after a cold-start 
 
   const coldStartService = new CalendarFeedService(moduleStateRepository);
   const fallbackResult = await coldStartService.getUpcomingEvents({
-    calendars: [icsPath],
+    legacyCalendars: [
+      {
+        source: icsPath,
+        label: "Planning",
+        color: "#22D3EE",
+      },
+    ],
     refreshIntervalSeconds: 300,
   });
 
   assert.equal(fallbackResult.events.length, 1);
   assert.equal(fallbackResult.events[0]?.title, "Persisted planning event");
-  assert.match(
-    fallbackResult.warnings.join(" "),
-    /saved calendar snapshot while refresh is unavailable/i,
+  assert.match(fallbackResult.warnings.join(" "), /saved feed snapshot .* refresh is unavailable/i);
+});
+
+test("CalendarFeedService resolves saved feed ids through the global registry", async (t) => {
+  const tempDir = await mkdtemp(join(tmpdir(), "hearth-calendar-feeds-"));
+  t.after(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  const start = new Date();
+  start.setHours(8, 0, 0, 0);
+  start.setDate(start.getDate() + 1);
+
+  const end = new Date(start);
+  end.setHours(9, 0, 0, 0);
+
+  const icsPath = join(tempDir, "school.ics");
+  await writeFile(
+    icsPath,
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Hearth Test//EN",
+      "BEGIN:VEVENT",
+      "UID:feed-registry-test",
+      "DTSTAMP:20260306T000000Z",
+      `DTSTART:${start
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .replace(/\.\d{3}Z$/, "Z")}`,
+      `DTEND:${end
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .replace(/\.\d{3}Z$/, "Z")}`,
+      "SUMMARY:School assembly",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
   );
+
+  const settingsRepository = {
+    getCalendarFeeds: () => ({
+      feeds: [
+        {
+          id: "school",
+          name: "School",
+          url: icsPath,
+          color: "#34D399",
+          enabled: true,
+        },
+      ],
+    }),
+  };
+
+  const service = new CalendarFeedService(
+    createModuleStateRepositoryStub(),
+    settingsRepository as unknown as SettingsRepository,
+  );
+  const result = await service.getUpcomingEvents({
+    feedSelections: [
+      {
+        feedId: "school",
+        labelOverride: "Kids School",
+        colorOverride: "#60A5FA",
+      },
+    ],
+    refreshIntervalSeconds: 300,
+  });
+
+  assert.deepEqual(result.warnings, []);
+  assert.deepEqual(result.sources, [
+    {
+      id: "school",
+      label: "Kids School",
+      color: "#60A5FA",
+    },
+  ]);
+  assert.equal(result.events[0]?.source, "school");
+  assert.equal(result.events[0]?.sourceLabel, "Kids School");
+  assert.equal(result.events[0]?.sourceColor, "#60A5FA");
 });

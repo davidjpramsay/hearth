@@ -72,7 +72,7 @@ const services = {
   deviceRepository,
   settingsRepository,
   moduleStateRepository,
-  calendarFeedService: new CalendarFeedService(moduleStateRepository),
+  calendarFeedService: new CalendarFeedService(moduleStateRepository, settingsRepository),
   photosSlideshowService: new PhotosSlideshowService(moduleStateRepository),
   localWarningService,
   screenProfileService: new ScreenProfileService(
@@ -99,6 +99,9 @@ if (!config.localWarningDevForceActive) {
 backupService.start();
 localWarningService.start();
 await moduleAdapterService.start();
+void services.calendarFeedService.prefetchConfiguredFeeds().catch((error) => {
+  console.warn("[startup] Failed to prefetch enabled calendar feeds.", error);
+});
 
 const shutdown = async () => {
   await moduleAdapterService.stop();

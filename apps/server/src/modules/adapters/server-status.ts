@@ -3,6 +3,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import os from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getRuntimeTimeZone } from "@hearth/shared";
 import { z } from "zod";
 import { config } from "../../config.js";
 import type { ModuleServerAdapter } from "../types.js";
@@ -96,6 +97,10 @@ export const serverStatusResponseSchema = z.object({
     hostname: z.string(),
     platform: z.string(),
   }),
+  time: z.object({
+    runtimeTimeZone: z.string(),
+    defaultSiteTimeZone: z.string().nullable(),
+  }),
   build: z.object({
     serverEntrySha1: z.string().nullable(),
     serverEntryBuiltAt: z.string().nullable(),
@@ -121,6 +126,10 @@ const toStatusPayload = () =>
     host: {
       hostname: os.hostname(),
       platform: process.platform,
+    },
+    time: {
+      runtimeTimeZone: getRuntimeTimeZone(),
+      defaultSiteTimeZone: config.defaultSiteTimeZone,
     },
     build: readBuildMetadata(),
   });

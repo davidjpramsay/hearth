@@ -18,6 +18,10 @@ test("server status adapter response schema accepts valid payload", () => {
       hostname: "local",
       platform: "darwin",
     },
+    time: {
+      runtimeTimeZone: "Australia/Perth",
+      defaultSiteTimeZone: "Australia/Perth",
+    },
     build: {
       serverEntrySha1: "abc123",
       serverEntryBuiltAt: new Date().toISOString(),

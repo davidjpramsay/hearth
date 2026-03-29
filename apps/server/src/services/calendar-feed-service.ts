@@ -4,14 +4,19 @@ import { basename, isAbsolute, resolve } from "node:path";
 import type { ParameterValue, VEvent } from "node-ical";
 import ical from "node-ical";
 import {
+  calendarFeedsConfigSchema,
   calendarModuleConfigSchema,
+  calendarModuleEventSchema,
   calendarModuleEventsResponseSchema,
   serializeCalendarEventBoundary,
+  type CalendarFeedsConfig,
   type CalendarModuleEvent,
   type CalendarModuleEventsResponse,
 } from "@hearth/shared";
+import { z } from "zod";
 import { config } from "../config.js";
 import type { ModuleStateRepository } from "../repositories/module-state-repository.js";
+import type { SettingsRepository } from "../repositories/settings-repository.js";
 import {
   readPersistedModuleResponse,
   writePersistedModuleResponse,
@@ -23,22 +28,50 @@ const CALENDAR_RANGE_DAYS_AHEAD = 120;
 const MAX_RETURNED_EVENTS = 700;
 const FETCH_TIMEOUT_MS = 10_000;
 const CALENDAR_PERSISTED_RESPONSE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const CALENDAR_PERSISTED_SOURCE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const REMOTE_PROTOCOL_REGEX = /^(https?|webcals?):\/\//i;
 const WEB_CAL_DOUBLE_SLASH_REGEX = /^webcals?:\/\//i;
 const WEB_CAL_SINGLE_SLASH_REGEX = /^webcals?:\/(?!\/)/i;
+const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
+const DEFAULT_CALENDAR_COLORS = [
+  "#22D3EE",
+  "#60A5FA",
+  "#A78BFA",
+  "#34D399",
+  "#F59E0B",
+  "#FB7185",
+  "#F97316",
+  "#38BDF8",
+];
+
+const cachedCalendarSourceEventSchema = z.object({
+  uid: z.string().min(1),
+  title: z.string().min(1),
+  start: z.string().datetime({ offset: true }),
+  end: z.string().datetime({ offset: true }).nullable(),
+  allDay: z.boolean(),
+  location: z.string().nullable(),
+});
+
+const cachedCalendarSourceSnapshotSchema = z.object({
+  events: z.array(cachedCalendarSourceEventSchema).default([]),
+});
+
+type CachedCalendarSourceEvent = z.infer<typeof cachedCalendarSourceEventSchema>;
 
 interface SourceCacheEntry {
   fetchedAtMs: number;
-  events: CalendarModuleEvent[];
+  events: CachedCalendarSourceEvent[];
 }
 
 interface SourceLoadResult {
   events: CalendarModuleEvent[];
   warning: string | null;
-  sourceStatus: "live" | "memory-cache" | "failed";
+  sourceStatus: "live" | "memory-cache" | "persisted-cache" | "failed";
 }
 
-interface NormalizedSource {
+interface ResolvedSource {
+  id: string;
   source: string;
   label: string;
   color: string;
@@ -84,25 +117,13 @@ const toSourceLabel = (source: string): string => {
   return basename(source);
 };
 
-const toPublicSourceId = (source: string): string =>
-  `src-${createHash("sha256").update(source).digest("hex").slice(0, 16)}`;
-
-const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
-const DEFAULT_CALENDAR_COLORS = [
-  "#22D3EE",
-  "#60A5FA",
-  "#A78BFA",
-  "#34D399",
-  "#F59E0B",
-  "#FB7185",
-  "#F97316",
-  "#38BDF8",
-];
+const toLegacyPublicSourceId = (source: string): string =>
+  `legacy-${createHash("sha256").update(source).digest("hex").slice(0, 16)}`;
 
 const defaultCalendarColor = (index: number): string =>
   DEFAULT_CALENDAR_COLORS[index % DEFAULT_CALENDAR_COLORS.length] ?? "#22D3EE";
 
-const normalizeColor = (input: string | undefined): string | null => {
+const normalizeColor = (input: string | null | undefined): string | null => {
   if (typeof input !== "string") {
     return null;
   }
@@ -115,34 +136,11 @@ const normalizeColor = (input: string | undefined): string | null => {
   return trimmed.toUpperCase();
 };
 
-const normalizeSources = (
-  sources: string[],
-  labels: string[],
-  colors: string[],
-): NormalizedSource[] => {
-  const seen = new Set<string>();
-  const normalized: NormalizedSource[] = [];
-
-  for (let index = 0; index < sources.length; index += 1) {
-    const source = sources[index]?.trim() ?? "";
-    if (source.length === 0 || seen.has(source)) {
-      continue;
-    }
-
-    seen.add(source);
-    const customLabel = labels[index]?.trim() ?? "";
-    normalized.push({
-      source,
-      label: customLabel.length > 0 ? customLabel : toSourceLabel(source),
-      color: normalizeColor(colors[index]) ?? defaultCalendarColor(index),
-    });
-  }
-
-  return normalized;
-};
-
-const buildPersistedCalendarResponseKey = (sources: NormalizedSource[]): string =>
+const buildPersistedCalendarResponseKey = (sources: ResolvedSource[]): string =>
   `calendar-response:${createHash("sha256").update(JSON.stringify(sources)).digest("hex")}`;
+
+const buildPersistedCalendarSourceKey = (source: string): string =>
+  `calendar-source:${createHash("sha256").update(source).digest("hex")}`;
 
 const isValidDate = (value: unknown): value is Date =>
   value instanceof Date && !Number.isNaN(value.getTime());
@@ -167,50 +165,82 @@ const summarizeError = (error: unknown): string =>
     ? error.message.trim()
     : "Unknown parsing error";
 
-const applySourceColor = (
-  events: CalendarModuleEvent[],
-  sourceColor: string | null,
+const materializeSourceEvents = (
+  sourceEvents: CachedCalendarSourceEvent[],
+  source: ResolvedSource,
 ): CalendarModuleEvent[] =>
-  events.map((event) => ({
-    ...event,
-    sourceColor,
-  }));
+  sourceEvents.map((event) =>
+    calendarModuleEventSchema.parse({
+      id: `${source.id}::${event.uid}::${event.start}`,
+      source: source.id,
+      sourceLabel: source.label,
+      sourceColor: source.color,
+      title: event.title,
+      start: event.start,
+      end: event.end,
+      allDay: event.allDay,
+      location: event.location,
+    }),
+  );
 
 export class CalendarFeedService {
   private readonly sourceCache = new Map<string, SourceCacheEntry>();
 
-  constructor(private readonly moduleStateRepository: ModuleStateRepository | null = null) {}
+  constructor(
+    private readonly moduleStateRepository: ModuleStateRepository | null = null,
+    private readonly settingsRepository: SettingsRepository | null = null,
+  ) {}
+
+  async prefetchConfiguredFeeds(calendarFeedsConfig?: CalendarFeedsConfig): Promise<void> {
+    const configuredFeeds =
+      calendarFeedsConfig ??
+      this.settingsRepository?.getCalendarFeeds() ??
+      calendarFeedsConfigSchema.parse({});
+
+    const enabledFeeds = configuredFeeds.feeds.filter((feed) => feed.enabled);
+    await Promise.all(
+      enabledFeeds.map((feed) =>
+        this.loadSourceEvents({
+          source: {
+            id: feed.id,
+            source: feed.url,
+            label: feed.name,
+            color: normalizeColor(feed.color) ?? "#22D3EE",
+          },
+          refreshMs: 0,
+        }).catch(() => null),
+      ),
+    );
+  }
 
   async getUpcomingEvents(rawConfig: unknown): Promise<CalendarModuleEventsResponse> {
     const parsedConfig = calendarModuleConfigSchema.parse(rawConfig);
-    const sources = normalizeSources(
-      parsedConfig.calendars,
-      parsedConfig.calendarLabels,
-      parsedConfig.calendarColors,
-    );
+    const resolved = this.resolveConfiguredSources(parsedConfig);
 
-    if (sources.length === 0) {
-      return {
+    if (resolved.sources.length === 0) {
+      return calendarModuleEventsResponseSchema.parse({
         generatedAt: new Date().toISOString(),
+        sources: [],
         events: [],
-        warnings: ["Add at least one .ics URL or file path in Calendar settings."],
-      };
+        warnings:
+          resolved.warnings.length > 0
+            ? resolved.warnings
+            : ["Add at least one saved calendar feed or legacy calendar source."],
+      });
     }
 
-    const persistedResponseKey = buildPersistedCalendarResponseKey(sources);
+    const persistedResponseKey = buildPersistedCalendarResponseKey(resolved.sources);
     const refreshMs = Math.max(parsedConfig.refreshIntervalSeconds, 30) * 1000;
     const sourceResults = await Promise.all(
-      sources.map((source) =>
+      resolved.sources.map((source) =>
         this.loadSourceEvents({
-          source: source.source,
-          sourceLabel: source.label,
-          sourceColor: source.color,
+          source,
           refreshMs,
         }),
       ),
     );
 
-    const warnings: string[] = [];
+    const warnings = [...resolved.warnings];
     const mergedEvents: CalendarModuleEvent[] = [];
 
     for (const result of sourceResults) {
@@ -228,6 +258,11 @@ export class CalendarFeedService {
 
     const responsePayload = calendarModuleEventsResponseSchema.parse({
       generatedAt: new Date().toISOString(),
+      sources: resolved.sources.map((source) => ({
+        id: source.id,
+        label: source.label,
+        color: source.color,
+      })),
       events: deduplicatedEvents,
       warnings,
     });
@@ -267,50 +302,131 @@ export class CalendarFeedService {
     });
   }
 
+  private resolveConfiguredSources(
+    rawConfig: ReturnType<typeof calendarModuleConfigSchema.parse>,
+  ): {
+    sources: ResolvedSource[];
+    warnings: string[];
+  } {
+    const configuredFeeds =
+      this.settingsRepository?.getCalendarFeeds() ?? calendarFeedsConfigSchema.parse({});
+    const feedMap = new Map(configuredFeeds.feeds.map((feed) => [feed.id, feed]));
+    const seenSources = new Set<string>();
+    const sources: ResolvedSource[] = [];
+    const warnings: string[] = [];
+
+    for (const selection of rawConfig.feedSelections) {
+      const feed = feedMap.get(selection.feedId);
+      if (!feed) {
+        warnings.push(`Saved calendar feed "${selection.feedId}" is missing.`);
+        continue;
+      }
+
+      if (!feed.enabled) {
+        warnings.push(`Saved calendar feed "${feed.name}" is disabled.`);
+        continue;
+      }
+
+      const source = feed.url.trim();
+      if (source.length === 0 || seenSources.has(source)) {
+        continue;
+      }
+
+      seenSources.add(source);
+      sources.push({
+        id: feed.id,
+        source,
+        label: selection.labelOverride?.trim() ? selection.labelOverride.trim() : feed.name,
+        color:
+          normalizeColor(selection.colorOverride) ??
+          normalizeColor(feed.color) ??
+          defaultCalendarColor(sources.length),
+      });
+    }
+
+    for (const legacyCalendar of rawConfig.legacyCalendars) {
+      const source = legacyCalendar.source.trim();
+      if (source.length === 0 || seenSources.has(source)) {
+        continue;
+      }
+
+      seenSources.add(source);
+      sources.push({
+        id: toLegacyPublicSourceId(source),
+        source,
+        label: legacyCalendar.label?.trim() ? legacyCalendar.label.trim() : toSourceLabel(source),
+        color: normalizeColor(legacyCalendar.color) ?? defaultCalendarColor(sources.length),
+      });
+    }
+
+    return {
+      sources,
+      warnings,
+    };
+  }
+
   private async loadSourceEvents(input: {
-    source: string;
-    sourceLabel: string;
-    sourceColor: string | null;
+    source: ResolvedSource;
     refreshMs: number;
   }): Promise<SourceLoadResult> {
-    const { source, sourceLabel, sourceColor, refreshMs } = input;
+    const { source, refreshMs } = input;
     const now = Date.now();
-    const cached = this.sourceCache.get(source);
+    const cached = this.sourceCache.get(source.source);
 
     if (cached && now - cached.fetchedAtMs < refreshMs) {
       return {
-        events: applySourceColor(cached.events, sourceColor),
+        events: materializeSourceEvents(cached.events, source),
         warning: null,
         sourceStatus: "memory-cache",
       };
     }
 
     try {
-      const sourceBody = await this.loadSourceBody(source);
-      const events = this.parseEventsFromIcs(sourceBody, source, sourceLabel, sourceColor);
+      const sourceBody = await this.loadSourceBody(source.source);
+      const events = this.parseEventsFromIcs(sourceBody, source.source);
 
-      this.sourceCache.set(source, {
+      this.sourceCache.set(source.source, {
         fetchedAtMs: now,
         events,
       });
+      writePersistedModuleResponse(
+        this.moduleStateRepository,
+        buildPersistedCalendarSourceKey(source.source),
+        cachedCalendarSourceSnapshotSchema.parse({ events }),
+      );
 
       return {
-        events: applySourceColor(events, sourceColor),
+        events: materializeSourceEvents(events, source),
         warning: null,
         sourceStatus: "live",
       };
     } catch (error) {
       if (cached) {
         return {
-          events: applySourceColor(cached.events, sourceColor),
-          warning: `Using cached data for "${sourceLabel}" after refresh failure.`,
+          events: materializeSourceEvents(cached.events, source),
+          warning: `Using cached data for "${source.label}" after refresh failure.`,
           sourceStatus: "memory-cache",
+        };
+      }
+
+      const persistedSource = readPersistedModuleResponse({
+        repository: this.moduleStateRepository,
+        key: buildPersistedCalendarSourceKey(source.source),
+        parse: (payload) => cachedCalendarSourceSnapshotSchema.parse(payload),
+        maxAgeMs: CALENDAR_PERSISTED_SOURCE_MAX_AGE_MS,
+      });
+
+      if (persistedSource) {
+        return {
+          events: materializeSourceEvents(persistedSource.payload.events, source),
+          warning: `Using saved feed snapshot for "${source.label}" while refresh is unavailable.`,
+          sourceStatus: "persisted-cache",
         };
       }
 
       return {
         events: [],
-        warning: `Failed to load "${sourceLabel}": ${summarizeError(error)}`,
+        warning: `Failed to load "${source.label}": ${summarizeError(error)}`,
         sourceStatus: "failed",
       };
     }
@@ -345,32 +461,18 @@ export class CalendarFeedService {
     return readFile(localPath, "utf8");
   }
 
-  private parseEventsFromIcs(
-    icsBody: string,
-    source: string,
-    sourceLabel: string,
-    sourceColor: string | null,
-  ): CalendarModuleEvent[] {
+  private parseEventsFromIcs(icsBody: string, source: string): CachedCalendarSourceEvent[] {
     const calendarComponents = ical.sync.parseICS(icsBody);
     const rangeStart = startOfDay(addDays(new Date(), -CALENDAR_RANGE_DAYS_PAST));
     const rangeEnd = endOfDay(addDays(new Date(), CALENDAR_RANGE_DAYS_AHEAD));
-    const events: CalendarModuleEvent[] = [];
+    const events: CachedCalendarSourceEvent[] = [];
 
     for (const component of Object.values(calendarComponents)) {
       if (!component || component.type !== "VEVENT") {
         continue;
       }
 
-      events.push(
-        ...this.expandEventInstances(
-          component,
-          source,
-          sourceLabel,
-          sourceColor,
-          rangeStart,
-          rangeEnd,
-        ),
-      );
+      events.push(...this.expandEventInstances(component, source, rangeStart, rangeEnd));
     }
 
     return events;
@@ -379,13 +481,11 @@ export class CalendarFeedService {
   private expandEventInstances(
     event: VEvent,
     source: string,
-    sourceLabel: string,
-    sourceColor: string | null,
     rangeStart: Date,
     rangeEnd: Date,
-  ): CalendarModuleEvent[] {
-    const sourceId = toPublicSourceId(source);
-    const uid = event.uid?.trim() || `event-${Math.random().toString(36).slice(2, 10)}`;
+  ): CachedCalendarSourceEvent[] {
+    const uid =
+      event.uid?.trim() || `event-${createHash("sha256").update(source).digest("hex").slice(0, 8)}`;
     const title = readParameterValue(event.summary) ?? "Untitled event";
     const location = readParameterValue(event.location);
 
@@ -400,9 +500,6 @@ export class CalendarFeedService {
         .map((instance) =>
           this.createNormalizedEvent({
             uid,
-            sourceId,
-            sourceLabel,
-            sourceColor,
             title,
             location,
             start: instance.start,
@@ -412,14 +509,11 @@ export class CalendarFeedService {
             rangeEnd,
           }),
         )
-        .filter((value): value is CalendarModuleEvent => value !== null);
+        .filter((value): value is CachedCalendarSourceEvent => value !== null);
     }
 
     const singleEvent = this.createNormalizedEvent({
       uid,
-      sourceId,
-      sourceLabel,
-      sourceColor,
       title,
       location,
       start: event.start,
@@ -434,9 +528,6 @@ export class CalendarFeedService {
 
   private createNormalizedEvent(input: {
     uid: string;
-    sourceId: string;
-    sourceLabel: string;
-    sourceColor: string | null;
     title: string;
     location: string | null;
     start: unknown;
@@ -444,7 +535,7 @@ export class CalendarFeedService {
     allDay: boolean;
     rangeStart: Date;
     rangeEnd: Date;
-  }): CalendarModuleEvent | null {
+  }): CachedCalendarSourceEvent | null {
     if (!isValidDate(input.start)) {
       return null;
     }
@@ -461,18 +552,13 @@ export class CalendarFeedService {
       return null;
     }
 
-    const startIso = serializeCalendarEventBoundary(start, input.allDay);
-
-    return {
-      id: `${input.sourceId}::${input.uid}::${startIso}`,
-      source: input.sourceId,
-      sourceLabel: input.sourceLabel,
-      sourceColor: input.sourceColor,
+    return cachedCalendarSourceEventSchema.parse({
+      uid: input.uid,
       title: input.title,
-      start: startIso,
+      start: serializeCalendarEventBoundary(start, input.allDay),
       end: end ? serializeCalendarEventBoundary(end, input.allDay) : null,
       allDay: input.allDay,
       location: input.location,
-    };
+    });
   }
 }

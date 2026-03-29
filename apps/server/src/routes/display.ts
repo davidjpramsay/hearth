@@ -1,4 +1,5 @@
 import {
+  calendarFeedsConfigSchema,
   displayDevicesResponseSchema,
   photoCollectionsConfigSchema,
   photoLibraryFoldersResponseSchema,
@@ -298,6 +299,39 @@ export const registerDisplayRoutes = (app: FastifyInstance, services: AppService
     services.settingsRepository.setPhotoCollections(parsedBody.data);
     return reply.send(
       photoCollectionsConfigSchema.parse(services.settingsRepository.getPhotoCollections()),
+    );
+  });
+
+  app.get("/display/calendar-feeds", async (request, reply) => {
+    await app.authenticate(request, reply);
+
+    if (reply.sent) {
+      return;
+    }
+
+    const feeds = services.settingsRepository.getCalendarFeeds();
+    return reply.send(calendarFeedsConfigSchema.parse(feeds));
+  });
+
+  app.put("/display/calendar-feeds", async (request, reply) => {
+    await app.authenticate(request, reply);
+
+    if (reply.sent) {
+      return;
+    }
+
+    const parsedBody = calendarFeedsConfigSchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.code(400).send({ message: parsedBody.error.message });
+    }
+
+    services.settingsRepository.setCalendarFeeds(parsedBody.data);
+    void services.calendarFeedService.prefetchConfiguredFeeds(parsedBody.data).catch((error) => {
+      request.log.warn({ error }, "Failed to prefetch calendar feeds after settings update");
+    });
+
+    return reply.send(
+      calendarFeedsConfigSchema.parse(services.settingsRepository.getCalendarFeeds()),
     );
   });
 

@@ -1,24 +1,34 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  type CalendarFeed,
+  type CalendarFeedsConfig,
+  getRuntimeTimeZone,
+  isValidIanaTimeZone,
   screenProfileLayoutsSchema,
   type DisplayDevice,
   type DisplayDeviceInfo,
   type ReportScreenTargetSelection,
+  type SiteTimeConfig,
   type ScreenProfileLayouts,
 } from "@hearth/shared";
 import {
+  getCalendarFeeds,
   deleteDisplayDevice,
   getDisplayDevices,
   getLayouts,
+  getSiteTimeConfig,
   getScreenProfileLayouts,
   updateDisplayDevice,
+  updateCalendarFeeds,
+  updateSiteTimeConfig,
 } from "../api/client";
 import { getServerStatus, type ServerStatusResponse } from "../api/server-status";
 import { logoutAdminSession } from "../auth/session";
 import { getAuthToken } from "../auth/storage";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
 import { PageShell } from "../components/PageShell";
+import { getSupportedTimeZoneOptions } from "../time-zone-options";
 import { THEME_OPTIONS, type ThemeId } from "../theme/theme";
 
 type DeviceRoutingMode = "set" | "layout";
@@ -34,8 +44,39 @@ interface DeviceDraft {
 }
 
 type BusyDeviceAction = "save" | "delete";
+const CALENDAR_FEED_ID_PREFIX = "calendar-feed";
 
 const defaultProfileLayouts: ScreenProfileLayouts = screenProfileLayoutsSchema.parse({});
+const defaultSiteTimeConfig: SiteTimeConfig = {
+  siteTimezone: getRuntimeTimeZone(),
+};
+const defaultCalendarFeedsConfig: CalendarFeedsConfig = {
+  feeds: [],
+};
+const ADMIN_TIME_ZONE_DATALIST_ID = "admin-household-time-zones";
+
+const normalizeCalendarFeedId = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+
+const createCalendarFeedId = (feeds: Array<Pick<CalendarFeed, "id">>): string => {
+  const usedIds = new Set(feeds.map((feed) => feed.id.trim().toLowerCase()));
+  let suffix = 1;
+
+  while (suffix < 1000) {
+    const candidate = `${CALENDAR_FEED_ID_PREFIX}-${suffix}`;
+    if (!usedIds.has(candidate)) {
+      return candidate;
+    }
+    suffix += 1;
+  }
+
+  return `${CALENDAR_FEED_ID_PREFIX}-${Date.now().toString(36)}`;
+};
 
 const normalizeDeviceTargetSelection = (input: {
   targetSelection: ReportScreenTargetSelection | null;
@@ -173,6 +214,23 @@ const formatTimestamp = (value: string | null): string => {
   return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleString() : value;
 };
 
+const formatDateTimeAtTimeZone = (value: string | number | null, timeZone?: string): string => {
+  if (value === null) {
+    return "Unavailable";
+  }
+
+  const timestamp = typeof value === "number" ? value : Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return typeof value === "string" ? value : "Unavailable";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "full",
+    timeStyle: "medium",
+    timeZone,
+  }).format(new Date(timestamp));
+};
+
 const formatFingerprint = (value: string | null): string => {
   if (!value) {
     return "Unavailable";
@@ -223,13 +281,25 @@ export const AdminDevicesPage = () => {
     useState<ScreenProfileLayouts>(defaultProfileLayouts);
   const [layoutNames, setLayoutNames] = useState<string[]>([]);
   const [drafts, setDrafts] = useState<Record<string, DeviceDraft>>({});
+  const [siteTimeConfig, setSiteTimeConfig] = useState<SiteTimeConfig>(defaultSiteTimeConfig);
+  const [siteTimeZoneDraft, setSiteTimeZoneDraft] = useState(defaultSiteTimeConfig.siteTimezone);
+  const [siteTimeBusy, setSiteTimeBusy] = useState(false);
+  const [calendarFeedsConfig, setCalendarFeedsConfig] = useState<CalendarFeedsConfig>(
+    defaultCalendarFeedsConfig,
+  );
+  const [savedCalendarFeedsConfig, setSavedCalendarFeedsConfig] = useState<CalendarFeedsConfig>(
+    defaultCalendarFeedsConfig,
+  );
+  const [calendarFeedsBusy, setCalendarFeedsBusy] = useState(false);
   const [serverStatus, setServerStatus] = useState<ServerStatusResponse | null>(null);
+  const [serverStatusReceivedAtMs, setServerStatusReceivedAtMs] = useState<number | null>(null);
   const [serverStatusError, setServerStatusError] = useState<string | null>(null);
   const [busyDeviceState, setBusyDeviceState] = useState<{
     deviceId: string;
     action: BusyDeviceAction;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [clockTickMs, setClockTickMs] = useState(() => Date.now());
 
   const availableSetOptions = useMemo(
     () =>
@@ -259,6 +329,35 @@ export const AdminDevicesPage = () => {
 
     return counts;
   }, [devices]);
+  const timeZoneOptions = useMemo(() => getSupportedTimeZoneOptions(), []);
+  const siteTimeZoneIsValid = isValidIanaTimeZone(siteTimeZoneDraft.trim());
+  const effectiveServerNowMs = useMemo(() => {
+    if (!serverStatus || serverStatusReceivedAtMs === null) {
+      return null;
+    }
+
+    const baseMs = Date.parse(serverStatus.timestamp);
+    if (!Number.isFinite(baseMs)) {
+      return null;
+    }
+
+    return baseMs + Math.max(0, clockTickMs - serverStatusReceivedAtMs);
+  }, [clockTickMs, serverStatus, serverStatusReceivedAtMs]);
+  const latestDeviceSeenAt = useMemo(
+    () =>
+      devices.reduce<string | null>(
+        (latest, device) =>
+          latest === null || Date.parse(device.lastSeenAt) > Date.parse(latest)
+            ? device.lastSeenAt
+            : latest,
+        null,
+      ),
+    [devices],
+  );
+  const calendarFeedsDirty = useMemo(
+    () => JSON.stringify(calendarFeedsConfig) !== JSON.stringify(savedCalendarFeedsConfig),
+    [calendarFeedsConfig, savedCalendarFeedsConfig],
+  );
 
   const loadData = useCallback(async () => {
     const token = getAuthToken();
@@ -269,26 +368,39 @@ export const AdminDevicesPage = () => {
 
     try {
       setError(null);
-      const [devicesResponse, layoutsResponse, profileResponse, serverStatusResult] =
-        await Promise.all([
-          getDisplayDevices(token),
-          getLayouts(false, token),
-          getScreenProfileLayouts(token),
-          getServerStatus()
-            .then((data) => ({ data, error: null }))
-            .catch((statusError) => ({
-              data: null,
-              error:
-                statusError instanceof Error
-                  ? statusError.message
-                  : "Failed to load build visibility data",
-            })),
-        ]);
+      const [
+        devicesResponse,
+        layoutsResponse,
+        profileResponse,
+        siteTimeResponse,
+        calendarFeedsResponse,
+        serverStatusResult,
+      ] = await Promise.all([
+        getDisplayDevices(token),
+        getLayouts(false, token),
+        getScreenProfileLayouts(token),
+        getSiteTimeConfig(token),
+        getCalendarFeeds(token),
+        getServerStatus()
+          .then((data) => ({ data, error: null }))
+          .catch((statusError) => ({
+            data: null,
+            error:
+              statusError instanceof Error
+                ? statusError.message
+                : "Failed to load build visibility data",
+          })),
+      ]);
 
       setDevices(devicesResponse.devices);
       setLayoutNames(layoutsResponse.map((layout) => layout.name));
       setScreenProfileLayouts(profileResponse);
+      setSiteTimeConfig(siteTimeResponse);
+      setSiteTimeZoneDraft(siteTimeResponse.siteTimezone);
+      setCalendarFeedsConfig(calendarFeedsResponse);
+      setSavedCalendarFeedsConfig(calendarFeedsResponse);
       setServerStatus(serverStatusResult.data);
+      setServerStatusReceivedAtMs(serverStatusResult.data ? Date.now() : null);
       setServerStatusError(serverStatusResult.error);
 
       const nextAvailableSetIds = new Set(Object.keys(profileResponse.families));
@@ -316,9 +428,107 @@ export const AdminDevicesPage = () => {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setClockTickMs(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
+
   const onLogout = useCallback(() => {
     logoutAdminSession();
   }, []);
+
+  const onSaveSiteTime = async () => {
+    const token = getAuthToken();
+    if (!token) {
+      navigate("/admin/login", { replace: true });
+      return;
+    }
+
+    if (!siteTimeZoneIsValid) {
+      setError("Enter a valid IANA timezone such as Australia/Perth.");
+      return;
+    }
+
+    try {
+      setSiteTimeBusy(true);
+      setError(null);
+      const updated = await updateSiteTimeConfig(token, {
+        siteTimezone: siteTimeZoneDraft.trim(),
+      });
+      setSiteTimeConfig(updated);
+      setSiteTimeZoneDraft(updated.siteTimezone);
+      await loadData();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to update household time");
+    } finally {
+      setSiteTimeBusy(false);
+    }
+  };
+
+  const updateCalendarFeedDraft = (
+    index: number,
+    updater: (current: CalendarFeed) => CalendarFeed,
+  ) => {
+    setCalendarFeedsConfig((current) => ({
+      feeds: current.feeds.map((feed, feedIndex) => (feedIndex === index ? updater(feed) : feed)),
+    }));
+  };
+
+  const addCalendarFeedDraft = () => {
+    setCalendarFeedsConfig((current) => ({
+      feeds: [
+        ...current.feeds,
+        {
+          id: createCalendarFeedId(current.feeds),
+          name: "",
+          url: "",
+          color: "#22D3EE",
+          enabled: true,
+        },
+      ],
+    }));
+  };
+
+  const removeCalendarFeedDraft = (index: number) => {
+    setCalendarFeedsConfig((current) => ({
+      feeds: current.feeds.filter((_feed, feedIndex) => feedIndex !== index),
+    }));
+  };
+
+  const onSaveCalendarFeeds = async () => {
+    const token = getAuthToken();
+    if (!token) {
+      navigate("/admin/login", { replace: true });
+      return;
+    }
+
+    const normalizedPayload: CalendarFeedsConfig = {
+      feeds: calendarFeedsConfig.feeds.map((feed) => ({
+        ...feed,
+        id: normalizeCalendarFeedId(feed.id),
+        name: feed.name.trim().slice(0, 80),
+        url: feed.url.trim(),
+        color: feed.color.trim().toUpperCase(),
+      })),
+    };
+
+    try {
+      setCalendarFeedsBusy(true);
+      setError(null);
+      const saved = await updateCalendarFeeds(token, normalizedPayload);
+      setCalendarFeedsConfig(saved);
+      setSavedCalendarFeedsConfig(saved);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to update calendar feeds");
+    } finally {
+      setCalendarFeedsBusy(false);
+    }
+  };
 
   const updateDraft = (deviceId: string, updater: (current: DeviceDraft) => DeviceDraft) => {
     setDrafts((current) => {
@@ -403,7 +613,7 @@ export const AdminDevicesPage = () => {
   return (
     <PageShell
       title="Devices"
-      subtitle="Manage per-device names, display theme, and routing."
+      subtitle="Manage household time, per-device names, display theme, and routing."
       rightActions={<AdminNavActions current="devices" onLogout={onLogout} />}
     >
       {error ? (
@@ -411,6 +621,262 @@ export const AdminDevicesPage = () => {
           {error}
         </p>
       ) : null}
+
+      <section className="mb-6 rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-100">Household time</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              This timezone drives site-local modules and logic, including chores rollover, time
+              gates, Bible verse rotation, and default clocks.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void loadData()}
+            className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
+          >
+            Refresh
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+          <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+            <h3 className="text-sm font-semibold text-slate-100">Timezone setting</h3>
+            <div className="mt-3 space-y-3">
+              <label className="block space-y-2 text-sm text-slate-300">
+                <span>Household timezone</span>
+                <input
+                  list={ADMIN_TIME_ZONE_DATALIST_ID}
+                  className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
+                  value={siteTimeZoneDraft}
+                  onChange={(event) => setSiteTimeZoneDraft(event.target.value)}
+                  placeholder="Australia/Perth"
+                />
+                <datalist id={ADMIN_TIME_ZONE_DATALIST_ID}>
+                  {timeZoneOptions.map((timeZone) => (
+                    <option key={timeZone} value={timeZone} />
+                  ))}
+                </datalist>
+              </label>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSiteTimeZoneDraft(getRuntimeTimeZone())}
+                  className="rounded border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-300"
+                >
+                  Use browser timezone
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    siteTimeBusy ||
+                    !siteTimeZoneIsValid ||
+                    siteTimeZoneDraft.trim() === siteTimeConfig.siteTimezone
+                  }
+                  onClick={() => void onSaveSiteTime()}
+                  className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {siteTimeBusy ? "Saving..." : "Save timezone"}
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-400">
+                Use an IANA timezone like `Australia/Perth` or `America/New_York`.
+              </p>
+              {!siteTimeZoneIsValid ? (
+                <p className="text-xs text-amber-200">Enter a valid IANA timezone before saving.</p>
+              ) : null}
+            </div>
+          </article>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+              <h3 className="text-sm font-semibold text-slate-100">Current household time</h3>
+              <dl className="mt-3 space-y-2 text-sm text-slate-300">
+                <div>
+                  <dt className="text-slate-500">Timezone</dt>
+                  <dd className="font-mono text-slate-200">{siteTimeConfig.siteTimezone}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Synced clock</dt>
+                  <dd>
+                    {formatDateTimeAtTimeZone(effectiveServerNowMs, siteTimeConfig.siteTimezone)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Latest display check-in</dt>
+                  <dd>{formatTimestamp(latestDeviceSeenAt)}</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+              <h3 className="text-sm font-semibold text-slate-100">Sync diagnostics</h3>
+              <dl className="mt-3 space-y-2 text-sm text-slate-300">
+                <div>
+                  <dt className="text-slate-500">Server current time (UTC)</dt>
+                  <dd>{formatDateTimeAtTimeZone(effectiveServerNowMs, "UTC")}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Server runtime timezone</dt>
+                  <dd className="font-mono text-slate-200">
+                    {serverStatus?.time?.runtimeTimeZone ?? "Unavailable"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Deployment default timezone</dt>
+                  <dd className="font-mono text-slate-200">
+                    {serverStatus?.time?.defaultSiteTimeZone ?? "Not set"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">This browser timezone</dt>
+                  <dd className="font-mono text-slate-200">{getRuntimeTimeZone()}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">This browser current time</dt>
+                  <dd>{formatDateTimeAtTimeZone(clockTickMs, getRuntimeTimeZone())}</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section className="mb-6 rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-100">Calendar feeds</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Store ICS feed URLs once here, then choose them from each calendar module by ID. Feed
+              URLs stay admin-only; layouts and displays only reference saved feed IDs plus optional
+              label and color overrides.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={addCalendarFeedDraft}
+              className="rounded border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-slate-300"
+            >
+              Add feed
+            </button>
+            <button
+              type="button"
+              disabled={calendarFeedsBusy || !calendarFeedsDirty}
+              onClick={() => void onSaveCalendarFeeds()}
+              className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {calendarFeedsBusy ? "Saving..." : "Save feeds"}
+            </button>
+          </div>
+        </div>
+
+        {calendarFeedsConfig.feeds.length === 0 ? (
+          <p className="mt-4 rounded border border-slate-700/80 bg-slate-950/60 px-3 py-3 text-sm text-slate-400">
+            No saved feeds yet.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {calendarFeedsConfig.feeds.map((feed, index) => (
+              <article
+                key={`${feed.id || "draft"}-${index}`}
+                className="rounded-lg border border-slate-800 bg-slate-950/60 p-4"
+              >
+                <div className="grid gap-3 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,1.6fr)_auto_auto]">
+                  <label className="block space-y-1">
+                    <span className="text-xs font-medium text-slate-300">Name</span>
+                    <input
+                      className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                      type="text"
+                      value={feed.name}
+                      onChange={(event) =>
+                        updateCalendarFeedDraft(index, (current) => ({
+                          ...current,
+                          name: event.target.value,
+                        }))
+                      }
+                      placeholder="School"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-xs font-medium text-slate-300">Stable ID</span>
+                    <input
+                      className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 font-mono text-sm text-slate-100"
+                      type="text"
+                      value={feed.id}
+                      onChange={(event) =>
+                        updateCalendarFeedDraft(index, (current) => ({
+                          ...current,
+                          id: normalizeCalendarFeedId(event.target.value),
+                        }))
+                      }
+                      placeholder="school"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-xs font-medium text-slate-300">ICS feed URL or path</span>
+                    <input
+                      className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                      type="text"
+                      value={feed.url}
+                      onChange={(event) =>
+                        updateCalendarFeedDraft(index, (current) => ({
+                          ...current,
+                          url: event.target.value,
+                        }))
+                      }
+                      placeholder="https://calendar.example.com/family.ics"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-xs font-medium text-slate-300">Color</span>
+                    <input
+                      className="h-10 w-16 cursor-pointer rounded border border-slate-700 bg-slate-800 p-1"
+                      type="color"
+                      value={feed.color}
+                      onChange={(event) =>
+                        updateCalendarFeedDraft(index, (current) => ({
+                          ...current,
+                          color: event.target.value.toUpperCase(),
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <div className="flex items-end gap-3">
+                    <label className="flex items-center gap-2 whitespace-nowrap rounded border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={feed.enabled}
+                        onChange={(event) =>
+                          updateCalendarFeedDraft(index, (current) => ({
+                            ...current,
+                            enabled: event.target.checked,
+                          }))
+                        }
+                      />
+                      <span>Enabled</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => removeCalendarFeedDraft(index)}
+                      className="rounded border border-rose-400/70 px-3 py-2 text-sm font-semibold text-rose-100 hover:bg-rose-500/20"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="mb-6 rounded-xl border border-slate-700 bg-slate-900/70 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">

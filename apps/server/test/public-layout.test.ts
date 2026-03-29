@@ -22,12 +22,25 @@ test("sanitizeLayoutRecordForPublicDisplay redacts calendar URLs and photo folde
           title: "Calendar",
           config: {
             viewMode: "list",
-            calendars: [
-              "webcal://secret.example.com/private-feed-1",
-              "webcal://secret.example.com/private-feed-2",
+            feedSelections: [
+              {
+                feedId: "school",
+                labelOverride: null,
+                colorOverride: null,
+              },
             ],
-            calendarLabels: ["School", ""],
-            calendarColors: ["#22D3EE", "#60A5FA"],
+            legacyCalendars: [
+              {
+                source: "webcal://secret.example.com/private-feed-1",
+                label: "School",
+                color: "#22D3EE",
+              },
+              {
+                source: "webcal://secret.example.com/private-feed-2",
+                label: null,
+                color: "#60A5FA",
+              },
+            ],
             daysToShow: 14,
             use24Hour: true,
             refreshIntervalSeconds: 300,
@@ -51,7 +64,24 @@ test("sanitizeLayoutRecordForPublicDisplay redacts calendar URLs and photo folde
 
   const sanitized = sanitizeLayoutRecordForPublicDisplay(layout);
   assert.ok(sanitized);
-  assert.deepEqual(sanitized.config.modules[0]?.config.calendars, ["Calendar 1", "Calendar 2"]);
-  assert.equal(sanitized.config.modules[0]?.config.calendarLabels[0], "School");
+  assert.deepEqual(sanitized.config.modules[0]?.config.feedSelections, [
+    {
+      feedId: "school",
+      labelOverride: null,
+      colorOverride: null,
+    },
+  ]);
+  assert.deepEqual(sanitized.config.modules[0]?.config.legacyCalendars, [
+    {
+      source: "Calendar 1",
+      label: "School",
+      color: "#22D3EE",
+    },
+    {
+      source: "Calendar 2",
+      label: null,
+      color: "#60A5FA",
+    },
+  ]);
   assert.equal(sanitized.config.modules[1]?.config.folderPath, "/photos");
 });

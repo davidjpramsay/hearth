@@ -30,7 +30,17 @@ export interface DisplayDeviceUpdatedEvent {
   reason: "device-updated";
 }
 
-export type AppEvent = LayoutUpdatedEvent | ChoresUpdatedEvent | DisplayDeviceUpdatedEvent;
+export interface SiteTimeUpdatedEvent {
+  type: "site-time-updated";
+  changedAt: string;
+  siteTimezone: string;
+}
+
+export type AppEvent =
+  | LayoutUpdatedEvent
+  | ChoresUpdatedEvent
+  | DisplayDeviceUpdatedEvent
+  | SiteTimeUpdatedEvent;
 
 type Listener = (event: AppEvent) => void;
 

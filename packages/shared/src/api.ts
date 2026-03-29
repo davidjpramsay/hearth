@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { layoutConfigSchema, layoutRecordSchema } from "./layout.js";
+import { calendarFeedsConfigSchema } from "./modules/calendar.js";
 import { photoCollectionFolderSchema, photoCollectionsConfigSchema } from "./modules/photos.js";
 
 export const loginRequestSchema = z.object({
@@ -44,6 +45,7 @@ export const layoutsQuerySchema = z.object({
 
 export const layoutsResponseSchema = z.array(layoutRecordSchema);
 export const layoutResponseSchema = layoutRecordSchema;
+export const calendarFeedsResponseSchema = calendarFeedsConfigSchema;
 export const photoCollectionsResponseSchema = photoCollectionsConfigSchema;
 export const photoLibraryFoldersResponseSchema = z.object({
   folders: z.array(photoCollectionFolderSchema).max(4096).default([]),
@@ -54,5 +56,6 @@ export type LoginResponse = z.infer<typeof loginResponseSchema>;
 export type CreateLayoutRequest = z.infer<typeof createLayoutRequestSchema>;
 export type UpdateLayoutRequest = z.infer<typeof updateLayoutRequestSchema>;
 export type LayoutsQuery = z.infer<typeof layoutsQuerySchema>;
+export type CalendarFeedsResponse = z.infer<typeof calendarFeedsResponseSchema>;
 export type PhotoCollectionsResponse = z.infer<typeof photoCollectionsResponseSchema>;
 export type PhotoLibraryFoldersResponse = z.infer<typeof photoLibraryFoldersResponseSchema>;

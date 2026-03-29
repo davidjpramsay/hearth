@@ -36,7 +36,9 @@ const createHarness = async () => {
     deviceRepository,
     settingsRepository,
     moduleStateRepository: {} as AppServices["moduleStateRepository"],
-    calendarFeedService: {} as AppServices["calendarFeedService"],
+    calendarFeedService: {
+      prefetchConfiguredFeeds: async () => undefined,
+    } as AppServices["calendarFeedService"],
     photosSlideshowService: {} as AppServices["photosSlideshowService"],
     screenProfileService,
     layoutEventBus,
@@ -162,6 +164,61 @@ test("delete display device removes the saved device record", async () => {
 
     assert.equal(response.statusCode, 204);
     assert.equal(harness.deviceRepository.getDevice("device-delete-route-1"), null);
+  } finally {
+    await harness.dispose();
+  }
+});
+
+test("calendar feed settings can be saved and loaded through display routes", async () => {
+  const harness = await createHarness();
+
+  try {
+    const saveResponse = await harness.app.inject({
+      method: "PUT",
+      url: "/display/calendar-feeds",
+      payload: {
+        feeds: [
+          {
+            id: "school",
+            name: "School",
+            url: "https://calendar.example.com/school.ics",
+            color: "#22D3EE",
+            enabled: true,
+          },
+        ],
+      },
+    });
+
+    assert.equal(saveResponse.statusCode, 200);
+    assert.deepEqual(saveResponse.json(), {
+      feeds: [
+        {
+          id: "school",
+          name: "School",
+          url: "https://calendar.example.com/school.ics",
+          color: "#22D3EE",
+          enabled: true,
+        },
+      ],
+    });
+
+    const loadResponse = await harness.app.inject({
+      method: "GET",
+      url: "/display/calendar-feeds",
+    });
+
+    assert.equal(loadResponse.statusCode, 200);
+    assert.deepEqual(loadResponse.json(), {
+      feeds: [
+        {
+          id: "school",
+          name: "School",
+          url: "https://calendar.example.com/school.ics",
+          color: "#22D3EE",
+          enabled: true,
+        },
+      ],
+    });
   } finally {
     await harness.dispose();
   }

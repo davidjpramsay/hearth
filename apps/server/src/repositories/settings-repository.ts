@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import {
+  calendarFeedsConfigSchema,
   choresPayoutConfigSchema,
   createLayoutSetLogicGraphFromBranches,
   deriveLayoutSetAuthoringFromLogicGraph,
@@ -15,6 +16,7 @@ import {
   DEFAULT_LAYOUT_LOGIC_PHOTO_ACTION_TYPE,
   DEFAULT_PORTRAIT_LAYOUT_LOGIC_CONDITION_TYPE,
   type AutoLayoutTarget,
+  type CalendarFeedsConfig,
   type ChoresPayoutConfig,
   type PhotoCollectionsConfig,
   type SiteTimeConfig,
@@ -27,6 +29,7 @@ const CHORES_PAYOUT_CONFIG_KEY = "chores_payout_config";
 const SITE_TIME_CONFIG_KEY = "site_time_config";
 const SCREEN_PROFILE_LAYOUTS_KEY = "screen_profile_layouts";
 const PHOTO_COLLECTIONS_KEY = "photo_collections";
+const CALENDAR_FEEDS_KEY = "calendar_feeds";
 const DEFAULT_TARGET_CYCLE_SECONDS = 20;
 const DEFAULT_PHOTO_ACTION_TYPE = DEFAULT_LAYOUT_LOGIC_PHOTO_ACTION_TYPE;
 const DEFAULT_SET_ID = "set-1";
@@ -479,5 +482,22 @@ export class SettingsRepository {
       PHOTO_COLLECTIONS_KEY,
       JSON.stringify(photoCollectionsConfigSchema.parse(config)),
     );
+  }
+
+  getCalendarFeeds(): CalendarFeedsConfig {
+    const rawValue = this.getValue(CALENDAR_FEEDS_KEY);
+    if (!rawValue) {
+      return calendarFeedsConfigSchema.parse({});
+    }
+
+    try {
+      return calendarFeedsConfigSchema.parse(JSON.parse(rawValue));
+    } catch {
+      return calendarFeedsConfigSchema.parse({});
+    }
+  }
+
+  setCalendarFeeds(config: CalendarFeedsConfig): void {
+    this.setValue(CALENDAR_FEEDS_KEY, JSON.stringify(calendarFeedsConfigSchema.parse(config)));
   }
 }

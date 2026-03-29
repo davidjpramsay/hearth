@@ -407,6 +407,10 @@ export const DashboardPage = () => {
     const handleChoresUpdated = () => {
       window.dispatchEvent(new CustomEvent("hearth:chores-updated"));
     };
+    const handleSiteTimeUpdated = () => {
+      window.dispatchEvent(new CustomEvent("hearth:chores-updated"));
+      void resolveLayout({ orientation: photoOrientationRef.current });
+    };
     const handleDeviceUpdated = (event: Event) => {
       const detail = parseEventSourcePayload<DisplayDeviceUpdatedEventDetail>(event);
       if (!detail || detail.deviceId !== deviceIdRef.current) {
@@ -422,6 +426,7 @@ export const DashboardPage = () => {
 
     eventSource.addEventListener("layout-updated", handleLayoutChange);
     eventSource.addEventListener("chores-updated", handleChoresUpdated);
+    eventSource.addEventListener("site-time-updated", handleSiteTimeUpdated);
     eventSource.addEventListener("display-device-updated", handleDeviceUpdated);
 
     eventSource.onerror = () => {
@@ -433,6 +438,7 @@ export const DashboardPage = () => {
     return () => {
       eventSource.removeEventListener("layout-updated", handleLayoutChange);
       eventSource.removeEventListener("chores-updated", handleChoresUpdated);
+      eventSource.removeEventListener("site-time-updated", handleSiteTimeUpdated);
       eventSource.removeEventListener("display-device-updated", handleDeviceUpdated);
       eventSource.close();
     };

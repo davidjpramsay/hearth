@@ -117,12 +117,48 @@ export class LayoutRepository {
         const decrypted = this.decryptCalendarSource(trimmedEntry);
         return decrypted && decrypted.trim().length > 0 ? decrypted.trim() : "";
       });
+      const legacyCalendarEntries = Array.isArray(
+        (rawConfig as { legacyCalendars?: unknown }).legacyCalendars,
+      )
+        ? ((rawConfig as { legacyCalendars: unknown[] }).legacyCalendars as unknown[])
+        : [];
+      const transformedLegacyCalendars = legacyCalendarEntries.map((entry) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+          return entry;
+        }
+
+        const legacySource =
+          typeof (entry as { source?: unknown }).source === "string"
+            ? (entry as { source: string }).source.trim()
+            : "";
+
+        if (legacySource.length === 0) {
+          return {
+            ...entry,
+            source: "",
+          };
+        }
+
+        if (direction === "encrypt") {
+          return {
+            ...entry,
+            source: this.encryptCalendarSource(legacySource),
+          };
+        }
+
+        const decrypted = this.decryptCalendarSource(legacySource);
+        return {
+          ...entry,
+          source: decrypted && decrypted.trim().length > 0 ? decrypted.trim() : "",
+        };
+      });
 
       return {
         ...moduleInstance,
         config: {
           ...rawConfig,
           calendars: transformedCalendars,
+          legacyCalendars: transformedLegacyCalendars,
         },
       };
     });

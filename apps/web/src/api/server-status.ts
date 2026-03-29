@@ -15,6 +15,12 @@ export const serverStatusResponseSchema = z.object({
     hostname: z.string(),
     platform: z.string(),
   }),
+  time: z
+    .object({
+      runtimeTimeZone: z.string(),
+      defaultSiteTimeZone: z.string().nullable(),
+    })
+    .optional(),
   build: z.object({
     serverEntrySha1: z.string().nullable(),
     serverEntryBuiltAt: z.string().nullable(),

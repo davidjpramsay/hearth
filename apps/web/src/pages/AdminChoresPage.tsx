@@ -159,7 +159,6 @@ export const AdminChoresPage = () => {
     paydayDayOfWeek: 6,
     siteTimezone: getRuntimeTimeZone(),
   });
-  const [siteTimezoneDraft, setSiteTimezoneDraft] = useState(() => getRuntimeTimeZone());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -168,7 +167,6 @@ export const AdminChoresPage = () => {
     setMembers(snapshot.members);
     setChores(snapshot.chores);
     setPayoutConfig(snapshot.payoutConfig);
-    setSiteTimezoneDraft(snapshot.payoutConfig.siteTimezone);
     setSiteToday(snapshot.siteToday);
     setBoard(snapshot.board);
     setSelectedDate((current) => clampIsoDateToRange(current, snapshot.selectableWeekRange));
@@ -214,9 +212,11 @@ export const AdminChoresPage = () => {
     };
 
     eventSource.addEventListener("chores-updated", handleUpdate);
+    eventSource.addEventListener("site-time-updated", handleUpdate);
 
     return () => {
       eventSource.removeEventListener("chores-updated", handleUpdate);
+      eventSource.removeEventListener("site-time-updated", handleUpdate);
       eventSource.close();
     };
   }, [loadData, token]);
@@ -362,7 +362,6 @@ export const AdminChoresPage = () => {
         ...changes,
       });
       setPayoutConfig(updated);
-      setSiteTimezoneDraft(updated.siteTimezone);
       await loadData();
     } catch (configError) {
       setError(
@@ -1002,40 +1001,21 @@ export const AdminChoresPage = () => {
               </select>
             </label>
             <div className="mt-2 space-y-2">
-              <label className="block space-y-1">
-                <span className="text-sm text-slate-300">Household timezone</span>
-                <input
-                  className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-100"
-                  value={siteTimezoneDraft}
-                  onChange={(event) => setSiteTimezoneDraft(event.target.value)}
-                  placeholder="Australia/Perth"
-                />
-              </label>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSiteTimezoneDraft(getRuntimeTimeZone())}
-                  className="rounded border border-slate-500 px-2 py-1 text-xs text-slate-200 hover:border-slate-300"
-                >
-                  Use browser timezone
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || siteTimezoneDraft.trim() === payoutConfig.siteTimezone}
-                  onClick={() => {
-                    void savePayoutConfig({
-                      siteTimezone: siteTimezoneDraft.trim() || getRuntimeTimeZone(),
-                    });
-                  }}
-                  className="rounded bg-cyan-500 px-2 py-1 text-xs font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-60"
-                >
-                  Save timezone
-                </button>
-              </div>
-              <p className="text-xs text-slate-400">
-                Household timezone controls site-local modules. Chores use it for day rollover and
-                week boundaries, and Bible verse uses it for the verse of the day.
+              <p className="text-sm text-slate-300">
+                Household timezone:{" "}
+                <span className="font-semibold text-slate-100">{payoutConfig.siteTimezone}</span>
               </p>
+              <p className="text-xs text-slate-400">
+                Household timezone controls site-local modules. Manage it from Devices so clocks,
+                chores, time gates, and verse-of-the-day all stay aligned.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate("/devices")}
+                className="rounded border border-slate-500 px-2 py-1 text-xs text-slate-200 hover:border-slate-300"
+              >
+                Open devices and time
+              </button>
             </div>
             <p className="mt-2 text-xs text-slate-300">
               Current week: {formatDateLabel(currentWeekRange.startDate)} to{" "}

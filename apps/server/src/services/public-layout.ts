@@ -15,7 +15,10 @@ const sanitizeCalendarModule = (moduleInstance: ModuleInstance): ModuleInstance 
     ...moduleInstance,
     config: {
       ...parsedConfig.data,
-      calendars: parsedConfig.data.calendars.map((_entry, index) => `Calendar ${index + 1}`),
+      legacyCalendars: parsedConfig.data.legacyCalendars.map((entry, index) => ({
+        ...entry,
+        source: `Calendar ${index + 1}`,
+      })),
     },
   };
 };

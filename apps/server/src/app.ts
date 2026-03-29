@@ -16,6 +16,7 @@ import { registerLayoutRoutes } from "./routes/layouts.js";
 import { registerLocalWarningsRoutes } from "./routes/local-warnings.js";
 import { registerModuleAdapterRoutes } from "./routes/module-adapters.js";
 import { registerPhotoRoutes } from "./routes/photos.js";
+import { registerSiteTimeRoutes } from "./routes/site-time.js";
 import { registerWeatherRoutes } from "./routes/weather.js";
 import type { AppServices } from "./types.js";
 
@@ -52,6 +53,7 @@ export const createApp = async (services: AppServices) => {
       registerBibleVerseRoutes(apiApp, services);
       registerChoresModuleRoutes(apiApp, services);
       registerPhotoRoutes(apiApp, services);
+      registerSiteTimeRoutes(apiApp, services);
       registerDisplayRoutes(apiApp, services);
       registerEventRoutes(apiApp, services);
     },
