@@ -9,6 +9,7 @@ import {
   type ChoresModuleConfig,
 } from "@hearth/shared";
 import { moduleDefinition as choresModule } from "../src/modules/sdk/chores.module";
+import { writePersistedModuleSnapshot } from "../src/modules/data/persisted-module-snapshot";
 import { syncDisplayTimeContext } from "../src/runtime/display-time";
 
 type Listener = EventListenerOrEventListenerObject;
@@ -122,9 +123,10 @@ const callListener = (listener: Listener, event: Event): void => {
   listener.handleEvent(event);
 };
 
-const installBrowserShims = (responses: ChoresBoardResponse[]) => {
+const installBrowserShims = (responses: Array<ChoresBoardResponse | Error>) => {
   const windowListeners = new Map<string, Set<Listener>>();
   const documentListeners = new Map<string, Set<Listener>>();
+  const localStorageEntries = new Map<string, string>();
   let fetchCallCount = 0;
   let visibilityState: DocumentVisibilityState = "visible";
 
@@ -147,6 +149,15 @@ const installBrowserShims = (responses: ChoresBoardResponse[]) => {
     clearInterval,
     setTimeout,
     clearTimeout,
+    localStorage: {
+      getItem: (key: string) => localStorageEntries.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        localStorageEntries.set(key, value);
+      },
+      removeItem: (key: string) => {
+        localStorageEntries.delete(key);
+      },
+    },
   } as unknown as Window & typeof globalThis;
 
   const documentShim = {
@@ -189,6 +200,9 @@ const installBrowserShims = (responses: ChoresBoardResponse[]) => {
     value: async () => {
       const response = responses[Math.min(fetchCallCount, responses.length - 1)];
       fetchCallCount += 1;
+      if (response instanceof Error) {
+        throw response;
+      }
       return {
         ok: true,
         status: 200,
@@ -325,7 +339,7 @@ test("chores module refreshes when synced site time crosses into a new day", asy
     assert.match(JSON.stringify(renderer?.toJSON()), /Tuesday Dishes/);
 
     await act(async () => {
-      const localNowMs = new Date("2026-03-24T15:59:59.000Z").getTime();
+      const localNowMs = Date.now();
       syncDisplayTimeContext({
         siteTimeZone: "Australia/Perth",
         serverNowMs: new Date("2026-03-24T16:00:01.000Z").getTime(),
@@ -339,6 +353,52 @@ test("chores module refreshes when synced site time crosses into a new day", asy
     assert.equal(shims.getFetchCallCount(), 2);
     assert.match(tree, /Wednesday Dishes/);
     assert.doesNotMatch(tree, /Tuesday Dishes/);
+  } finally {
+    syncDisplayTimeContext({
+      siteTimeZone: getRuntimeTimeZone(),
+      serverNowMs: Date.now(),
+      localStartedAtMs: Date.now(),
+      localReceivedAtMs: Date.now(),
+    });
+    await act(async () => {
+      renderer?.unmount();
+      await flushMicrotasks();
+    });
+    restoreBrowserShims();
+  }
+});
+
+test("chores module uses the persisted snapshot on a cold boot fetch failure", async () => {
+  installBrowserShims([new Error("Failed to fetch")]);
+
+  const localNowMs = Date.now();
+  const syncedNowMs = new Date("2026-03-24T04:00:00.000Z").getTime();
+  syncDisplayTimeContext({
+    siteTimeZone: "Australia/Perth",
+    serverNowMs: syncedNowMs,
+    localStartedAtMs: localNowMs,
+    localReceivedAtMs: localNowMs,
+  });
+  writePersistedModuleSnapshot(
+    "chores:chores-test:money",
+    createBoard({
+      startDate: "2026-03-24",
+      items: [{ choreId: 1, choreName: "Cached Dishes", completed: false }],
+    }),
+    localNowMs,
+  );
+
+  let renderer: ReactTestRenderer | null = null;
+
+  try {
+    await act(async () => {
+      renderer = create(renderModule());
+      await flushMicrotasks();
+    });
+
+    const tree = JSON.stringify(renderer?.toJSON());
+    assert.match(tree, /Cached Dishes/);
+    assert.doesNotMatch(tree, /Failed to fetch/);
   } finally {
     syncDisplayTimeContext({
       siteTimeZone: getRuntimeTimeZone(),

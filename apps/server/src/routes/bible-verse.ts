@@ -3,10 +3,15 @@ import {
   bibleVerseModuleParamsSchema,
   bibleVerseModuleResponseSchema,
   getDayOfYearInTimeZone,
+  toCalendarDateInTimeZone,
 } from "@hearth/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { config } from "../config.js";
+import {
+  readPersistedModuleResponse,
+  writePersistedModuleResponse,
+} from "../services/persisted-module-response-cache.js";
 import type { AppServices } from "../types.js";
 
 const DAILY_PASSAGE_REFERENCES = [
@@ -48,6 +53,29 @@ const ESV_PASSAGE_RESPONSE_SCHEMA = z.object({
   canonical: z.string().optional(),
   passages: z.array(z.string().min(1)).min(1),
 });
+const BIBLE_VERSE_SNAPSHOT_MAX_AGE_MS = 36 * 60 * 60 * 1000;
+
+const buildBibleVerseSnapshotKey = (instanceId: string, siteDate: string): string =>
+  `bible-verse:${instanceId}:${siteDate}`;
+
+const readPersistedBibleVerseResponse = (services: AppServices, key: string) =>
+  readPersistedModuleResponse({
+    repository: services.moduleStateRepository,
+    key,
+    parse: (payload) => bibleVerseModuleResponseSchema.parse(payload),
+    maxAgeMs: BIBLE_VERSE_SNAPSHOT_MAX_AGE_MS,
+    validate: (payload) => payload.verse !== null && payload.reference !== null,
+  });
+
+const buildBibleVerseFallbackPayload = (
+  generatedAt: string,
+  cachedPayload: ReturnType<typeof bibleVerseModuleResponseSchema.parse>,
+) =>
+  bibleVerseModuleResponseSchema.parse({
+    ...cachedPayload,
+    generatedAt,
+    warning: "Showing saved verse for today while live verse refresh is unavailable.",
+  });
 
 export const selectDailyPassageReference = (date: Date, siteTimezone: string): string => {
   const index = getDayOfYearInTimeZone(date, siteTimezone) % DAILY_PASSAGE_REFERENCES.length;
@@ -137,6 +165,9 @@ export const registerBibleVerseRoutes = (app: FastifyInstance, services: AppServ
     const siteTimeConfig = services.settingsRepository.getSiteTimeConfig();
     reply.header("cache-control", "no-store");
     const generatedAt = new Date().toISOString();
+    const siteToday = toCalendarDateInTimeZone(new Date(), siteTimeConfig.siteTimezone);
+    const snapshotKey = buildBibleVerseSnapshotKey(params.data.instanceId, siteToday);
+    const persistedVerse = readPersistedBibleVerseResponse(services, snapshotKey);
     const basePayload = {
       generatedAt,
       verse: null,
@@ -146,6 +177,10 @@ export const registerBibleVerseRoutes = (app: FastifyInstance, services: AppServ
     };
 
     if (!config.esvApiKey) {
+      if (persistedVerse) {
+        return reply.send(buildBibleVerseFallbackPayload(generatedAt, persistedVerse.payload));
+      }
+
       return reply.send(
         bibleVerseModuleResponseSchema.parse({
           ...basePayload,
@@ -158,16 +193,17 @@ export const registerBibleVerseRoutes = (app: FastifyInstance, services: AppServ
       const verse = await fetchVerseOfDay(siteTimeConfig.siteTimezone);
       const cleanedText = verse.text.replace(/\s+/g, " ").trim();
       const reference = verse.reference;
+      const responsePayload = bibleVerseModuleResponseSchema.parse({
+        generatedAt,
+        verse: cleanedText,
+        reference,
+        sourceLabel: "api.esv.org (ESV)",
+        warning: null,
+      });
 
-      return reply.send(
-        bibleVerseModuleResponseSchema.parse({
-          generatedAt,
-          verse: cleanedText,
-          reference,
-          sourceLabel: "api.esv.org (ESV)",
-          warning: null,
-        }),
-      );
+      writePersistedModuleResponse(services.moduleStateRepository, snapshotKey, responsePayload);
+
+      return reply.send(responsePayload);
     } catch (error) {
       request.log.warn(
         {
@@ -176,6 +212,10 @@ export const registerBibleVerseRoutes = (app: FastifyInstance, services: AppServ
         },
         "Failed to load bible verse of the day",
       );
+
+      if (persistedVerse) {
+        return reply.send(buildBibleVerseFallbackPayload(generatedAt, persistedVerse.payload));
+      }
 
       return reply.send(
         bibleVerseModuleResponseSchema.parse({

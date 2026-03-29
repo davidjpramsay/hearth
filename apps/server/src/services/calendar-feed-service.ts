@@ -5,17 +5,24 @@ import type { ParameterValue, VEvent } from "node-ical";
 import ical from "node-ical";
 import {
   calendarModuleConfigSchema,
+  calendarModuleEventsResponseSchema,
   serializeCalendarEventBoundary,
   type CalendarModuleEvent,
   type CalendarModuleEventsResponse,
 } from "@hearth/shared";
 import { config } from "../config.js";
+import type { ModuleStateRepository } from "../repositories/module-state-repository.js";
+import {
+  readPersistedModuleResponse,
+  writePersistedModuleResponse,
+} from "./persisted-module-response-cache.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CALENDAR_RANGE_DAYS_PAST = 1;
 const CALENDAR_RANGE_DAYS_AHEAD = 120;
 const MAX_RETURNED_EVENTS = 700;
 const FETCH_TIMEOUT_MS = 10_000;
+const CALENDAR_PERSISTED_RESPONSE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const REMOTE_PROTOCOL_REGEX = /^(https?|webcals?):\/\//i;
 const WEB_CAL_DOUBLE_SLASH_REGEX = /^webcals?:\/\//i;
 const WEB_CAL_SINGLE_SLASH_REGEX = /^webcals?:\/(?!\/)/i;
@@ -28,6 +35,7 @@ interface SourceCacheEntry {
 interface SourceLoadResult {
   events: CalendarModuleEvent[];
   warning: string | null;
+  sourceStatus: "live" | "memory-cache" | "failed";
 }
 
 interface NormalizedSource {
@@ -133,6 +141,9 @@ const normalizeSources = (
   return normalized;
 };
 
+const buildPersistedCalendarResponseKey = (sources: NormalizedSource[]): string =>
+  `calendar-response:${createHash("sha256").update(JSON.stringify(sources)).digest("hex")}`;
+
 const isValidDate = (value: unknown): value is Date =>
   value instanceof Date && !Number.isNaN(value.getTime());
 
@@ -168,6 +179,8 @@ const applySourceColor = (
 export class CalendarFeedService {
   private readonly sourceCache = new Map<string, SourceCacheEntry>();
 
+  constructor(private readonly moduleStateRepository: ModuleStateRepository | null = null) {}
+
   async getUpcomingEvents(rawConfig: unknown): Promise<CalendarModuleEventsResponse> {
     const parsedConfig = calendarModuleConfigSchema.parse(rawConfig);
     const sources = normalizeSources(
@@ -184,6 +197,7 @@ export class CalendarFeedService {
       };
     }
 
+    const persistedResponseKey = buildPersistedCalendarResponseKey(sources);
     const refreshMs = Math.max(parsedConfig.refreshIntervalSeconds, 30) * 1000;
     const sourceResults = await Promise.all(
       sources.map((source) =>
@@ -212,11 +226,45 @@ export class CalendarFeedService {
       .sort((left, right) => new Date(left.start).getTime() - new Date(right.start).getTime())
       .slice(0, MAX_RETURNED_EVENTS);
 
-    return {
+    const responsePayload = calendarModuleEventsResponseSchema.parse({
       generatedAt: new Date().toISOString(),
       events: deduplicatedEvents,
       warnings,
-    };
+    });
+    const hasFailedSource = sourceResults.some((result) => result.sourceStatus === "failed");
+
+    if (!hasFailedSource) {
+      writePersistedModuleResponse(
+        this.moduleStateRepository,
+        persistedResponseKey,
+        responsePayload,
+      );
+      return responsePayload;
+    }
+
+    const allSourcesFailed = sourceResults.every((result) => result.sourceStatus === "failed");
+    if (!allSourcesFailed) {
+      return responsePayload;
+    }
+
+    const persistedResponse = readPersistedModuleResponse({
+      repository: this.moduleStateRepository,
+      key: persistedResponseKey,
+      parse: (payload) => calendarModuleEventsResponseSchema.parse(payload),
+      maxAgeMs: CALENDAR_PERSISTED_RESPONSE_MAX_AGE_MS,
+    });
+    if (!persistedResponse) {
+      return responsePayload;
+    }
+
+    return calendarModuleEventsResponseSchema.parse({
+      ...persistedResponse.payload,
+      generatedAt: new Date().toISOString(),
+      warnings: [
+        ...persistedResponse.payload.warnings,
+        "Using saved calendar snapshot while refresh is unavailable.",
+      ],
+    });
   }
 
   private async loadSourceEvents(input: {
@@ -230,7 +278,11 @@ export class CalendarFeedService {
     const cached = this.sourceCache.get(source);
 
     if (cached && now - cached.fetchedAtMs < refreshMs) {
-      return { events: applySourceColor(cached.events, sourceColor), warning: null };
+      return {
+        events: applySourceColor(cached.events, sourceColor),
+        warning: null,
+        sourceStatus: "memory-cache",
+      };
     }
 
     try {
@@ -242,18 +294,24 @@ export class CalendarFeedService {
         events,
       });
 
-      return { events: applySourceColor(events, sourceColor), warning: null };
+      return {
+        events: applySourceColor(events, sourceColor),
+        warning: null,
+        sourceStatus: "live",
+      };
     } catch (error) {
       if (cached) {
         return {
           events: applySourceColor(cached.events, sourceColor),
           warning: `Using cached data for "${sourceLabel}" after refresh failure.`,
+          sourceStatus: "memory-cache",
         };
       }
 
       return {
         events: [],
         warning: `Failed to load "${sourceLabel}": ${summarizeError(error)}`,
+        sourceStatus: "failed",
       };
     }
   }

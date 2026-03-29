@@ -7,11 +7,16 @@ import {
   type CalendarModuleEvent,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import {
+  readPersistedModuleSnapshot,
+  writePersistedModuleSnapshot,
+} from "../data/persisted-module-snapshot";
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const CALENDAR_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const CALENDAR_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 const CALENDAR_FALLBACK_COLORS = [
   "#22D3EE",
@@ -203,6 +208,16 @@ const formatEventTime = (event: CalendarTileEvent, timeFormatter: Intl.DateTimeF
   return `${start} - ${end}`;
 };
 
+const buildCalendarSnapshotKey = (
+  instanceId: string,
+  settings: Pick<CalendarModuleConfig, "calendars" | "calendarLabels" | "calendarColors">,
+): string =>
+  `calendar:${instanceId}:${JSON.stringify({
+    calendars: settings.calendars,
+    calendarLabels: settings.calendarLabels,
+    calendarColors: settings.calendarColors,
+  })}`;
+
 const loadCalendarEvents = async (instanceId: string, signal: AbortSignal) => {
   const response = await fetch(`/api/modules/calendar/${encodeURIComponent(instanceId)}/events`, {
     method: "GET",
@@ -239,22 +254,49 @@ export const moduleDefinition = defineModule({
   dataSchema: calendarModuleEventsResponseSchema,
   runtime: {
     Component: ({ instanceId, settings, isEditing }) => {
-      const [payload, setPayload] = useState(() =>
-        calendarModuleEventsResponseSchema.parse({
-          generatedAt: new Date().toISOString(),
-          events: [],
-          warnings: [],
-        }),
+      const snapshotKey = useMemo(
+        () => buildCalendarSnapshotKey(instanceId, settings),
+        [instanceId, settings.calendarColors, settings.calendarLabels, settings.calendars],
+      );
+      const initialSnapshot = useMemo(
+        () =>
+          readPersistedModuleSnapshot({
+            key: snapshotKey,
+            parse: (storedPayload) => calendarModuleEventsResponseSchema.parse(storedPayload),
+            maxAgeMs: CALENDAR_SNAPSHOT_MAX_AGE_MS,
+          }),
+        [snapshotKey],
+      );
+      const [payload, setPayload] = useState(
+        () =>
+          initialSnapshot?.data ??
+          calendarModuleEventsResponseSchema.parse({
+            generatedAt: new Date().toISOString(),
+            events: [],
+            warnings: [],
+          }),
       );
       const [error, setError] = useState<string | null>(null);
-      const [loading, setLoading] = useState(true);
-      const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(null);
+      const [loading, setLoading] = useState(() => initialSnapshot === null);
+      const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(
+        () => initialSnapshot?.updatedAtMs ?? null,
+      );
       const browserOnline = useBrowserOnlineStatus();
       const connectivityState = resolveModuleConnectivityState({
         error,
         hasSnapshot: lastUpdatedMs !== null,
         isOnline: browserOnline,
       });
+
+      useEffect(() => {
+        if (!initialSnapshot) {
+          return;
+        }
+
+        setPayload(initialSnapshot.data);
+        setLastUpdatedMs(initialSnapshot.updatedAtMs);
+        setLoading(false);
+      }, [initialSnapshot]);
 
       useEffect(() => {
         if (isEditing) {
@@ -277,9 +319,11 @@ export const moduleDefinition = defineModule({
               return;
             }
 
+            const updatedAtMs = Date.now();
             setPayload(nextPayload);
-            setLastUpdatedMs(Date.now());
+            setLastUpdatedMs(updatedAtMs);
             setError(null);
+            writePersistedModuleSnapshot(snapshotKey, nextPayload, updatedAtMs);
           } catch (loadError) {
             if (!active || (loadError instanceof Error && loadError.name === "AbortError")) {
               return;
@@ -304,7 +348,7 @@ export const moduleDefinition = defineModule({
           window.clearInterval(timer);
           abortController?.abort();
         };
-      }, [instanceId, isEditing, settings.refreshIntervalSeconds]);
+      }, [instanceId, isEditing, settings.refreshIntervalSeconds, snapshotKey]);
 
       const parsedEvents = useMemo<CalendarTileEvent[]>(
         () =>

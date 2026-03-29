@@ -8,10 +8,16 @@ import {
   type WeatherModuleCurrentResponse,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import {
+  readPersistedModuleSnapshot,
+  writePersistedModuleSnapshot,
+} from "../data/persisted-module-snapshot";
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 import { type TileDensity, useTileDensity } from "../ui/useTileDensity";
+
+const WEATHER_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 const emptyPayload = (): WeatherModuleCurrentResponse =>
   weatherModuleCurrentResponseSchema.parse({
@@ -26,6 +32,21 @@ const emptyPayload = (): WeatherModuleCurrentResponse =>
     forecastDays: [],
     warning: null,
   });
+
+const buildWeatherSnapshotKey = (
+  instanceId: string,
+  settings: Pick<
+    WeatherModuleConfig,
+    "locationQuery" | "latitude" | "longitude" | "temperatureUnit" | "windSpeedUnit"
+  >,
+): string =>
+  `weather:${instanceId}:${JSON.stringify({
+    locationQuery: settings.locationQuery.trim().toLowerCase(),
+    latitude: settings.latitude,
+    longitude: settings.longitude,
+    temperatureUnit: settings.temperatureUnit,
+    windSpeedUnit: settings.windSpeedUnit,
+  })}`;
 
 const loadWeather = async (
   instanceId: string,
@@ -355,16 +376,50 @@ export const moduleDefinition = defineModule({
     Component: ({ instanceId, settings, isEditing }) => {
       const { ref: tileRef, metrics: tileMetrics } = useTileDensity<HTMLDivElement>();
       const density = tileMetrics.density;
-      const [payload, setPayload] = useState<WeatherModuleCurrentResponse>(() => emptyPayload());
-      const [loading, setLoading] = useState(true);
+      const snapshotKey = useMemo(
+        () => buildWeatherSnapshotKey(instanceId, settings),
+        [
+          instanceId,
+          settings.latitude,
+          settings.locationQuery,
+          settings.longitude,
+          settings.temperatureUnit,
+          settings.windSpeedUnit,
+        ],
+      );
+      const initialSnapshot = useMemo(
+        () =>
+          readPersistedModuleSnapshot({
+            key: snapshotKey,
+            parse: (storedPayload) => weatherModuleCurrentResponseSchema.parse(storedPayload),
+            maxAgeMs: WEATHER_SNAPSHOT_MAX_AGE_MS,
+          }),
+        [snapshotKey],
+      );
+      const [payload, setPayload] = useState<WeatherModuleCurrentResponse>(
+        () => initialSnapshot?.data ?? emptyPayload(),
+      );
+      const [loading, setLoading] = useState(() => initialSnapshot === null);
       const [error, setError] = useState<string | null>(null);
-      const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(null);
+      const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(
+        () => initialSnapshot?.updatedAtMs ?? null,
+      );
       const browserOnline = useBrowserOnlineStatus();
       const connectivityState = resolveModuleConnectivityState({
         error,
         hasSnapshot: lastUpdatedMs !== null,
         isOnline: browserOnline,
       });
+
+      useEffect(() => {
+        if (!initialSnapshot) {
+          return;
+        }
+
+        setPayload(initialSnapshot.data);
+        setLastUpdatedMs(initialSnapshot.updatedAtMs);
+        setLoading(false);
+      }, [initialSnapshot]);
       const forecastLimit = useMemo(() => {
         if (!settings.showForecast) {
           return 0;
@@ -461,9 +516,11 @@ export const moduleDefinition = defineModule({
               return;
             }
 
+            const updatedAtMs = Date.now();
             setPayload(next);
-            setLastUpdatedMs(Date.now());
+            setLastUpdatedMs(updatedAtMs);
             setError(null);
+            writePersistedModuleSnapshot(snapshotKey, next, updatedAtMs);
           } catch (loadError) {
             if (!active || (loadError instanceof Error && loadError.name === "AbortError")) {
               return;
@@ -499,6 +556,7 @@ export const moduleDefinition = defineModule({
         settings.refreshIntervalSeconds,
         settings.temperatureUnit,
         settings.windSpeedUnit,
+        snapshotKey,
       ]);
 
       if (isEditing) {

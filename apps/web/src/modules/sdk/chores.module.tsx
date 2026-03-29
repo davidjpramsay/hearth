@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   choresBoardResponseSchema,
   choresModuleConfigSchema,
@@ -16,9 +16,15 @@ import {
   getDisplayNow,
   getDisplaySiteTimeZone,
 } from "../../runtime/display-time";
+import {
+  readPersistedModuleSnapshot,
+  writePersistedModuleSnapshot,
+} from "../data/persisted-module-snapshot";
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
+
+const CHORES_SNAPSHOT_MAX_AGE_MS = 36 * 60 * 60 * 1000;
 
 const localIsoDate = (timeZone: string, date: Date = getDisplayNow()): string =>
   toCalendarDateInTimeZone(date, timeZone);
@@ -48,6 +54,9 @@ const emptyBoard = (timeZone: string): ChoresBoardResponse =>
       weeklyByMember: [],
     },
   });
+
+const buildChoresSnapshotKey = (instanceId: string, enableMoneyTracking: boolean): string =>
+  `chores:${instanceId}:${enableMoneyTracking ? "money" : "nomoney"}`;
 
 const fetchSummary = async (
   instanceId: string,
@@ -126,14 +135,33 @@ export const moduleDefinition = defineModule({
   dataSchema: choresBoardResponseSchema,
   runtime: {
     Component: ({ instanceId, settings, isEditing }) => {
-      const [siteTimeZone, setSiteTimeZone] = useState(() => getDisplaySiteTimeZone());
-      const [board, setBoard] = useState<ChoresBoardResponse>(() =>
-        emptyBoard(getDisplaySiteTimeZone()),
+      const runtimeSiteTimeZone = getDisplaySiteTimeZone();
+      const snapshotKey = useMemo(
+        () => buildChoresSnapshotKey(instanceId, settings.enableMoneyTracking),
+        [instanceId, settings.enableMoneyTracking],
       );
-      const [loading, setLoading] = useState(true);
+      const initialSnapshot = useMemo(
+        () =>
+          readPersistedModuleSnapshot({
+            key: snapshotKey,
+            parse: (storedPayload) => choresBoardResponseSchema.parse(storedPayload),
+            maxAgeMs: CHORES_SNAPSHOT_MAX_AGE_MS,
+            validate: (storedBoard) => storedBoard.startDate === localIsoDate(runtimeSiteTimeZone),
+          }),
+        [runtimeSiteTimeZone, snapshotKey],
+      );
+      const [siteTimeZone, setSiteTimeZone] = useState(
+        () => initialSnapshot?.data.payoutConfig.siteTimezone ?? runtimeSiteTimeZone,
+      );
+      const [board, setBoard] = useState<ChoresBoardResponse>(
+        () => initialSnapshot?.data ?? emptyBoard(runtimeSiteTimeZone),
+      );
+      const [loading, setLoading] = useState(() => initialSnapshot === null);
       const [error, setError] = useState<string | null>(null);
       const [savingKeys, setSavingKeys] = useState<string[]>([]);
-      const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(null);
+      const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(
+        () => initialSnapshot?.updatedAtMs ?? null,
+      );
       const boardRef = useRef(board);
       const loadRef = useRef<() => Promise<void>>(async () => undefined);
       const browserOnline = useBrowserOnlineStatus();
@@ -146,6 +174,17 @@ export const moduleDefinition = defineModule({
       useEffect(() => {
         boardRef.current = board;
       }, [board]);
+
+      useEffect(() => {
+        if (!initialSnapshot) {
+          return;
+        }
+
+        setBoard(initialSnapshot.data);
+        setSiteTimeZone(initialSnapshot.data.payoutConfig.siteTimezone);
+        setLastUpdatedMs(initialSnapshot.updatedAtMs);
+        setLoading(false);
+      }, [initialSnapshot]);
 
       useEffect(() => {
         if (isEditing) {
@@ -163,10 +202,12 @@ export const moduleDefinition = defineModule({
               return;
             }
 
+            const updatedAtMs = Date.now();
             setBoard(summary);
             setSiteTimeZone(summary.payoutConfig.siteTimezone);
-            setLastUpdatedMs(Date.now());
+            setLastUpdatedMs(updatedAtMs);
             setError(null);
+            writePersistedModuleSnapshot(snapshotKey, summary, updatedAtMs);
           } catch (loadError) {
             if (!active) {
               return;
@@ -225,7 +266,7 @@ export const moduleDefinition = defineModule({
           window.removeEventListener("focus", onWindowFocus);
           window.clearInterval(timer);
         };
-      }, [instanceId, isEditing]);
+      }, [instanceId, isEditing, snapshotKey]);
 
       useEffect(() => {
         if (isEditing) {
@@ -321,15 +362,19 @@ export const moduleDefinition = defineModule({
             date: item.date,
             completed,
           });
+          const updatedAtMs = Date.now();
           setBoard(summary);
           setSiteTimeZone(summary.payoutConfig.siteTimezone);
-          setLastUpdatedMs(Date.now());
+          setLastUpdatedMs(updatedAtMs);
+          writePersistedModuleSnapshot(snapshotKey, summary, updatedAtMs);
         } catch (toggleError) {
           const summary = await fetchSummary(instanceId).catch(() => null);
           if (summary) {
+            const updatedAtMs = Date.now();
             setBoard(summary);
             setSiteTimeZone(summary.payoutConfig.siteTimezone);
-            setLastUpdatedMs(Date.now());
+            setLastUpdatedMs(updatedAtMs);
+            writePersistedModuleSnapshot(snapshotKey, summary, updatedAtMs);
           } else {
             setBoard(previousBoard);
           }

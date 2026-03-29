@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   photoCollectionsConfigSchema,
   photosModuleConfigSchema,
@@ -12,11 +12,16 @@ import { defineModule } from "@hearth/module-sdk";
 import { getPhotoCollections } from "../../api/client";
 import { getAuthToken } from "../../auth/storage";
 import { getDeviceId } from "../../device/device-id";
+import {
+  readPersistedModuleSnapshot,
+  writePersistedModuleSnapshot,
+} from "../data/persisted-module-snapshot";
 import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 
 const LAYOUT_CROSSFADE_DATA_ATTRIBUTE = "data-hearth-layout-crossfade";
+const PHOTO_SNAPSHOT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const DISPLAY_SOURCE_KIND_STORAGE_KEY = "hearth:display-source-kind";
 const DISPLAY_CYCLE_SECONDS_STORAGE_KEY = "hearth:display-cycle-seconds";
 const DISPLAY_PHOTO_COLLECTION_ID_STORAGE_KEY = "hearth:display-photo-collection-id";
@@ -49,6 +54,22 @@ const preloadImage = async (src: string): Promise<void> => {
 
 const clampIntervalSeconds = (value: number): number =>
   Math.max(3, Math.min(3600, Math.round(value)));
+
+const buildPhotosSnapshotKey = (
+  instanceId: string,
+  input: {
+    requestedSourceKind: "set" | "layout" | null;
+    setCollectionId: string | null;
+    moduleCollectionId: string | null;
+    folderPath: string;
+  },
+): string =>
+  `photos:${instanceId}:${JSON.stringify({
+    requestedSourceKind: input.requestedSourceKind ?? "layout",
+    setCollectionId: input.setCollectionId,
+    moduleCollectionId: input.moduleCollectionId,
+    folderPath: input.folderPath.trim(),
+  })}`;
 
 const getDisplaySourceKindFromStorage = (): "set" | "layout" | null => {
   if (typeof window === "undefined") {
@@ -247,24 +268,56 @@ export const moduleDefinition = defineModule({
       const effectiveSetCollectionId = setCollectionId;
       const effectiveIntervalSeconds =
         setCycleIntervalSeconds ?? clampIntervalSeconds(settings.intervalSeconds);
+      const snapshotKey = useMemo(
+        () =>
+          buildPhotosSnapshotKey(instanceId, {
+            requestedSourceKind,
+            setCollectionId: effectiveSetCollectionId,
+            moduleCollectionId: settings.collectionId,
+            folderPath: settings.folderPath,
+          }),
+        [
+          effectiveSetCollectionId,
+          instanceId,
+          requestedSourceKind,
+          settings.collectionId,
+          settings.folderPath,
+        ],
+      );
+      const initialSnapshot = useMemo(
+        () =>
+          readPersistedModuleSnapshot({
+            key: snapshotKey,
+            parse: (storedPayload) => photosModuleNextResponseSchema.parse(storedPayload),
+            maxAgeMs: PHOTO_SNAPSHOT_MAX_AGE_MS,
+            validate: (storedPayload) => storedPayload.frame !== null,
+          }),
+        [snapshotKey],
+      );
       const isLayoutCrossfading =
         !isEditing &&
         typeof document !== "undefined" &&
         document.documentElement.getAttribute(LAYOUT_CROSSFADE_DATA_ATTRIBUTE) === "1";
-      const [frameData, setFrameData] = useState(() =>
-        photosModuleNextResponseSchema.parse({
-          generatedAt: new Date().toISOString(),
-          frame: null,
-          stableOrientation: null,
-          warning: null,
-        }),
+      const [frameData, setFrameData] = useState(
+        () =>
+          initialSnapshot?.data ??
+          photosModuleNextResponseSchema.parse({
+            generatedAt: new Date().toISOString(),
+            frame: null,
+            stableOrientation: null,
+            warning: null,
+          }),
       );
-      const [displayFrame, setDisplayFrame] = useState<PhotosModuleFrame | null>(null);
+      const [displayFrame, setDisplayFrame] = useState<PhotosModuleFrame | null>(
+        () => initialSnapshot?.data.frame ?? null,
+      );
       const displayFrameRef = useRef<PhotosModuleFrame | null>(null);
-      const [imageVisible, setImageVisible] = useState(false);
+      const [imageVisible, setImageVisible] = useState(() => initialSnapshot?.data.frame !== null);
       const [error, setError] = useState<string | null>(null);
-      const [loading, setLoading] = useState(true);
-      const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(null);
+      const [loading, setLoading] = useState(() => initialSnapshot === null);
+      const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(
+        () => initialSnapshot?.updatedAtMs ?? null,
+      );
       const browserOnline = useBrowserOnlineStatus();
       const connectivityState = resolveModuleConnectivityState({
         error,
@@ -275,6 +328,30 @@ export const moduleDefinition = defineModule({
       useEffect(() => {
         displayFrameRef.current = displayFrame;
       }, [displayFrame]);
+
+      useEffect(() => {
+        if (initialSnapshot) {
+          setFrameData(initialSnapshot.data);
+          setDisplayFrame(initialSnapshot.data.frame);
+          setImageVisible(initialSnapshot.data.frame !== null);
+          setLastUpdatedMs(initialSnapshot.updatedAtMs);
+          setLoading(false);
+          return;
+        }
+
+        setFrameData(
+          photosModuleNextResponseSchema.parse({
+            generatedAt: new Date().toISOString(),
+            frame: null,
+            stableOrientation: null,
+            warning: null,
+          }),
+        );
+        setDisplayFrame(null);
+        setImageVisible(false);
+        setLastUpdatedMs(null);
+        setLoading(true);
+      }, [initialSnapshot, snapshotKey]);
 
       useEffect(() => {
         const applyCurrentContext = (event?: Event) => {
@@ -321,8 +398,9 @@ export const moduleDefinition = defineModule({
               return;
             }
 
+            const updatedAtMs = Date.now();
             setFrameData(next);
-            setLastUpdatedMs(Date.now());
+            setLastUpdatedMs(updatedAtMs);
             setError(null);
 
             if (!next.frame) {
@@ -331,6 +409,7 @@ export const moduleDefinition = defineModule({
             }
 
             if (displayFrameRef.current?.imageId === next.frame.imageId) {
+              writePersistedModuleSnapshot(snapshotKey, next, updatedAtMs);
               return;
             }
 
@@ -347,6 +426,7 @@ export const moduleDefinition = defineModule({
               return;
             }
 
+            writePersistedModuleSnapshot(snapshotKey, next, updatedAtMs);
             setDisplayFrame(next.frame);
           } catch (loadError) {
             if (!active) {
@@ -376,6 +456,7 @@ export const moduleDefinition = defineModule({
         instanceId,
         isEditing,
         requestedSourceKind,
+        snapshotKey,
       ]);
 
       useEffect(() => {

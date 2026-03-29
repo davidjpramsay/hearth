@@ -72,7 +72,7 @@ const services = {
   deviceRepository,
   settingsRepository,
   moduleStateRepository,
-  calendarFeedService: new CalendarFeedService(),
+  calendarFeedService: new CalendarFeedService(moduleStateRepository),
   photosSlideshowService: new PhotosSlideshowService(moduleStateRepository),
   localWarningService,
   screenProfileService: new ScreenProfileService(

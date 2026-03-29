@@ -46,7 +46,7 @@ import {
 } from "@hearth/shared";
 import { handleUnauthorizedAdminResponse } from "../auth/session";
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
+const API_BASE = import.meta.env?.VITE_API_BASE ?? "/api";
 
 const request = async <T>(
   path: string,

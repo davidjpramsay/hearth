@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import type { ModuleStateRepository } from "../src/repositories/module-state-repository.js";
 import { CalendarFeedService } from "../src/services/calendar-feed-service.js";
 
 const toIcsDate = (date: Date): string =>
@@ -14,6 +15,17 @@ const toIcsDate = (date: Date): string =>
 
 const toUtcMidnightIso = (date: Date): string =>
   new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0)).toISOString();
+
+const createModuleStateRepositoryStub = (): ModuleStateRepository => {
+  const store = new Map<string, unknown>();
+
+  return {
+    getState: <T>(key: string): T | null => (store.get(key) as T | undefined) ?? null,
+    setState: (key: string, value: unknown) => {
+      store.set(key, value);
+    },
+  } as ModuleStateRepository;
+};
 
 test("CalendarFeedService serializes all-day events as calendar days", async (t) => {
   const tempDir = await mkdtemp(join(tmpdir(), "hearth-calendar-"));
@@ -60,4 +72,69 @@ test("CalendarFeedService serializes all-day events as calendar days", async (t)
   assert.equal(event.allDay, true);
   assert.equal(event.start, toUtcMidnightIso(start));
   assert.equal(event.end, toUtcMidnightIso(end));
+});
+
+test("CalendarFeedService falls back to a persisted response after a cold-start source failure", async (t) => {
+  const tempDir = await mkdtemp(join(tmpdir(), "hearth-calendar-cache-"));
+  t.after(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  const start = new Date();
+  start.setHours(9, 0, 0, 0);
+  start.setDate(start.getDate() + 2);
+
+  const end = new Date(start);
+  end.setHours(10, 0, 0, 0);
+
+  const icsPath = join(tempDir, "upcoming.ics");
+  await writeFile(
+    icsPath,
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Hearth Test//EN",
+      "BEGIN:VEVENT",
+      "UID:persisted-calendar-test",
+      "DTSTAMP:20260306T000000Z",
+      `DTSTART:${start
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .replace(/\.\d{3}Z$/, "Z")}`,
+      `DTEND:${end
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .replace(/\.\d{3}Z$/, "Z")}`,
+      "SUMMARY:Persisted planning event",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n"),
+  );
+
+  const moduleStateRepository = createModuleStateRepositoryStub();
+  const initialService = new CalendarFeedService(moduleStateRepository);
+  const initialResult = await initialService.getUpcomingEvents({
+    calendars: [icsPath],
+    refreshIntervalSeconds: 300,
+  });
+
+  assert.equal(initialResult.warnings.length, 0);
+  assert.equal(initialResult.events.length, 1);
+  assert.equal(initialResult.events[0]?.title, "Persisted planning event");
+
+  await rm(icsPath, { force: true });
+
+  const coldStartService = new CalendarFeedService(moduleStateRepository);
+  const fallbackResult = await coldStartService.getUpcomingEvents({
+    calendars: [icsPath],
+    refreshIntervalSeconds: 300,
+  });
+
+  assert.equal(fallbackResult.events.length, 1);
+  assert.equal(fallbackResult.events[0]?.title, "Persisted planning event");
+  assert.match(
+    fallbackResult.warnings.join(" "),
+    /saved calendar snapshot while refresh is unavailable/i,
+  );
 });
