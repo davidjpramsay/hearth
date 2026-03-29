@@ -891,9 +891,18 @@ test("time gate nodes resolve the matching window or else branch in the househol
     evaluateCondition: resolveBuiltinLayoutLogicCondition,
   });
 
-  assert.deepEqual(firstGateSequence.map((target) => target.layoutName), ["Nine AM layout"]);
-  assert.deepEqual(secondGateSequence.map((target) => target.layoutName), ["Ten AM layout"]);
-  assert.deepEqual(fallbackSequence.map((target) => target.layoutName), ["Else layout"]);
+  assert.deepEqual(
+    firstGateSequence.map((target) => target.layoutName),
+    ["Nine AM layout"],
+  );
+  assert.deepEqual(
+    secondGateSequence.map((target) => target.layoutName),
+    ["Ten AM layout"],
+  );
+  assert.deepEqual(
+    fallbackSequence.map((target) => target.layoutName),
+    ["Else layout"],
+  );
 });
 
 test("time gate validation reports overlapping windows", () => {

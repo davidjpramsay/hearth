@@ -273,7 +273,10 @@ const removeCollectionFromAuthoring = (
           };
         }
 
-        if (node.nodeType === "photo-orientation" && node.photoActionCollectionId === collectionId) {
+        if (
+          node.nodeType === "photo-orientation" &&
+          node.photoActionCollectionId === collectionId
+        ) {
           return {
             ...node,
             photoActionCollectionId: null,

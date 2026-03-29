@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   photoCollectionsConfigSchema,
   photosModuleConfigSchema,
@@ -28,6 +28,24 @@ interface DisplayCycleContextEventDetail {
   cycleSeconds: number | null;
   photoCollectionId: string | null;
 }
+
+const preloadImage = async (src: string): Promise<void> => {
+  if (typeof Image === "undefined") {
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => {
+      resolve();
+    };
+    image.onerror = () => {
+      reject(new Error("Failed to preload photo"));
+    };
+    image.src = src;
+  });
+};
 
 const clampIntervalSeconds = (value: number): number =>
   Math.max(3, Math.min(3600, Math.round(value)));
@@ -242,6 +260,7 @@ export const moduleDefinition = defineModule({
         }),
       );
       const [displayFrame, setDisplayFrame] = useState<PhotosModuleFrame | null>(null);
+      const displayFrameRef = useRef<PhotosModuleFrame | null>(null);
       const [imageVisible, setImageVisible] = useState(false);
       const [error, setError] = useState<string | null>(null);
       const [loading, setLoading] = useState(true);
@@ -252,6 +271,10 @@ export const moduleDefinition = defineModule({
         hasSnapshot: lastUpdatedMs !== null,
         isOnline: browserOnline,
       });
+
+      useEffect(() => {
+        displayFrameRef.current = displayFrame;
+      }, [displayFrame]);
 
       useEffect(() => {
         const applyCurrentContext = (event?: Event) => {
@@ -307,9 +330,24 @@ export const moduleDefinition = defineModule({
               return;
             }
 
-            setDisplayFrame((current) =>
-              current?.imageId === next.frame?.imageId ? current : next.frame,
-            );
+            if (displayFrameRef.current?.imageId === next.frame.imageId) {
+              return;
+            }
+
+            try {
+              await preloadImage(next.frame.imageUrl);
+            } catch {
+              if (displayFrameRef.current === null) {
+                setError("Failed to load photos");
+              }
+              return;
+            }
+
+            if (!active) {
+              return;
+            }
+
+            setDisplayFrame(next.frame);
           } catch (loadError) {
             if (!active) {
               return;

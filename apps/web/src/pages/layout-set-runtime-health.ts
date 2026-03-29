@@ -211,11 +211,7 @@ export const analyzeSetRuntimeHealth = (input: {
       addIssue("warning", `${nodeTypeLabel(node.type)} node "${node.id}" has no outgoing path.`);
     }
 
-    if (
-      node.type === "if-portrait" ||
-      node.type === "if-landscape" ||
-      node.type === "if-time"
-    ) {
+    if (node.type === "if-portrait" || node.type === "if-landscape" || node.type === "if-time") {
       const hasYes = outgoing.some((edge) => edge.when === "yes");
       const hasNo = outgoing.some((edge) => edge.when === "no");
 

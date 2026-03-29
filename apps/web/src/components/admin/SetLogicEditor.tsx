@@ -1225,7 +1225,10 @@ const buildFlowGraph = (input: {
   );
   const hiddenWarningPortraitSources = new Set(
     routerNodes
-      .filter((node) => isPhotoOrientationNode(node) && getActionNodeKind(node.photoActionType) === "warning")
+      .filter(
+        (node) =>
+          isPhotoOrientationNode(node) && getActionNodeKind(node.photoActionType) === "warning",
+      )
       .map((node) => `${node.id}::portrait`),
   );
   const visibleConnections = input.block.connections.filter(
@@ -1289,62 +1292,60 @@ const buildFlowGraph = (input: {
   routerNodes.forEach((node, index) => {
     const routerNodeKind = getRouterNodeKind(node);
     const isTimeGate = isTimeGateNode(node);
-    const conditionBranchCopy =
-      isPhotoOrientationNode(node)
-        ? getConditionBranchCopy(
-            getNormalizedConditionTypeForNodeKind(
-              getActionNodeKind(node.photoActionType),
-              "portrait-photo",
-              node.portrait.conditionType,
-            ),
-          )
-        : null;
+    const conditionBranchCopy = isPhotoOrientationNode(node)
+      ? getConditionBranchCopy(
+          getNormalizedConditionTypeForNodeKind(
+            getActionNodeKind(node.photoActionType),
+            "portrait-photo",
+            node.portrait.conditionType,
+          ),
+        )
+      : null;
     const routerHeight = getRouterNodeHeight(node);
-    const routes =
-      isTimeGate
+    const routes = isTimeGate
+      ? [
+          ...node.gates.map((gate, gateIndex) => {
+            const meta = getTimeGateRouteMeta(gateIndex);
+            return {
+              key: gate.id,
+              label: formatPhotoRouterTimeGateWindow(gate),
+              count: connectionBySourceHandle.has(`${node.id}::${gate.id}`) ? 1 : 0,
+              enabled: true,
+              connectable: true,
+              ...meta,
+            };
+          }),
+          {
+            key: "fallback",
+            label: "Else",
+            count: connectionBySourceHandle.has(`${node.id}::fallback`) ? 1 : 0,
+            enabled: true,
+            connectable: true,
+            ...BRANCH_META.fallback,
+          },
+        ]
+      : routerNodeKind === "warning"
         ? [
-            ...node.gates.map((gate, gateIndex) => {
-              const meta = getTimeGateRouteMeta(gateIndex);
-              return {
-                key: gate.id,
-                label: formatPhotoRouterTimeGateWindow(gate),
-                count: connectionBySourceHandle.has(`${node.id}::${gate.id}`) ? 1 : 0,
-                enabled: true,
-                connectable: true,
-                ...meta,
-              };
-            }),
             {
               key: "fallback",
-              label: "Else",
+              label: conditionBranchCopy?.fallbackLabel ?? "Otherwise",
               count: connectionBySourceHandle.has(`${node.id}::fallback`) ? 1 : 0,
               enabled: true,
               connectable: true,
               ...BRANCH_META.fallback,
             },
           ]
-        : routerNodeKind === "warning"
-          ? [
-              {
-                key: "fallback",
-                label: conditionBranchCopy?.fallbackLabel ?? "Otherwise",
-                count: connectionBySourceHandle.has(`${node.id}::fallback`) ? 1 : 0,
-                enabled: true,
-                connectable: true,
-                ...BRANCH_META.fallback,
-              },
-            ]
-          : ROUTER_ROUTE_ORDER.map((branchKey) => ({
-              key: branchKey,
-              label:
-                branchKey === "portrait"
-                  ? conditionBranchCopy?.matchedLabel ?? "Matches"
-                  : conditionBranchCopy?.fallbackLabel ?? "Otherwise",
-              count: connectionBySourceHandle.has(`${node.id}::${branchKey}`) ? 1 : 0,
-              enabled: true,
-              connectable: true,
-              ...(branchKey === "portrait" ? BRANCH_META.portrait : BRANCH_META.fallback),
-            }));
+        : ROUTER_ROUTE_ORDER.map((branchKey) => ({
+            key: branchKey,
+            label:
+              branchKey === "portrait"
+                ? (conditionBranchCopy?.matchedLabel ?? "Matches")
+                : (conditionBranchCopy?.fallbackLabel ?? "Otherwise"),
+            count: connectionBySourceHandle.has(`${node.id}::${branchKey}`) ? 1 : 0,
+            enabled: true,
+            connectable: true,
+            ...(branchKey === "portrait" ? BRANCH_META.portrait : BRANCH_META.fallback),
+          }));
 
     nodes.push({
       id: node.id,
@@ -1361,10 +1362,9 @@ const buildFlowGraph = (input: {
       data: {
         title: node.title,
         kindLabel: getRouterNodeKindLabel(routerNodeKind),
-        actionSummary:
-          isTimeGate
-            ? "Routes to different paths based on the household time window."
-            : getCanvasActionTypeById(node.photoActionType).description,
+        actionSummary: isTimeGate
+          ? "Routes to different paths based on the household time window."
+          : getCanvasActionTypeById(node.photoActionType).description,
         sourceLabel:
           routerNodeKind === "warning"
             ? null
@@ -1536,9 +1536,7 @@ export const SetLogicEditor = ({
         setEditorError(null);
         onChange(nextAuthoring);
       } catch (error) {
-        setEditorError(
-          error instanceof Error ? error.message : "Unable to apply this graph edit.",
-        );
+        setEditorError(error instanceof Error ? error.message : "Unable to apply this graph edit.");
       }
     },
     [onChange],
@@ -1944,7 +1942,8 @@ export const SetLogicEditor = ({
     : null;
   const selectedTimeGateNode = selectedNodeId
     ? (block.nodes.find(
-        (node): node is PhotoRouterTimeGateNode => node.id === selectedNodeId && isTimeGateNode(node),
+        (node): node is PhotoRouterTimeGateNode =>
+          node.id === selectedNodeId && isTimeGateNode(node),
       ) ?? null)
     : null;
   const selectedActionKind = selectedActionNode
@@ -2586,7 +2585,7 @@ export const SetLogicEditor = ({
                     ...current,
                     portrait: updater(current.portrait),
                   })),
-                )}
+              )}
             </>
           ) : selectedTimeGateNode ? (
             <>
@@ -2654,7 +2653,8 @@ export const SetLogicEditor = ({
                           <div>
                             <p className="text-sm font-semibold">Gate {gateIndex + 1}</p>
                             <p className="mt-1 text-xs opacity-80">
-                              Connect this output to the path for {formatPhotoRouterTimeGateWindow(gate)}.
+                              Connect this output to the path for{" "}
+                              {formatPhotoRouterTimeGateWindow(gate)}.
                             </p>
                           </div>
                           <button
@@ -2686,7 +2686,10 @@ export const SetLogicEditor = ({
                                   ...current,
                                   gates: current.gates.map((entry) =>
                                     entry.id === gate.id
-                                      ? { ...entry, startTime: event.target.value || entry.startTime }
+                                      ? {
+                                          ...entry,
+                                          startTime: event.target.value || entry.startTime,
+                                        }
                                       : entry,
                                   ),
                                 }))

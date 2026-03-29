@@ -69,6 +69,11 @@ test("reportScreenProfile seeds a new device from reported local settings", () =
     assert.equal(response.device.targetSelection?.layoutName, "16:9 Standard Portrait");
     assert.equal(response.resolvedTargetSelection.kind, "layout");
     assert.equal(response.layout?.name, "16:9 Standard Portrait");
+    assert.equal(
+      response.siteTimeZone,
+      harness.settingsRepository.getSiteTimeConfig().siteTimezone,
+    );
+    assert.ok(response.serverNowMs > 0);
 
     const storedDevice = harness.deviceRepository.getDevice("device-seed-1");
     assert.ok(storedDevice);

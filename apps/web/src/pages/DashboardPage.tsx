@@ -20,6 +20,7 @@ import {
 } from "./dashboard-device-bootstrap";
 import { getDisplayClientInfo } from "../device/display-client-info";
 import { moduleRegistry } from "../registry/module-registry";
+import { getDisplayNowMs, syncDisplayTimeContext } from "../runtime/display-time";
 import { applyTheme } from "../theme/theme";
 
 const FALLBACK_VIEWPORT = {
@@ -316,6 +317,7 @@ export const DashboardPage = () => {
     latestResolveRequestIdRef.current = requestId;
     const orientation = input?.orientation ?? photoOrientationRef.current;
     const bootstrapState = deviceBootstrapRef.current;
+    const requestStartedAtMs = Date.now();
 
     try {
       const resolution = await reportScreenProfile({
@@ -332,6 +334,12 @@ export const DashboardPage = () => {
       if (requestId !== latestResolveRequestIdRef.current) {
         return;
       }
+      syncDisplayTimeContext({
+        siteTimeZone: resolution.siteTimeZone,
+        serverNowMs: resolution.serverNowMs,
+        localStartedAtMs: requestStartedAtMs,
+        localReceivedAtMs: Date.now(),
+      });
       deviceBootstrapRef.current = getDashboardDeviceBootstrapStateFromResolution(resolution);
       setDeviceIdentity(resolution.device);
       applyTheme(resolution.device.themeId);
@@ -380,7 +388,7 @@ export const DashboardPage = () => {
       return;
     }
 
-    const delayMs = Math.max(120, nextCycleAtMs - Date.now() + 25);
+    const delayMs = Math.max(120, nextCycleAtMs - getDisplayNowMs() + 25);
     const timer = window.setTimeout(() => {
       void resolveLayout({ orientation: photoOrientationRef.current });
     }, delayMs);

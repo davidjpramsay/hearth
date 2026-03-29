@@ -3,6 +3,7 @@ import { layoutRecordSchema } from "./layout.js";
 import {
   clockTimeSchema,
   formatClockTimeFromMinutes,
+  ianaTimeZoneSchema,
   parseClockTimeToMinutes,
 } from "./time.js";
 import {
@@ -186,13 +187,17 @@ export const photoRouterTimeGateNodeSchema = z.object({
   id: logicNodeIdSchema,
   nodeType: z.literal("time-gate"),
   title: screenSetNameSchema.default(DEFAULT_TIME_GATE_TITLE),
-  gates: z.array(photoRouterTimeGateSchema).min(1).max(24).default([
-    {
-      id: "time-gate-1",
-      startTime: "09:00",
-      endTime: "10:00",
-    },
-  ]),
+  gates: z
+    .array(photoRouterTimeGateSchema)
+    .min(1)
+    .max(24)
+    .default([
+      {
+        id: "time-gate-1",
+        startTime: "09:00",
+        endTime: "10:00",
+      },
+    ]),
 });
 
 export const photoRouterGraphNodeSchema = z.discriminatedUnion("nodeType", [
@@ -1962,7 +1967,7 @@ const toCanonicalRule = (
         ? LANDSCAPE_CONDITION_TYPE
         : expectedTrigger === "time-window"
           ? SITE_TIME_WINDOW_LAYOUT_LOGIC_CONDITION_TYPE
-        : null;
+          : null;
 
   return {
     layoutName,
@@ -2177,7 +2182,7 @@ export const createLayoutSetLogicGraphFromBranches = (
                 ? LANDSCAPE_CONDITION_TYPE
                 : rule.trigger === "time-window"
                   ? SITE_TIME_WINDOW_LAYOUT_LOGIC_CONDITION_TYPE
-                : null),
+                  : null),
           conditionParams: rule.conditionParams ?? {},
         }),
       );
@@ -2823,6 +2828,8 @@ export const reportScreenProfileResponseSchema = z.object({
   mode: displayLayoutSwitchModeSchema,
   autoCycleSeconds: z.number().int().min(3).max(3600),
   nextCycleAtMs: z.number().int().nonnegative().nullable(),
+  serverNowMs: z.number().int().nonnegative(),
+  siteTimeZone: ianaTimeZoneSchema,
   selectedPhotoCollectionId: photoCollectionIdSchema.nullable(),
   requestedPhotoOrientation: photosOrientationSchema.nullable(),
   appliedPhotoOrientation: autoPhotoOrientationSchema.nullable(),

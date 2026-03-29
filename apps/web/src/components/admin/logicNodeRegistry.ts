@@ -308,12 +308,7 @@ export const evaluateConditionById = (input: {
   return condition.evaluate(
     {
       orientation: input.orientation,
-      now:
-        input.now instanceof Date
-          ? input.now
-          : input.now
-            ? new Date(input.now)
-            : undefined,
+      now: input.now instanceof Date ? input.now : input.now ? new Date(input.now) : undefined,
       siteTimeZone: input.siteTimeZone ?? null,
     },
     parseConditionParamsByType(input.conditionType, input.conditionParams),

@@ -116,5 +116,37 @@ export const getMinutesSinceMidnightInTimeZone = (date: Date, timeZone: string):
   return Number.parseInt(hourPart, 10) * 60 + Number.parseInt(minutePart, 10);
 };
 
+export const getMillisecondsUntilNextCalendarDateInTimeZone = (
+  date: Date,
+  timeZone: string,
+): number => {
+  const normalizedTimeZone = ianaTimeZoneSchema.parse(timeZone);
+  const currentDate = toCalendarDateInTimeZone(date, normalizedTimeZone);
+  const currentMs = date.getTime();
+  let lowMs = currentMs + 1;
+  let highMs = currentMs + 36 * 60 * 60 * 1000;
+
+  while (toCalendarDateInTimeZone(new Date(highMs), normalizedTimeZone) === currentDate) {
+    highMs += 12 * 60 * 60 * 1000;
+    if (highMs - currentMs > 7 * 24 * 60 * 60 * 1000) {
+      throw new Error(
+        `Unable to find the next calendar boundary for time zone: ${normalizedTimeZone}`,
+      );
+    }
+  }
+
+  while (lowMs < highMs) {
+    const midpointMs = Math.floor((lowMs + highMs) / 2);
+    if (toCalendarDateInTimeZone(new Date(midpointMs), normalizedTimeZone) === currentDate) {
+      lowMs = midpointMs + 1;
+      continue;
+    }
+
+    highMs = midpointMs;
+  }
+
+  return Math.max(1, lowMs - currentMs);
+};
+
 export type ModuleTimeMode = z.infer<typeof moduleTimeModeSchema>;
 export type SiteTimeConfig = z.infer<typeof siteTimeConfigSchema>;

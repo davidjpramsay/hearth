@@ -1,22 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   choresBoardResponseSchema,
   choresModuleConfigSchema,
   choresModuleSummaryQuerySchema,
   choresPayoutConfigSchema,
-  getRuntimeTimeZone,
+  getMillisecondsUntilNextCalendarDateInTimeZone,
   toCalendarDateInTimeZone,
   type ChoreBoardItem,
   type ChoresBoardResponse,
   type ChoresModuleConfig,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import {
+  addDisplayTimeContextListener,
+  getDisplayNow,
+  getDisplaySiteTimeZone,
+} from "../../runtime/display-time";
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 
-const localIsoDate = (date: Date = new Date()): string =>
-  toCalendarDateInTimeZone(date, getRuntimeTimeZone());
+const localIsoDate = (timeZone: string, date: Date = getDisplayNow()): string =>
+  toCalendarDateInTimeZone(date, timeZone);
 
 const compareChoreItems = (left: ChoreBoardItem, right: ChoreBoardItem): number => {
   if (left.completed !== right.completed) {
@@ -27,15 +32,15 @@ const compareChoreItems = (left: ChoreBoardItem, right: ChoreBoardItem): number 
 };
 const FALLBACK_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
-const emptyBoard = (): ChoresBoardResponse =>
+const emptyBoard = (timeZone: string): ChoresBoardResponse =>
   choresBoardResponseSchema.parse({
     generatedAt: new Date().toISOString(),
-    startDate: localIsoDate(),
+    startDate: localIsoDate(timeZone),
     days: 1,
-    payoutConfig: choresPayoutConfigSchema.parse({}),
+    payoutConfig: choresPayoutConfigSchema.parse({ siteTimezone: timeZone }),
     members: [],
     chores: [],
-    board: [{ date: localIsoDate(), items: [] }],
+    board: [{ date: localIsoDate(timeZone), items: [] }],
     stats: {
       dailyCompletionRate: 0,
       weeklyCompletedCount: 0,
@@ -121,17 +126,26 @@ export const moduleDefinition = defineModule({
   dataSchema: choresBoardResponseSchema,
   runtime: {
     Component: ({ instanceId, settings, isEditing }) => {
-      const [board, setBoard] = useState<ChoresBoardResponse>(emptyBoard);
+      const [siteTimeZone, setSiteTimeZone] = useState(() => getDisplaySiteTimeZone());
+      const [board, setBoard] = useState<ChoresBoardResponse>(() =>
+        emptyBoard(getDisplaySiteTimeZone()),
+      );
       const [loading, setLoading] = useState(true);
       const [error, setError] = useState<string | null>(null);
       const [savingKeys, setSavingKeys] = useState<string[]>([]);
       const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(null);
+      const boardRef = useRef(board);
+      const loadRef = useRef<() => Promise<void>>(async () => undefined);
       const browserOnline = useBrowserOnlineStatus();
       const connectivityState = resolveModuleConnectivityState({
         error,
         hasSnapshot: lastUpdatedMs !== null,
         isOnline: browserOnline,
       });
+
+      useEffect(() => {
+        boardRef.current = board;
+      }, [board]);
 
       useEffect(() => {
         if (isEditing) {
@@ -150,6 +164,7 @@ export const moduleDefinition = defineModule({
             }
 
             setBoard(summary);
+            setSiteTimeZone(summary.payoutConfig.siteTimezone);
             setLastUpdatedMs(Date.now());
             setError(null);
           } catch (loadError) {
@@ -164,9 +179,18 @@ export const moduleDefinition = defineModule({
             }
           }
         };
+        loadRef.current = load;
 
         const onChoresUpdated = () => {
           void load();
+        };
+        const onDisplayTimeUpdated = () => {
+          const nextSiteTimeZone = getDisplaySiteTimeZone();
+          setSiteTimeZone(nextSiteTimeZone);
+          const expectedDate = localIsoDate(nextSiteTimeZone);
+          if (boardRef.current.startDate !== expectedDate) {
+            void load();
+          }
         };
         const onVisibilityChange = () => {
           if (document.visibilityState === "visible") {
@@ -181,6 +205,9 @@ export const moduleDefinition = defineModule({
         };
 
         void load();
+        const removeDisplayTimeListener = addDisplayTimeContextListener(() => {
+          onDisplayTimeUpdated();
+        });
         window.addEventListener("hearth:chores-updated", onChoresUpdated);
         document.addEventListener("visibilitychange", onVisibilityChange);
         window.addEventListener("pageshow", onPageShow);
@@ -191,6 +218,7 @@ export const moduleDefinition = defineModule({
 
         return () => {
           active = false;
+          removeDisplayTimeListener();
           window.removeEventListener("hearth:chores-updated", onChoresUpdated);
           document.removeEventListener("visibilitychange", onVisibilityChange);
           window.removeEventListener("pageshow", onPageShow);
@@ -198,6 +226,22 @@ export const moduleDefinition = defineModule({
           window.clearInterval(timer);
         };
       }, [instanceId, isEditing]);
+
+      useEffect(() => {
+        if (isEditing) {
+          return;
+        }
+
+        const delayMs =
+          getMillisecondsUntilNextCalendarDateInTimeZone(getDisplayNow(), siteTimeZone) + 250;
+        const timer = window.setTimeout(() => {
+          void loadRef.current();
+        }, delayMs);
+
+        return () => {
+          window.clearTimeout(timer);
+        };
+      }, [board.startDate, isEditing, siteTimeZone]);
 
       if (isEditing) {
         return (
@@ -278,11 +322,13 @@ export const moduleDefinition = defineModule({
             completed,
           });
           setBoard(summary);
+          setSiteTimeZone(summary.payoutConfig.siteTimezone);
           setLastUpdatedMs(Date.now());
         } catch (toggleError) {
           const summary = await fetchSummary(instanceId).catch(() => null);
           if (summary) {
             setBoard(summary);
+            setSiteTimeZone(summary.payoutConfig.siteTimezone);
             setLastUpdatedMs(Date.now());
           } else {
             setBoard(previousBoard);

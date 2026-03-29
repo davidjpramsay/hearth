@@ -4,10 +4,12 @@ import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import {
   choresBoardResponseSchema,
+  getRuntimeTimeZone,
   type ChoresBoardResponse,
   type ChoresModuleConfig,
 } from "@hearth/shared";
 import { moduleDefinition as choresModule } from "../src/modules/sdk/chores.module";
+import { syncDisplayTimeContext } from "../src/runtime/display-time";
 
 type Listener = EventListenerOrEventListenerObject;
 
@@ -291,6 +293,59 @@ test("chores module refreshes when the page becomes visible again", async () => 
     assert.match(tree, /Today Dishes/);
     assert.doesNotMatch(tree, /Yesterday Dishes/);
   } finally {
+    await act(async () => {
+      renderer?.unmount();
+      await flushMicrotasks();
+    });
+    restoreBrowserShims();
+  }
+});
+
+test("chores module refreshes when synced site time crosses into a new day", async () => {
+  const shims = installBrowserShims([
+    createBoard({
+      startDate: "2026-03-24",
+      items: [{ choreId: 1, choreName: "Tuesday Dishes", completed: false }],
+    }),
+    createBoard({
+      startDate: "2026-03-25",
+      items: [{ choreId: 1, choreName: "Wednesday Dishes", completed: false }],
+    }),
+  ]);
+
+  let renderer: ReactTestRenderer | null = null;
+
+  try {
+    await act(async () => {
+      renderer = create(renderModule());
+      await flushMicrotasks();
+    });
+
+    assert.equal(shims.getFetchCallCount(), 1);
+    assert.match(JSON.stringify(renderer?.toJSON()), /Tuesday Dishes/);
+
+    await act(async () => {
+      const localNowMs = new Date("2026-03-24T15:59:59.000Z").getTime();
+      syncDisplayTimeContext({
+        siteTimeZone: "Australia/Perth",
+        serverNowMs: new Date("2026-03-24T16:00:01.000Z").getTime(),
+        localStartedAtMs: localNowMs,
+        localReceivedAtMs: localNowMs,
+      });
+      await flushMicrotasks();
+    });
+
+    const tree = JSON.stringify(renderer?.toJSON());
+    assert.equal(shims.getFetchCallCount(), 2);
+    assert.match(tree, /Wednesday Dishes/);
+    assert.doesNotMatch(tree, /Tuesday Dishes/);
+  } finally {
+    syncDisplayTimeContext({
+      siteTimeZone: getRuntimeTimeZone(),
+      serverNowMs: Date.now(),
+      localStartedAtMs: Date.now(),
+      localReceivedAtMs: Date.now(),
+    });
     await act(async () => {
       renderer?.unmount();
       await flushMicrotasks();

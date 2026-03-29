@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { clampModulePresentationScale, withModulePresentation } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import {
+  addDisplayTimeContextListener,
+  getDisplayNow,
+  getDisplaySiteTimeZone,
+} from "../../runtime/display-time";
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { useTileDensity } from "../ui/useTileDensity";
 
@@ -47,12 +52,13 @@ const settingsSchema = z.preprocess(migrateLegacyClockFontSizes, baseSettingsSch
 
 type Settings = z.infer<typeof settingsSchema>;
 
-const buildClockParts = (date: Date, use24Hour: boolean) => {
+const buildClockParts = (date: Date, use24Hour: boolean, timeZone: string) => {
   const parts = new Intl.DateTimeFormat(undefined, {
     hour: use24Hour ? "2-digit" : "numeric",
     minute: "2-digit",
     second: "2-digit",
     hour12: !use24Hour,
+    timeZone,
   }).formatToParts(date);
 
   const hour = parts.find((part) => part.type === "hour")?.value ?? "--";
@@ -142,7 +148,7 @@ export const moduleDefinition = defineModule({
     description: "Clock migrated to Hearth Module SDK",
     icon: "clock",
     defaultSize: { w: 3, h: 2 },
-    timeMode: "device-local",
+    timeMode: "site-local",
     categories: ["time"],
     permissions: [],
     dataSources: [{ id: "local-time", kind: "local" }],
@@ -151,19 +157,29 @@ export const moduleDefinition = defineModule({
   runtime: {
     Component: ({ settings, isEditing }) => {
       const { ref, metrics } = useTileDensity<HTMLDivElement>();
-      const [now, setNow] = useState(() => new Date());
+      const [siteTimeZone, setSiteTimeZone] = useState(() => getDisplaySiteTimeZone());
+      const [now, setNow] = useState(() => getDisplayNow());
 
       useEffect(() => {
         if (isEditing) {
           return;
         }
 
+        const syncTime = () => {
+          setSiteTimeZone(getDisplaySiteTimeZone());
+          setNow(getDisplayNow());
+        };
         const interval = window.setInterval(() => {
-          setNow(new Date());
+          setNow(getDisplayNow());
         }, 1000);
+        const removeDisplayTimeListener = addDisplayTimeContextListener(() => {
+          syncTime();
+        });
+        syncTime();
 
         return () => {
           window.clearInterval(interval);
+          removeDisplayTimeListener();
         };
       }, [isEditing]);
 
@@ -171,13 +187,15 @@ export const moduleDefinition = defineModule({
         month: "short",
         day: "numeric",
         year: "numeric",
+        timeZone: siteTimeZone,
       });
       const dayFormatter = new Intl.DateTimeFormat(undefined, {
         weekday: "long",
+        timeZone: siteTimeZone,
       });
       const timeParts = useMemo(
-        () => buildClockParts(now, settings.use24Hour),
-        [now, settings.use24Hour],
+        () => buildClockParts(now, settings.use24Hour, siteTimeZone),
+        [now, settings.use24Hour, siteTimeZone],
       );
       const compact = metrics.width < 320 || metrics.height < 150;
       const showTimeMeta = settings.showSeconds || (!settings.use24Hour && timeParts.dayPeriod);
@@ -194,7 +212,7 @@ export const moduleDefinition = defineModule({
           <div className="module-panel-shell flex h-full flex-col justify-between px-4 py-4 text-[color:var(--color-text-primary)]">
             <div>
               <p className="module-copy-label text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
-                Local time
+                Site time
               </p>
               <p className="module-copy-title mt-2 text-[color:var(--color-text-primary)]">
                 Clock preview
