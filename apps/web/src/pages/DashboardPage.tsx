@@ -19,9 +19,18 @@ import {
   getInitialDashboardDeviceBootstrapState,
 } from "./dashboard-device-bootstrap";
 import { getDisplayClientInfo } from "../device/display-client-info";
+import {
+  resolveModuleConnectivityState,
+  useBrowserOnlineStatus,
+} from "../modules/data/connection-state";
+import { ModuleConnectionBadge } from "../modules/ui/ModuleConnectionBadge";
 import { moduleRegistry } from "../registry/module-registry";
 import { getDisplayNowMs, syncDisplayTimeContext } from "../runtime/display-time";
 import { applyTheme } from "../theme/theme";
+import {
+  readPersistedDashboardSnapshot,
+  writePersistedDashboardSnapshot,
+} from "./persisted-dashboard-snapshot";
 
 const FALLBACK_VIEWPORT = {
   width: 1920,
@@ -284,20 +293,33 @@ const DashboardWarningTicker = ({ ticker }: { ticker: ReportScreenProfileWarning
 };
 
 export const DashboardPage = () => {
-  const [activeLayout, setActiveLayout] = useState<LayoutRecord | null>(null);
-  const [deviceIdentity, setDeviceIdentity] = useState<DisplayDeviceRuntime | null>(null);
+  const deviceIdRef = useRef<string>(getOrCreateDeviceId());
+  const initialSnapshotRef = useRef(readPersistedDashboardSnapshot(deviceIdRef.current));
+  const [activeLayout, setActiveLayout] = useState<LayoutRecord | null>(
+    () => initialSnapshotRef.current?.layout ?? null,
+  );
+  const [deviceIdentity, setDeviceIdentity] = useState<DisplayDeviceRuntime | null>(
+    () => initialSnapshotRef.current?.device ?? null,
+  );
   const [error, setError] = useState<string | null>(null);
-  const [warningTicker, setWarningTicker] = useState<ReportScreenProfileWarningTicker | null>(null);
+  const [warningTicker, setWarningTicker] = useState<ReportScreenProfileWarningTicker | null>(
+    () => initialSnapshotRef.current?.warningTicker ?? null,
+  );
+  const [showDisconnectedBadge, setShowDisconnectedBadge] = useState(false);
+  const [disconnectedTitle, setDisconnectedTitle] = useState<string | null>(null);
   const [viewportSize, setViewportSize] = useState(getViewportSize);
   const [photoOrientationHint, setPhotoOrientationHint] = useState<PhotosOrientation | null>(null);
   const [nextCycleAtMs, setNextCycleAtMs] = useState<number | null>(null);
+  const browserOnline = useBrowserOnlineStatus();
   const activeLayoutRef = useRef<LayoutRecord | null>(null);
   const photoOrientationRef = useRef<PhotosOrientation | null>(null);
   const latestResolveRequestIdRef = useRef(0);
   const lastPhotoEventKeyRef = useRef<string | null>(null);
-  const deviceIdRef = useRef<string>(getOrCreateDeviceId());
   const deviceBootstrapRef = useRef(getInitialDashboardDeviceBootstrapState());
   const lastOrientationSwitchAtRef = useRef(0);
+  const retryResolveTimerRef = useRef<number | null>(null);
+  const previousBrowserOnlineRef = useRef(browserOnline);
+  const showDisconnectedBadgeRef = useRef(false);
   const primaryPhotosInstanceId = useMemo(
     () =>
       activeLayout?.config.modules.find((instance) => instance.moduleId === "photos")?.id ?? null,
@@ -312,66 +334,121 @@ export const DashboardPage = () => {
     photoOrientationRef.current = photoOrientationHint;
   }, [photoOrientationHint]);
 
-  const resolveLayout = useCallback(async (input?: { orientation?: PhotosOrientation | null }) => {
-    const requestId = latestResolveRequestIdRef.current + 1;
-    latestResolveRequestIdRef.current = requestId;
-    const orientation = input?.orientation ?? photoOrientationRef.current;
-    const bootstrapState = deviceBootstrapRef.current;
-    const requestStartedAtMs = Date.now();
+  useEffect(() => {
+    showDisconnectedBadgeRef.current = showDisconnectedBadge;
+  }, [showDisconnectedBadge]);
 
-    try {
-      const resolution = await reportScreenProfile({
-        targetSelection: bootstrapState.targetSelection,
-        selectedFamily:
-          bootstrapState.targetSelection.kind === "set"
-            ? bootstrapState.targetSelection.setId
-            : null,
-        photoOrientation: orientation,
-        reportedThemeId: bootstrapState.reportedThemeId,
-        screenSessionId: deviceIdRef.current,
-        deviceInfo: getDisplayClientInfo(),
-      });
-      if (requestId !== latestResolveRequestIdRef.current) {
-        return;
-      }
-      syncDisplayTimeContext({
-        siteTimeZone: resolution.siteTimeZone,
-        serverNowMs: resolution.serverNowMs,
-        localStartedAtMs: requestStartedAtMs,
-        localReceivedAtMs: Date.now(),
-      });
-      deviceBootstrapRef.current = getDashboardDeviceBootstrapStateFromResolution(resolution);
-      setDeviceIdentity(resolution.device);
-      applyTheme(resolution.device.themeId);
-      setNextCycleAtMs(resolution.nextCycleAtMs);
-      setWarningTicker(resolution.warningTicker);
-      publishDisplayCycleContext({
-        sourceKind: resolution.resolvedTargetSelection.kind,
-        cycleSeconds:
-          resolution.resolvedTargetSelection.kind === "set" ? resolution.autoCycleSeconds : null,
-        photoCollectionId:
-          resolution.resolvedTargetSelection.kind === "set"
-            ? resolution.selectedPhotoCollectionId
-            : null,
-      });
-      const nextLayout = resolution.layout;
-      const currentLayout = activeLayoutRef.current;
-
-      if (areSameLayoutSnapshot(currentLayout, nextLayout)) {
-        setError(null);
-        return;
-      }
-
-      setActiveLayout(nextLayout);
-
-      setError(null);
-    } catch (loadError) {
-      if (requestId !== latestResolveRequestIdRef.current) {
-        return;
-      }
-      setError(loadError instanceof Error ? loadError.message : "Failed to load");
+  useEffect(() => {
+    const snapshot = initialSnapshotRef.current;
+    if (!snapshot) {
+      return;
     }
+
+    applyTheme(snapshot.device.themeId);
+    publishDisplayCycleContext(snapshot.cycleContext);
   }, []);
+
+  const clearRetryResolve = useCallback(() => {
+    if (retryResolveTimerRef.current === null) {
+      return;
+    }
+
+    window.clearTimeout(retryResolveTimerRef.current);
+    retryResolveTimerRef.current = null;
+  }, []);
+
+  const resolveLayout = useCallback(
+    async (input?: { orientation?: PhotosOrientation | null }) => {
+      const requestId = latestResolveRequestIdRef.current + 1;
+      latestResolveRequestIdRef.current = requestId;
+      const orientation = input?.orientation ?? photoOrientationRef.current;
+      const bootstrapState = deviceBootstrapRef.current;
+      const requestStartedAtMs = Date.now();
+
+      try {
+        const resolution = await reportScreenProfile({
+          targetSelection: bootstrapState.targetSelection,
+          selectedFamily:
+            bootstrapState.targetSelection.kind === "set"
+              ? bootstrapState.targetSelection.setId
+              : null,
+          photoOrientation: orientation,
+          reportedThemeId: bootstrapState.reportedThemeId,
+          screenSessionId: deviceIdRef.current,
+          deviceInfo: getDisplayClientInfo(),
+        });
+        if (requestId !== latestResolveRequestIdRef.current) {
+          return;
+        }
+        clearRetryResolve();
+        syncDisplayTimeContext({
+          siteTimeZone: resolution.siteTimeZone,
+          serverNowMs: resolution.serverNowMs,
+          localStartedAtMs: requestStartedAtMs,
+          localReceivedAtMs: Date.now(),
+        });
+        deviceBootstrapRef.current = getDashboardDeviceBootstrapStateFromResolution(resolution);
+        setDeviceIdentity(resolution.device);
+        applyTheme(resolution.device.themeId);
+        setNextCycleAtMs(resolution.nextCycleAtMs);
+        setWarningTicker(resolution.warningTicker);
+        setShowDisconnectedBadge(false);
+        setDisconnectedTitle(null);
+        publishDisplayCycleContext({
+          sourceKind: resolution.resolvedTargetSelection.kind,
+          cycleSeconds:
+            resolution.resolvedTargetSelection.kind === "set" ? resolution.autoCycleSeconds : null,
+          photoCollectionId:
+            resolution.resolvedTargetSelection.kind === "set"
+              ? resolution.selectedPhotoCollectionId
+              : null,
+        });
+        writePersistedDashboardSnapshot(deviceIdRef.current, resolution);
+        const nextLayout = resolution.layout;
+        const currentLayout = activeLayoutRef.current;
+
+        if (areSameLayoutSnapshot(currentLayout, nextLayout)) {
+          setError(null);
+          return;
+        }
+
+        setActiveLayout(nextLayout);
+
+        setError(null);
+      } catch (loadError) {
+        if (requestId !== latestResolveRequestIdRef.current) {
+          return;
+        }
+        const message = loadError instanceof Error ? loadError.message : "Failed to load";
+        const connectivityState = resolveModuleConnectivityState({
+          error: message,
+          hasSnapshot: activeLayoutRef.current !== null,
+          isOnline: browserOnline,
+        });
+
+        setShowDisconnectedBadge(connectivityState.showDisconnected);
+        setDisconnectedTitle(
+          connectivityState.showDisconnected ? `${message}. Showing last synced layout.` : null,
+        );
+        setError(connectivityState.blockingError);
+
+        if (connectivityState.showDisconnected && retryResolveTimerRef.current === null) {
+          retryResolveTimerRef.current = window.setTimeout(() => {
+            retryResolveTimerRef.current = null;
+            void resolveLayout({ orientation: photoOrientationRef.current });
+          }, 5_000);
+        }
+      }
+    },
+    [browserOnline, clearRetryResolve],
+  );
+
+  useEffect(
+    () => () => {
+      clearRetryResolve();
+    },
+    [clearRetryResolve],
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -399,6 +476,21 @@ export const DashboardPage = () => {
   }, [nextCycleAtMs, resolveLayout]);
 
   useEffect(() => {
+    const wasBrowserOnline = previousBrowserOnlineRef.current;
+    previousBrowserOnlineRef.current = browserOnline;
+
+    if (!browserOnline && activeLayoutRef.current !== null) {
+      setShowDisconnectedBadge(true);
+      setDisconnectedTitle("Browser is offline. Showing last synced layout.");
+      return;
+    }
+
+    if (!wasBrowserOnline && browserOnline) {
+      void resolveLayout({ orientation: photoOrientationRef.current });
+    }
+  }, [browserOnline, resolveLayout]);
+
+  useEffect(() => {
     const eventSource = new EventSource("/api/events/layouts");
 
     const handleLayoutChange = () => {
@@ -423,19 +515,37 @@ export const DashboardPage = () => {
       deviceBootstrapRef.current = getDashboardDeviceBootstrapStateForDeviceRefresh();
       void resolveLayout({ orientation: photoOrientationRef.current });
     };
+    const handleOpen = () => {
+      if (!showDisconnectedBadgeRef.current) {
+        return;
+      }
 
+      void resolveLayout({ orientation: photoOrientationRef.current });
+    };
+
+    eventSource.onopen = handleOpen;
     eventSource.addEventListener("layout-updated", handleLayoutChange);
     eventSource.addEventListener("chores-updated", handleChoresUpdated);
     eventSource.addEventListener("site-time-updated", handleSiteTimeUpdated);
     eventSource.addEventListener("display-device-updated", handleDeviceUpdated);
 
     eventSource.onerror = () => {
-      window.setTimeout(() => {
-        void resolveLayout({ orientation: photoOrientationRef.current });
-      }, 2000);
+      if (activeLayoutRef.current !== null) {
+        setShowDisconnectedBadge(true);
+        setDisconnectedTitle(
+          "Live updates are temporarily unavailable. Showing last synced layout.",
+        );
+      }
+      if (retryResolveTimerRef.current === null) {
+        retryResolveTimerRef.current = window.setTimeout(() => {
+          retryResolveTimerRef.current = null;
+          void resolveLayout({ orientation: photoOrientationRef.current });
+        }, 2_000);
+      }
     };
 
     return () => {
+      eventSource.onopen = null;
       eventSource.removeEventListener("layout-updated", handleLayoutChange);
       eventSource.removeEventListener("chores-updated", handleChoresUpdated);
       eventSource.removeEventListener("site-time-updated", handleSiteTimeUpdated);
@@ -632,19 +742,23 @@ export const DashboardPage = () => {
             {error}
           </p>
         ) : null}
+        <ModuleConnectionBadge
+          visible={showDisconnectedBadge}
+          title={disconnectedTitle ?? undefined}
+        />
 
         {!activeLayout ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/70 text-center text-slate-300">
             <h1 className="font-display text-4xl font-bold text-slate-100">Hearth</h1>
             <p className="text-lg text-slate-200">Hearth — Home is where the Hearth is.</p>
             <p>
-              No display layout is configured for this screen. Use Admin &gt; Devices to assign a
+              No display layout is configured for this screen. Use Admin &gt; Settings to assign a
               set or pinned layout for this display.
             </p>
             <DeviceIdentityCard
               device={deviceIdentity}
               fallbackDeviceId={deviceIdRef.current}
-              message="Use Admin > Devices to match this screen, rename it, and assign its layout."
+              message="Use Admin > Settings to match this screen, rename it, and assign its layout."
             />
           </div>
         ) : !activeHasPlacedModules ? (
@@ -657,7 +771,7 @@ export const DashboardPage = () => {
             <DeviceIdentityCard
               device={deviceIdentity}
               fallbackDeviceId={deviceIdRef.current}
-              message="If you are still setting screens up, use Admin > Devices to rename this display so it is easy to identify later."
+              message="If you are still setting screens up, use Admin > Settings to rename this display so it is easy to identify later."
             />
           </div>
         ) : gridDisplayMetrics ? (

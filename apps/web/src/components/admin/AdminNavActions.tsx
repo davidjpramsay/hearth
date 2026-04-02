@@ -25,7 +25,7 @@ export const AdminNavActions = ({ current, onLogout }: AdminNavActionsProps) => 
           onClick={() => navigate("/devices")}
           className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
         >
-          Devices
+          Settings
         </button>
       ) : null}
       {current !== "chores" ? (

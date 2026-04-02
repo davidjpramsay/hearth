@@ -32,20 +32,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check formatting
-        run: pnpm format:check
-
-      - name: Build workspaces
-        run: pnpm build
-
-      - name: Run unit and integration tests
-        run: pnpm -r test
-
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Run browser smoke tests
-        run: pnpm exec playwright test
+      - name: Run verify
+        run: pnpm verify
 
       - name: Upload Playwright artifacts
         if: failure()

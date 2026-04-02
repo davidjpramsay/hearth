@@ -880,7 +880,7 @@ export const moduleDefinition = defineModule({
               <div>
                 <p className="font-medium text-slate-100">Saved calendar feeds</p>
                 <p className="mt-1 text-xs text-slate-400">
-                  Feed URLs live in Admin &gt; Devices. This module stores feed IDs and optional
+                  Feed URLs live in Admin &gt; Settings. This module stores feed IDs and optional
                   per-layout label and color overrides.
                 </p>
               </div>
@@ -888,7 +888,7 @@ export const moduleDefinition = defineModule({
             <div className="space-y-2 rounded border border-slate-700/80 bg-slate-900/60 p-3">
               {availableFeeds.length === 0 ? (
                 <p className="text-xs text-slate-400">
-                  No saved feeds yet. Add them from Admin &gt; Devices &gt; Calendar feeds.
+                  No saved feeds yet. Add them from Admin &gt; Settings &gt; Calendar feeds.
                 </p>
               ) : (
                 availableFeeds.map((feed) => {

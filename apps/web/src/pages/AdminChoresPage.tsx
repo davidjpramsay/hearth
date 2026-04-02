@@ -1006,7 +1006,7 @@ export const AdminChoresPage = () => {
                 <span className="font-semibold text-slate-100">{payoutConfig.siteTimezone}</span>
               </p>
               <p className="text-xs text-slate-400">
-                Household timezone controls site-local modules. Manage it from Devices so clocks,
+                Household timezone controls site-local modules. Manage it from Settings so clocks,
                 chores, time gates, and verse-of-the-day all stay aligned.
               </p>
               <button
@@ -1014,7 +1014,7 @@ export const AdminChoresPage = () => {
                 onClick={() => navigate("/devices")}
                 className="rounded border border-slate-500 px-2 py-1 text-xs text-slate-200 hover:border-slate-300"
               >
-                Open devices and time
+                Open settings
               </button>
             </div>
             <p className="mt-2 text-xs text-slate-300">

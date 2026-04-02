@@ -13,7 +13,7 @@ This is the prioritized feature sequence for upcoming work.
   - `source-local` for provider/feed-driven modules like weather and calendar
 - Auto-generated app secrets and rolling SQLite backups.
 - Calendar source URLs encrypted at rest.
-- Server-managed Devices view for per-screen theme and routing assignment.
+- Server-managed Settings view for per-screen theme and routing assignment.
 - Set-driven layout logic graph with portrait/landscape branching and rule-level cycle timers.
 - Visual action-node graph authoring that compiles into the runtime set graph.
 - Built-in Count Down SDK module with date/time countdown modes.
@@ -108,7 +108,7 @@ Goal: move from browser-local routing persistence to server-managed device ident
 Scope:
 
 - Add a device identity model (stable device id + user-friendly name/label).
-- Add an admin "Devices" view to assign each device:
+- Add an admin "Settings" view to assign each device:
   - follow a set, or
   - pin a layout.
 - Resolve layout in this order:
@@ -119,7 +119,7 @@ Scope:
 Done criteria:
 
 - A device can be assigned and persistently uses its configured layout behavior.
-- Devices can be reassigned between saved sets and pinned layouts without losing global routing config.
+- Displays can be reassigned between saved sets and pinned layouts without losing global routing config.
 - Multi-device installs can run different layouts simultaneously without conflicts.
 
 Status: Completed for current milestone.

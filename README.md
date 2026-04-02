@@ -5,7 +5,7 @@ Hearth is a self-hosted family dashboard for a wall display or kiosk browser.
 It is built to run on low-power hardware (Raspberry Pi / mini PCs) and provides:
 
 - Visual layout editor (`/admin`)
-- Devices admin for per-display theme + routing assignment
+- Settings admin for household time, calendar feeds, and per-display routing
 - Fullscreen display dashboard (`/`)
 - Modular tiles (Photos, Calendar, Clock, Chores, Weather, Bible verse, Welcome, Count Down, Kobo Reader)
 - SQLite persistence
@@ -59,11 +59,7 @@ pnpm create-module
 Then verify:
 
 ```bash
-pnpm -r build
-pnpm --filter @hearth/web test
-pnpm --filter @hearth/server test
-pnpm --filter @hearth/module-sdk test
-pnpm test:e2e
+pnpm verify
 ```
 
 Browser smoke coverage uses Playwright and boots a clean local Hearth server against a disposable
@@ -213,12 +209,12 @@ Notes:
 
 ## Display + Layout Modes
 
-- Display routing is per-screen and server-managed from Admin > Devices.
-- Devices register automatically after they open `/` once, then can be renamed and managed remotely.
+- Display routing is per-screen and server-managed from Admin > Settings.
+- Displays register automatically after they open `/` once, then can be renamed and managed remotely.
 - Each device has two routing modes:
   - `Layout Set`: follow one specific set and that set's logic graph
   - `Single Layout`: pin one specific layout (no set logic)
-- Each device also has its own theme selection in Admin > Devices.
+- Each device also has its own theme selection in Admin > Settings.
 - The display surface no longer exposes a local settings cog for routing/theme changes.
 - Set mode behavior:
   - each set runs its configured logic/cycle rules
@@ -237,7 +233,7 @@ Notes:
   - managed in Admin > Layouts > Photo Collections
   - each collection can include multiple folders
   - folders are resolved under the parent library root: `DATA_DIR/photos/<folder>`
-- Device changes made in Admin > Devices are pushed to open displays through SSE and applied on the next layout resolve.
+- Device changes made in Admin > Settings are pushed to open displays through SSE and applied on the next layout resolve.
 - Photos playback sequencing is scoped per device/session:
   - devices do not advance each other's "next photo" state, even with the same folder/shuffle settings
   - on one device, sequence continuity is preserved across layout/set switches
@@ -360,7 +356,8 @@ Recommended for collection-based setups:
 
 - Source of truth for contracts is `packages/shared/src/*.ts`.
 - Generated artifacts belong in `dist/` only.
-- If you add or change schemas, run `pnpm build` before pushing.
+- Use `pnpm verify` for the supported manual/CI verification path.
+- `pnpm test` is still available for package-only checks; it rebuilds shared workspace dependencies first so package tests do not race missing `dist/` artifacts.
 
 ## Current Module Set
 

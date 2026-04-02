@@ -9,6 +9,9 @@
     "create-module": "node scripts/create-module.mjs",
     "format": "prettier --write . --ignore-unknown",
     "format:check": "prettier --check . --ignore-unknown",
+    "test:prepare": "pnpm --filter @hearth/shared build && pnpm --filter @hearth/module-sdk build && pnpm --filter @hearth/core build",
+    "test": "pnpm test:prepare && pnpm --filter @hearth/module-sdk test && pnpm --filter @hearth/server test && pnpm --filter @hearth/web test",
+    "verify": "pnpm format:check && pnpm build && pnpm test && pnpm test:e2e",
     "test:e2e": "pnpm build && playwright test",
     "test:e2e:headed": "pnpm build && playwright test --headed"
   },

@@ -25,7 +25,7 @@ test.describe("Hearth smoke", () => {
     await expect(page.getByRole("heading", { name: "Layouts" })).toBeVisible();
   });
 
-  test("display registration appears in admin devices", async ({ page }) => {
+  test("display registration appears in admin settings", async ({ page }) => {
     const registration = page.waitForResponse(
       (response) =>
         response.url().includes("/api/display/screen-profile/report") &&
@@ -47,7 +47,7 @@ test.describe("Hearth smoke", () => {
       .toBe(true);
 
     await loginAsAdmin(page);
-    await page.getByRole("button", { name: "Devices" }).click();
+    await page.getByRole("button", { name: "Settings" }).click();
     await page.waitForURL("**/devices");
     await expect(page.getByRole("heading", { name: "Connected displays" })).toBeVisible();
 
