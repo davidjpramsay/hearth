@@ -30,7 +30,7 @@ export default defineModule({
   - `id` (kebab-case, unique)
   - `name`
   - `version`
-  - optional: `description`, `icon`, `categories`, `permissions`, `dataSources`
+  - optional: `description`, `icon`, `categories`, `permissions`, `dataSources`, `timeMode`
 - `ModuleContext`
 - `ModuleRuntime<TSettings, TData>`
 - `ModuleDefinition<TSettingsSchema, TDataSchema>`
@@ -83,3 +83,20 @@ Real examples:
 - `apps/web/src/modules/sdk/server-status.module.tsx`
 - `apps/web/src/modules/sdk/weather.module.tsx`
 - `apps/web/src/modules/sdk/calendar.module.tsx`
+
+## Time mode contract
+
+Use `manifest.timeMode` intentionally:
+
+- `device-local`: module behavior is allowed to follow the browser/device clock.
+- `site-local`: module behavior must follow the synced household/server time context.
+- `source-local`: module behavior is driven by timestamps or dates from the upstream payload.
+
+For `site-local` modules:
+
+- source current time and timezone from `apps/web/src/runtime/display-time.ts`
+- react to `addDisplayTimeContextListener(...)`
+- use timezone-aware helpers from `@hearth/shared` for day grouping and boundary calculations
+- schedule an explicit refresh at the next site-local day boundary when content depends on "today"
+
+Do not treat `timeMode` as metadata-only. If the manifest says `site-local`, the runtime logic should be implemented that way too.

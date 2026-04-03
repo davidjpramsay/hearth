@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { PUBLIC_DOCS_URL } from "../../config/public-links";
 
 interface AdminNavActionsProps {
   current: "layouts" | "devices" | "chores";
@@ -37,6 +38,14 @@ export const AdminNavActions = ({ current, onLogout }: AdminNavActionsProps) => 
           Chores
         </button>
       ) : null}
+      <a
+        href={PUBLIC_DOCS_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
+      >
+        Docs
+      </a>
       <button
         type="button"
         onClick={onLogout}

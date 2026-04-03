@@ -41,6 +41,7 @@ Hearth runtime is SDK-first:
 
 - `useModuleQuery(...)` for polling + cache + SWR
 - `useModuleStream(...)` for SSE topic subscriptions
+- `apps/web/src/runtime/display-time.ts` for synced household time / timezone on display clients
 
 4. Module UI shell (`apps/web/src/modules/ui/ModuleFrame.tsx`)
 
@@ -81,6 +82,11 @@ Hearth runtime is SDK-first:
 - SDK local-data clock: `apps/web/src/modules/sdk/clock.module.tsx`
 - SDK configurable countdown: `apps/web/src/modules/sdk/count-down.module.tsx`
 - SDK REST-backed: `apps/web/src/modules/sdk/server-status.module.tsx`
+- site-local rollover-safe modules:
+  - `apps/web/src/modules/sdk/clock.module.tsx`
+  - `apps/web/src/modules/sdk/chores.module.tsx`
+  - `apps/web/src/modules/sdk/calendar.module.tsx`
+  - `apps/web/src/modules/sdk/bible-verse.module.tsx`
 - Server adapters:
   - `apps/server/src/modules/adapters/server-status.ts`
   - `apps/server/src/modules/adapters/kobo-reader.ts`

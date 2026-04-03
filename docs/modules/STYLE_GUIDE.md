@@ -65,6 +65,15 @@ Use typography roles for structure, then utility classes only for emphasis and s
 - Use `useModuleStream` for SSE.
 - Keep display components resilient to null/partial data.
 
+## Time handling
+
+- If a module is day-sensitive or shows household time, set `manifest.timeMode` and implement the runtime to match it.
+- `site-local` modules must use `apps/web/src/runtime/display-time.ts` instead of trusting the Pi/browser clock directly.
+- For site-day logic, compare calendar dates with `toCalendarDateInTimeZone(...)`, not device-local midnight math.
+- If content changes at midnight, schedule a dedicated rollover refresh with `getMillisecondsUntilNextCalendarDateInTimeZone(...)` rather than waiting for the normal poll interval.
+- If server time sync or site timezone changes, re-evaluate immediately through `addDisplayTimeContextListener(...)`.
+- If you persist local snapshots for day-scoped content, reject snapshots from the wrong site day rather than showing stale "yesterday" content.
+
 ## Performance
 
 - Prefer small polling intervals only when needed.

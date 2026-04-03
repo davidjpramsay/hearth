@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState, type CSSProperties, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import {
   type CalendarFeed,
   calendarModuleConfigSchema,
   calendarModuleEventsResponseSchema,
+  getMillisecondsUntilNextCalendarDateInTimeZone,
   parseCalendarEventBoundary,
+  toCalendarDateInTimeZone,
   type CalendarModuleConfig,
   type CalendarModuleEvent,
   type CalendarModuleSource,
@@ -11,6 +13,11 @@ import {
 import { defineModule } from "@hearth/module-sdk";
 import { getCalendarFeeds } from "../../api/client";
 import { getAuthToken } from "../../auth/storage";
+import {
+  addDisplayTimeContextListener,
+  getDisplayNow,
+  getDisplaySiteTimeZone,
+} from "../../runtime/display-time";
 import {
   readPersistedModuleSnapshot,
   writePersistedModuleSnapshot,
@@ -21,6 +28,7 @@ import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CALENDAR_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const CALENDAR_CLOCK_TICK_MS = 60 * 1000;
 const CALENDAR_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 const CALENDAR_FALLBACK_COLORS = [
   "#22D3EE",
@@ -32,30 +40,45 @@ const CALENDAR_FALLBACK_COLORS = [
   "#F97316",
   "#38BDF8",
 ];
+type CalendarDateKey = `${number}-${number}-${number}`;
+
 type CalendarTileEvent = CalendarModuleEvent & {
   startDate: Date;
   endDate: Date | null;
 };
 
-const addDays = (date: Date, days: number): Date => new Date(date.getTime() + days * DAY_MS);
+const parseCalendarDateKey = (value: string): Date => {
+  const [yearPart, monthPart, dayPart] = value.split("-");
+  const year = Number.parseInt(yearPart ?? "", 10);
+  const month = Number.parseInt(monthPart ?? "", 10);
+  const day = Number.parseInt(dayPart ?? "", 10);
 
-const startOfDay = (date: Date): Date =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+};
 
-const startOfWeek = (date: Date): Date => addDays(startOfDay(date), -date.getDay());
+const addDaysToCalendarDate = (value: string, days: number): CalendarDateKey => {
+  const next = parseCalendarDateKey(value);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next.toISOString().slice(0, 10) as CalendarDateKey;
+};
+
+const startOfWeek = (value: string): CalendarDateKey =>
+  addDaysToCalendarDate(value, -parseCalendarDateKey(value).getUTCDay());
 
 export const buildRollingMonthGrid = (
-  referenceDate: Date,
+  referenceDate: CalendarDateKey,
 ): {
   weekCount: number;
-  cells: Date[];
+  cells: CalendarDateKey[];
 } => {
   const weekCount = 4;
   const gridStart = startOfWeek(referenceDate);
 
   return {
     weekCount,
-    cells: Array.from({ length: weekCount * 7 }, (_value, index) => addDays(gridStart, index)),
+    cells: Array.from({ length: weekCount * 7 }, (_value, index) =>
+      addDaysToCalendarDate(gridStart, index),
+    ),
   };
 };
 
@@ -149,27 +172,41 @@ const getEventEndExclusive = (event: CalendarTileEvent): Date => {
   return new Date(eventStart.getTime() + 1);
 };
 
-const eventOccursOnDay = (event: CalendarTileEvent, date: Date): boolean => {
-  const dayStart = startOfDay(date);
-  const nextDayStart = addDays(dayStart, 1);
-  const eventStart = event.startDate;
-  const eventEndExclusive = getEventEndExclusive(event);
+const getEventLastOccupiedCalendarDate = (
+  event: CalendarTileEvent,
+  timeZone: string,
+): CalendarDateKey =>
+  toCalendarDateInTimeZone(
+    new Date(getEventEndExclusive(event).getTime() - 1),
+    timeZone,
+  ) as CalendarDateKey;
 
-  // Use exclusive end semantics to avoid spilling midnight-ending events
-  // into the following day.
-  return eventStart < nextDayStart && eventEndExclusive > dayStart;
+const eventOccursOnDay = (
+  event: CalendarTileEvent,
+  calendarDate: CalendarDateKey,
+  timeZone: string,
+): boolean => {
+  const startDate = toCalendarDateInTimeZone(event.startDate, timeZone);
+  const lastOccupiedDate = getEventLastOccupiedCalendarDate(event, timeZone);
+
+  return startDate <= calendarDate && lastOccupiedDate >= calendarDate;
 };
 
-const isPastEvent = (event: CalendarTileEvent, reference: Date): boolean =>
-  // Keep all events on the current local day at full emphasis.
-  getEventEndExclusive(event).getTime() <= startOfDay(reference).getTime();
+const isPastEvent = (
+  event: CalendarTileEvent,
+  referenceCalendarDate: CalendarDateKey,
+  timeZone: string,
+): boolean =>
+  // Keep all events on the current site-local day at full emphasis.
+  getEventLastOccupiedCalendarDate(event, timeZone) < referenceCalendarDate;
 
 const eventStyleForView = (
   event: CalendarTileEvent,
-  reference: Date,
+  referenceCalendarDate: CalendarDateKey,
+  timeZone: string,
 ): CSSProperties | undefined => {
   const baseStyle = eventAccentStyle(event.sourceColor);
-  if (!isPastEvent(event, reference)) {
+  if (!isPastEvent(event, referenceCalendarDate, timeZone)) {
     return baseStyle;
   }
   return baseStyle ? { ...baseStyle, opacity: 0.52 } : { opacity: 0.52 };
@@ -226,7 +263,7 @@ export const moduleDefinition = defineModule({
     description: "Calendar module migrated to Hearth Module SDK",
     icon: "calendar",
     defaultSize: { w: 6, h: 4 },
-    timeMode: "source-local",
+    timeMode: "site-local",
     categories: ["calendar"],
     permissions: ["network", "calendar"],
     dataSources: [{ id: "calendar-events", kind: "rest" }],
@@ -235,6 +272,8 @@ export const moduleDefinition = defineModule({
   dataSchema: calendarModuleEventsResponseSchema,
   runtime: {
     Component: ({ instanceId, settings, isEditing }) => {
+      const [siteTimeZone, setSiteTimeZone] = useState(() => getDisplaySiteTimeZone());
+      const [displayNow, setDisplayNow] = useState(() => getDisplayNow());
       const snapshotKey = useMemo(
         () => buildCalendarSnapshotKey(instanceId, settings),
         [instanceId, settings.feedSelections, settings.legacyCalendars],
@@ -263,6 +302,11 @@ export const moduleDefinition = defineModule({
       const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(
         () => initialSnapshot?.updatedAtMs ?? null,
       );
+      const loadRef = useRef<() => Promise<void>>(async () => undefined);
+      const siteTimeZoneRef = useRef(siteTimeZone);
+      const currentDateRef = useRef(
+        toCalendarDateInTimeZone(displayNow, siteTimeZone) as CalendarDateKey,
+      );
       const browserOnline = useBrowserOnlineStatus();
       const connectivityState = resolveModuleConnectivityState({
         error,
@@ -279,6 +323,14 @@ export const moduleDefinition = defineModule({
         setLastUpdatedMs(initialSnapshot.updatedAtMs);
         setLoading(false);
       }, [initialSnapshot]);
+
+      useEffect(() => {
+        siteTimeZoneRef.current = siteTimeZone;
+        currentDateRef.current = toCalendarDateInTimeZone(
+          displayNow,
+          siteTimeZone,
+        ) as CalendarDateKey;
+      }, [displayNow, siteTimeZone]);
 
       useEffect(() => {
         if (isEditing) {
@@ -318,8 +370,50 @@ export const moduleDefinition = defineModule({
             }
           }
         };
+        loadRef.current = refresh;
+
+        const syncDisplayClock = () => {
+          const nextSiteTimeZone = getDisplaySiteTimeZone();
+          const nextNow = getDisplayNow();
+          const previousCalendarDate = currentDateRef.current;
+          const nextCalendarDate = toCalendarDateInTimeZone(
+            nextNow,
+            nextSiteTimeZone,
+          ) as CalendarDateKey;
+          const siteTimeZoneChanged = siteTimeZoneRef.current !== nextSiteTimeZone;
+
+          setSiteTimeZone(nextSiteTimeZone);
+          setDisplayNow(nextNow);
+
+          if (siteTimeZoneChanged || nextCalendarDate !== previousCalendarDate) {
+            void refresh();
+          }
+        };
+        const onVisibilityChange = () => {
+          if (document.visibilityState === "visible") {
+            setDisplayNow(getDisplayNow());
+            void refresh();
+          }
+        };
+        const onPageShow = () => {
+          setDisplayNow(getDisplayNow());
+          void refresh();
+        };
+        const onWindowFocus = () => {
+          setDisplayNow(getDisplayNow());
+          void refresh();
+        };
 
         void refresh();
+        const displayClockInterval = window.setInterval(() => {
+          setDisplayNow(getDisplayNow());
+        }, CALENDAR_CLOCK_TICK_MS);
+        const removeDisplayTimeListener = addDisplayTimeContextListener(() => {
+          syncDisplayClock();
+        });
+        document.addEventListener("visibilitychange", onVisibilityChange);
+        window.addEventListener("pageshow", onPageShow);
+        window.addEventListener("focus", onWindowFocus);
         const refreshMs = Math.max(settings.refreshIntervalSeconds, 30) * 1000;
         const timer = window.setInterval(() => {
           void refresh();
@@ -327,10 +421,37 @@ export const moduleDefinition = defineModule({
 
         return () => {
           active = false;
+          removeDisplayTimeListener();
+          document.removeEventListener("visibilitychange", onVisibilityChange);
+          window.removeEventListener("pageshow", onPageShow);
+          window.removeEventListener("focus", onWindowFocus);
+          window.clearInterval(displayClockInterval);
           window.clearInterval(timer);
           abortController?.abort();
         };
       }, [instanceId, isEditing, settings.refreshIntervalSeconds, snapshotKey]);
+
+      const todayCalendarDate = useMemo(
+        () => toCalendarDateInTimeZone(displayNow, siteTimeZone) as CalendarDateKey,
+        [displayNow, siteTimeZone],
+      );
+
+      useEffect(() => {
+        if (isEditing) {
+          return;
+        }
+
+        const delayMs =
+          getMillisecondsUntilNextCalendarDateInTimeZone(getDisplayNow(), siteTimeZone) + 250;
+        const timer = window.setTimeout(() => {
+          setDisplayNow(getDisplayNow());
+          void loadRef.current();
+        }, delayMs);
+
+        return () => {
+          window.clearTimeout(timer);
+        };
+      }, [isEditing, siteTimeZone, todayCalendarDate]);
 
       const parsedEvents = useMemo<CalendarTileEvent[]>(
         () =>
@@ -365,8 +486,9 @@ export const moduleDefinition = defineModule({
             hour: "2-digit",
             minute: "2-digit",
             hour12: !settings.use24Hour,
+            timeZone: siteTimeZone,
           }),
-        [settings.use24Hour],
+        [settings.use24Hour, siteTimeZone],
       );
 
       const dayFormatter = useMemo(
@@ -375,41 +497,42 @@ export const moduleDefinition = defineModule({
             weekday: "short",
             month: "short",
             day: "numeric",
+            timeZone: "UTC",
           }),
         [],
       );
 
       const monthDayFormatter = useMemo(
-        () => new Intl.DateTimeFormat(undefined, { day: "numeric" }),
+        () => new Intl.DateTimeFormat(undefined, { day: "numeric", timeZone: "UTC" }),
         [],
       );
       const monthNameFormatter = useMemo(
-        () => new Intl.DateTimeFormat(undefined, { month: "long" }),
+        () => new Intl.DateTimeFormat(undefined, { month: "long", timeZone: "UTC" }),
         [],
       );
 
-      const now = new Date();
-      const todayDayStartMs = startOfDay(now).getTime();
       const headerTitle =
-        settings.viewMode === "month" ? monthNameFormatter.format(now) : "Upcoming";
+        settings.viewMode === "month"
+          ? monthNameFormatter.format(parseCalendarDateKey(todayCalendarDate))
+          : "Upcoming";
       const headerViewLabel =
         settings.viewMode === "month" ? "Month" : settings.viewMode.toUpperCase();
 
       const listDays = useMemo(() => {
-        const firstDay = startOfDay(now);
         return Array.from({ length: settings.daysToShow }, (_value, index) =>
-          addDays(firstDay, index),
+          addDaysToCalendarDate(todayCalendarDate, index),
         );
-      }, [settings.daysToShow, now]);
+      }, [settings.daysToShow, todayCalendarDate]);
 
       const weekDays = useMemo(() => {
-        const firstDay = startOfDay(now);
-        return Array.from({ length: 7 }, (_value, index) => addDays(firstDay, index));
-      }, [now]);
+        return Array.from({ length: 7 }, (_value, index) =>
+          addDaysToCalendarDate(todayCalendarDate, index),
+        );
+      }, [todayCalendarDate]);
 
       const monthGrid = useMemo(() => {
-        return buildRollingMonthGrid(now);
-      }, [now]);
+        return buildRollingMonthGrid(todayCalendarDate);
+      }, [todayCalendarDate]);
 
       const calendarLegendEntries = useMemo(() => {
         const seenSources = new Set<string>();
@@ -428,8 +551,11 @@ export const moduleDefinition = defineModule({
       }, [payload.sources]);
 
       const hasListEvents = useMemo(
-        () => listDays.some((day) => parsedEvents.some((event) => eventOccursOnDay(event, day))),
-        [listDays, parsedEvents],
+        () =>
+          listDays.some((day) =>
+            parsedEvents.some((event) => eventOccursOnDay(event, day, siteTimeZone)),
+          ),
+        [listDays, parsedEvents, siteTimeZone],
       );
 
       if (isEditing) {
@@ -494,7 +620,7 @@ export const moduleDefinition = defineModule({
                 <div className="space-y-3">
                   {listDays.map((day) => {
                     const dayEvents = parsedEvents
-                      .filter((event) => eventOccursOnDay(event, day))
+                      .filter((event) => eventOccursOnDay(event, day, siteTimeZone))
                       .slice(0, 8);
 
                     if (dayEvents.length === 0) {
@@ -503,18 +629,18 @@ export const moduleDefinition = defineModule({
 
                     return (
                       <section
-                        key={day.toISOString()}
+                        key={day}
                         className="rounded border border-slate-700/80 bg-slate-900/70 p-2"
                       >
                         <h4 className="module-copy-label mb-2 text-cyan-200">
-                          {dayFormatter.format(day)}
+                          {dayFormatter.format(parseCalendarDateKey(day))}
                         </h4>
                         <div className="space-y-2">
                           {dayEvents.map((event) => (
                             <article
                               key={event.id}
                               className="rounded border border-slate-700/70 bg-slate-950/70 px-2.5 py-1.5 text-left"
-                              style={eventStyleForView(event, now)}
+                              style={eventStyleForView(event, todayCalendarDate, siteTimeZone)}
                             >
                               <p className="module-copy-body line-clamp-2 text-left text-slate-100">
                                 {event.title}
@@ -569,23 +695,23 @@ export const moduleDefinition = defineModule({
               <div className="grid min-h-full min-w-[680px] grid-cols-7 gap-2">
                 {weekDays.map((day) => {
                   const dayEvents = parsedEvents
-                    .filter((event) => eventOccursOnDay(event, day))
+                    .filter((event) => eventOccursOnDay(event, day, siteTimeZone))
                     .slice(0, 4);
 
                   return (
                     <section
-                      key={day.toISOString()}
+                      key={day}
                       className="rounded border border-slate-700/80 bg-slate-900/70 p-2"
                     >
                       <h4 className="module-copy-label mb-2 text-center text-cyan-200">
-                        {dayFormatter.format(day)}
+                        {dayFormatter.format(parseCalendarDateKey(day))}
                       </h4>
                       <div className="space-y-1.5">
                         {dayEvents.map((event) => (
                           <article
                             key={event.id}
                             className="rounded border border-slate-700/70 bg-slate-950/80 px-2.5 py-1 text-left"
-                            style={eventStyleForView(event, now)}
+                            style={eventStyleForView(event, todayCalendarDate, siteTimeZone)}
                           >
                             <p className="module-copy-body line-clamp-2 text-left text-slate-100">
                               {event.title}
@@ -643,15 +769,15 @@ export const moduleDefinition = defineModule({
                   ))}
 
                   {monthGrid.cells.map((day) => {
-                    const inMonth = day.getMonth() === now.getMonth();
-                    const isToday = day.getTime() === todayDayStartMs;
+                    const inMonth = day.slice(0, 7) === todayCalendarDate.slice(0, 7);
+                    const isToday = day === todayCalendarDate;
                     const dayEvents = parsedEvents
-                      .filter((event) => eventOccursOnDay(event, day))
+                      .filter((event) => eventOccursOnDay(event, day, siteTimeZone))
                       .slice(0, 2);
 
                     return (
                       <section
-                        key={day.toISOString()}
+                        key={day}
                         className={`flex h-full min-h-0 flex-col rounded border p-2 ${
                           inMonth
                             ? "border-slate-700/80 bg-slate-900/70"
@@ -672,7 +798,7 @@ export const moduleDefinition = defineModule({
                             inMonth ? "text-slate-200" : "text-slate-500"
                           } module-copy-meta`}
                         >
-                          {monthDayFormatter.format(day)}
+                          {monthDayFormatter.format(parseCalendarDateKey(day))}
                         </p>
                         <div className="mt-1.5 min-h-0 space-y-1.5 overflow-hidden">
                           {dayEvents.map((event) => (
@@ -680,7 +806,7 @@ export const moduleDefinition = defineModule({
                               key={event.id}
                               className="module-copy-body line-clamp-2 rounded border border-slate-700/60 bg-slate-950/80 px-2 py-1 text-left leading-snug text-slate-100"
                               style={{
-                                ...eventStyleForView(event, now),
+                                ...eventStyleForView(event, todayCalendarDate, siteTimeZone),
                               }}
                             >
                               {event.title}

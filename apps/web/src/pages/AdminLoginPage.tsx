@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { login } from "../api/client";
 import { setAuthToken } from "../auth/storage";
 import { getSafeAdminPostLoginPath } from "../auth/session";
+import { PUBLIC_DOCS_URL } from "../config/public-links";
 
 export const AdminLoginPage = () => {
   const location = useLocation();
@@ -41,6 +42,17 @@ export const AdminLoginPage = () => {
       <section className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900/90 p-6 shadow-2xl shadow-black/25">
         <h1 className="font-display text-3xl font-bold text-slate-100">Hearth Admin</h1>
         <p className="mt-2 text-sm text-slate-300">{statusMessage}</p>
+        <p className="mt-3 text-sm text-slate-400">
+          Need setup or development guidance?{" "}
+          <a
+            href={PUBLIC_DOCS_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="font-semibold text-cyan-300 hover:text-cyan-200"
+          >
+            Open docs
+          </a>
+        </p>
 
         <form className="mt-6 space-y-4" onSubmit={onSubmit}>
           <label className="block space-y-2">

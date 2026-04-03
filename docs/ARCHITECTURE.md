@@ -120,16 +120,17 @@ Current behavior:
 ## Module Time Semantics
 
 - `device-local` modules read the display/browser clock directly:
-  - `clock`
   - `count-down`
-- `site-local` modules use the shared household `siteTimezone` stored in settings:
+- `site-local` modules use the synced household/server time context and household timezone:
+  - `clock`
   - `chores`
   - `bible-verse`
+  - `calendar`
 - `local-warnings` is an internal SDK module:
   - it powers the automatic full-screen warning layout and is not shown in the normal module picker
 - `source-local` modules follow the upstream data source timezone semantics:
   - `weather` uses the provider/location timezone
-  - `calendar` preserves feed/all-day date semantics from the source
+  - calendar feed event boundaries are still preserved from the source, but site-local grouping and rollover now follow synced household time
 
 ## Default Bootstrap State
 

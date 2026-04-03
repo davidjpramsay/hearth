@@ -1,14 +1,27 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   bibleVerseModuleConfigSchema,
   bibleVerseModuleResponseSchema,
+  getMillisecondsUntilNextCalendarDateInTimeZone,
+  toCalendarDateInTimeZone,
   type BibleVerseModuleConfig,
   type BibleVerseModuleResponse,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
+import {
+  addDisplayTimeContextListener,
+  getDisplayNow,
+  getDisplaySiteTimeZone,
+} from "../../runtime/display-time";
+import {
+  readPersistedModuleSnapshot,
+  writePersistedModuleSnapshot,
+} from "../data/persisted-module-snapshot";
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
+
+const BIBLE_VERSE_SNAPSHOT_MAX_AGE_MS = 36 * 60 * 60 * 1000;
 
 const emptyPayload = (): BibleVerseModuleResponse =>
   bibleVerseModuleResponseSchema.parse({
@@ -18,6 +31,12 @@ const emptyPayload = (): BibleVerseModuleResponse =>
     sourceLabel: "Bible VOTD",
     warning: null,
   });
+
+const currentSiteDate = (timeZone: string): string =>
+  toCalendarDateInTimeZone(getDisplayNow(), timeZone);
+
+const buildBibleVerseSnapshotKey = (instanceId: string, siteDate: string): string =>
+  `bible-verse:${instanceId}:${siteDate}`;
 
 const AUTO_SCROLL_GAP_PX = 48;
 const AUTO_SCROLL_SPEED_PX_PER_SECOND = 8;
@@ -61,20 +80,57 @@ export const moduleDefinition = defineModule({
   dataSchema: bibleVerseModuleResponseSchema,
   runtime: {
     Component: ({ instanceId, settings, isEditing }) => {
-      const [payload, setPayload] = useState<BibleVerseModuleResponse>(() => emptyPayload());
-      const [loading, setLoading] = useState(true);
+      const runtimeSiteTimeZone = getDisplaySiteTimeZone();
+      const initialSiteDate = currentSiteDate(runtimeSiteTimeZone);
+      const snapshotKey = buildBibleVerseSnapshotKey(instanceId, initialSiteDate);
+      const initialSnapshot = useMemo(
+        () =>
+          readPersistedModuleSnapshot({
+            key: snapshotKey,
+            parse: (storedPayload) => bibleVerseModuleResponseSchema.parse(storedPayload),
+            maxAgeMs: BIBLE_VERSE_SNAPSHOT_MAX_AGE_MS,
+            validate: (storedPayload) =>
+              storedPayload.verse !== null && storedPayload.reference !== null,
+          }),
+        [snapshotKey],
+      );
+      const [siteTimeZone, setSiteTimeZone] = useState(runtimeSiteTimeZone);
+      const [payload, setPayload] = useState<BibleVerseModuleResponse>(
+        () => initialSnapshot?.data ?? emptyPayload(),
+      );
+      const [loading, setLoading] = useState(() => initialSnapshot === null);
       const [error, setError] = useState<string | null>(null);
       const verseViewportRef = useRef<HTMLDivElement | null>(null);
       const verseContentRef = useRef<HTMLDivElement | null>(null);
       const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
       const [maxScrollOffset, setMaxScrollOffset] = useState(0);
-      const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(null);
+      const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(
+        () => initialSnapshot?.updatedAtMs ?? null,
+      );
+      const loadRef = useRef<() => Promise<void>>(async () => undefined);
+      const siteTimeZoneRef = useRef(siteTimeZone);
+      const currentSiteDateRef = useRef(initialSiteDate);
       const browserOnline = useBrowserOnlineStatus();
       const connectivityState = resolveModuleConnectivityState({
         error,
         hasSnapshot: lastUpdatedMs !== null,
         isOnline: browserOnline,
       });
+
+      useEffect(() => {
+        if (!initialSnapshot) {
+          return;
+        }
+
+        setPayload(initialSnapshot.data);
+        setLastUpdatedMs(initialSnapshot.updatedAtMs);
+        setLoading(false);
+      }, [initialSnapshot]);
+
+      useEffect(() => {
+        siteTimeZoneRef.current = siteTimeZone;
+        currentSiteDateRef.current = currentSiteDate(siteTimeZone);
+      }, [siteTimeZone]);
 
       useEffect(() => {
         if (isEditing) {
@@ -96,9 +152,15 @@ export const moduleDefinition = defineModule({
               return;
             }
 
+            const updatedAtMs = Date.now();
             setPayload(next);
-            setLastUpdatedMs(Date.now());
+            setLastUpdatedMs(updatedAtMs);
             setError(null);
+            writePersistedModuleSnapshot(
+              buildBibleVerseSnapshotKey(instanceId, currentSiteDate(siteTimeZoneRef.current)),
+              next,
+              updatedAtMs,
+            );
           } catch (loadError) {
             if (!active || (loadError instanceof Error && loadError.name === "AbortError")) {
               return;
@@ -111,8 +173,39 @@ export const moduleDefinition = defineModule({
             }
           }
         };
+        loadRef.current = refresh;
+
+        const syncDisplayClock = () => {
+          const nextSiteTimeZone = getDisplaySiteTimeZone();
+          const nextSiteDate = currentSiteDate(nextSiteTimeZone);
+          const siteTimeZoneChanged = siteTimeZoneRef.current !== nextSiteTimeZone;
+          const siteDateChanged = currentSiteDateRef.current !== nextSiteDate;
+
+          setSiteTimeZone(nextSiteTimeZone);
+
+          if (siteTimeZoneChanged || siteDateChanged) {
+            void refresh();
+          }
+        };
+        const onVisibilityChange = () => {
+          if (document.visibilityState === "visible") {
+            void refresh();
+          }
+        };
+        const onPageShow = () => {
+          void refresh();
+        };
+        const onWindowFocus = () => {
+          void refresh();
+        };
 
         void refresh();
+        const removeDisplayTimeListener = addDisplayTimeContextListener(() => {
+          syncDisplayClock();
+        });
+        document.addEventListener("visibilitychange", onVisibilityChange);
+        window.addEventListener("pageshow", onPageShow);
+        window.addEventListener("focus", onWindowFocus);
         const timer = window.setInterval(
           () => {
             void refresh();
@@ -122,10 +215,30 @@ export const moduleDefinition = defineModule({
 
         return () => {
           active = false;
+          removeDisplayTimeListener();
+          document.removeEventListener("visibilitychange", onVisibilityChange);
+          window.removeEventListener("pageshow", onPageShow);
+          window.removeEventListener("focus", onWindowFocus);
           window.clearInterval(timer);
           abortController?.abort();
         };
       }, [instanceId, isEditing, settings.refreshIntervalSeconds]);
+
+      useEffect(() => {
+        if (isEditing) {
+          return;
+        }
+
+        const delayMs =
+          getMillisecondsUntilNextCalendarDateInTimeZone(getDisplayNow(), siteTimeZone) + 250;
+        const timer = window.setTimeout(() => {
+          void loadRef.current();
+        }, delayMs);
+
+        return () => {
+          window.clearTimeout(timer);
+        };
+      }, [isEditing, siteTimeZone]);
 
       useEffect(() => {
         const viewport = verseViewportRef.current;

@@ -1,6 +1,7 @@
-import { Suspense, lazy, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { RequireAuth } from "./auth/RequireAuth";
+import { PUBLIC_DOCS_URL } from "./config/public-links";
 import { DashboardPage } from "./pages/DashboardPage";
 import { useBuildUpdateMonitor } from "./update/build-updates";
 
@@ -39,6 +40,20 @@ const withRouteSuspense = (node: ReactNode) => (
   <Suspense fallback={<RouteLoading />}>{node}</Suspense>
 );
 
+const ExternalDocsRedirect = () => {
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.location.replace(PUBLIC_DOCS_URL);
+    }
+  }, []);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-center text-sm text-slate-300">
+      Redirecting to public docs...
+    </div>
+  );
+};
+
 export const App = () => {
   const location = useLocation();
   const shouldAutoReload = location.pathname === "/";
@@ -63,6 +78,7 @@ export const App = () => {
 
       <Routes>
         <Route path="/" element={<DashboardPage />} />
+        <Route path="/docs" element={<ExternalDocsRedirect />} />
         <Route path="/admin" element={<Navigate to="/admin/layouts" replace />} />
         <Route path="/admin/login" element={withRouteSuspense(<AdminLoginPage />)} />
         <Route

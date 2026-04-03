@@ -22,6 +22,7 @@ packages/shared/src/**/*.d.ts
 packages/shared/src/**/*.js
 packages/shared/src/**/*.js.map
 apps/web/.vite
+apps/docs/.astro
 playwright-report
 test-results
 .tmp/e2e-data

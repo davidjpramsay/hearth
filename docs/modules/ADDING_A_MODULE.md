@@ -42,6 +42,24 @@ No manual registry edits needed for web modules.
 7. Register adapter in `apps/server/src/modules/adapters/index.ts`.
 8. Run `pnpm -r build`.
 
+## Time-sensitive modules
+
+If the module depends on "today", midnight rollover, or household-local time:
+
+1. Set `manifest.timeMode` explicitly.
+2. For household/site time, use `site-local` and read time from `apps/web/src/runtime/display-time.ts`.
+3. Do not drive day-sensitive UI from raw `new Date()` or `Date.now()` alone.
+4. Use `toCalendarDateInTimeZone(...)` for date grouping and `getMillisecondsUntilNextCalendarDateInTimeZone(...)` to schedule the next rollover refresh.
+5. Listen for `addDisplayTimeContextListener(...)` so server time-sync and timezone changes re-evaluate the module immediately.
+6. If the module persists last-good client snapshots, validate day-scoped snapshots against the current site date before reusing them.
+
+Current examples:
+
+- `apps/web/src/modules/sdk/clock.module.tsx`
+- `apps/web/src/modules/sdk/chores.module.tsx`
+- `apps/web/src/modules/sdk/calendar.module.tsx`
+- `apps/web/src/modules/sdk/bible-verse.module.tsx`
+
 ## Verify
 
 - `pnpm --filter @hearth/web build`
