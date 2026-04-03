@@ -715,7 +715,7 @@ export const AdminDevicesPage = () => {
             <p className="mt-1 text-sm text-slate-400">
               Store ICS feed URLs once here, then choose them from each calendar module by ID. Feed
               URLs stay admin-only; layouts and displays only reference saved feed IDs plus optional
-              label and color overrides.
+              label and colour overrides.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -748,7 +748,7 @@ export const AdminDevicesPage = () => {
                 key={`${feed.id || "draft"}-${index}`}
                 className="rounded-lg border border-slate-800 bg-slate-950/60 p-4"
               >
-                <div className="grid gap-3 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,1.6fr)_auto_auto]">
+                <div className="grid gap-3 xl:grid-cols-[minmax(0,0.75fr)_minmax(0,0.85fr)_minmax(0,1.7fr)]">
                   <label className="block space-y-1">
                     <span className="text-xs font-medium text-slate-300">Name</span>
                     <input
@@ -796,11 +796,13 @@ export const AdminDevicesPage = () => {
                       placeholder="https://calendar.example.com/family.ics"
                     />
                   </label>
+                </div>
 
-                  <label className="block space-y-1">
-                    <span className="text-xs font-medium text-slate-300">Color</span>
+                <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+                  <label className="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
+                    <span className="text-xs font-medium text-slate-300">Colour</span>
                     <input
-                      className="h-10 w-16 cursor-pointer rounded border border-slate-700 bg-slate-800 p-1"
+                      className="h-9 w-14 cursor-pointer rounded border border-slate-700 bg-slate-800 p-1"
                       type="color"
                       value={feed.color}
                       onChange={(event) =>
@@ -812,7 +814,7 @@ export const AdminDevicesPage = () => {
                     />
                   </label>
 
-                  <div className="flex items-end gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <label className="flex items-center gap-2 whitespace-nowrap rounded border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-200">
                       <input
                         type="checkbox"
@@ -826,13 +828,15 @@ export const AdminDevicesPage = () => {
                       />
                       <span>Enabled</span>
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => removeCalendarFeedDraft(index)}
-                      className="rounded border border-rose-400/70 px-3 py-2 text-sm font-semibold text-rose-100 hover:bg-rose-500/20"
-                    >
-                      Remove
-                    </button>
+                    <div className="flex items-center justify-end">
+                      <button
+                        type="button"
+                        onClick={() => removeCalendarFeedDraft(index)}
+                        className="rounded border border-rose-400/70 px-3 py-2 text-sm font-semibold text-rose-100 hover:bg-rose-500/20"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 </div>
               </article>
