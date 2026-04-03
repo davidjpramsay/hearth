@@ -45,6 +45,8 @@ type CalendarDateKey = `${number}-${number}-${number}`;
 type CalendarTileEvent = CalendarModuleEvent & {
   startDate: Date;
   endDate: Date | null;
+  allDayStartCalendarDate: CalendarDateKey | null;
+  allDayEndCalendarDateExclusive: CalendarDateKey | null;
 };
 
 const parseCalendarDateKey = (value: string): Date => {
@@ -54,6 +56,21 @@ const parseCalendarDateKey = (value: string): Date => {
   const day = Number.parseInt(dayPart ?? "", 10);
 
   return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+};
+
+const parseSerializedAllDayCalendarDate = (
+  value: string | null | undefined,
+): CalendarDateKey | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString().slice(0, 10) as CalendarDateKey;
 };
 
 const addDaysToCalendarDate = (value: string, days: number): CalendarDateKey => {
@@ -175,21 +192,37 @@ const getEventEndExclusive = (event: CalendarTileEvent): Date => {
 const getEventLastOccupiedCalendarDate = (
   event: CalendarTileEvent,
   timeZone: string,
-): CalendarDateKey =>
-  toCalendarDateInTimeZone(
+): CalendarDateKey => {
+  if (event.allDay) {
+    const allDayStart = event.allDayStartCalendarDate;
+    const allDayEndExclusive = event.allDayEndCalendarDateExclusive;
+
+    if (allDayStart && allDayEndExclusive && allDayEndExclusive > allDayStart) {
+      return addDaysToCalendarDate(allDayEndExclusive, -1);
+    }
+
+    if (allDayStart) {
+      return allDayStart;
+    }
+  }
+
+  return toCalendarDateInTimeZone(
     new Date(getEventEndExclusive(event).getTime() - 1),
     timeZone,
   ) as CalendarDateKey;
+};
 
 const eventOccursOnDay = (
   event: CalendarTileEvent,
   calendarDate: CalendarDateKey,
   timeZone: string,
 ): boolean => {
-  const startDate = toCalendarDateInTimeZone(event.startDate, timeZone);
+  const startDate = event.allDay
+    ? event.allDayStartCalendarDate
+    : (toCalendarDateInTimeZone(event.startDate, timeZone) as CalendarDateKey);
   const lastOccupiedDate = getEventLastOccupiedCalendarDate(event, timeZone);
 
-  return startDate <= calendarDate && lastOccupiedDate >= calendarDate;
+  return startDate !== null && startDate <= calendarDate && lastOccupiedDate >= calendarDate;
 };
 
 const isPastEvent = (
@@ -474,6 +507,12 @@ export const moduleDefinition = defineModule({
                 ...event,
                 startDate,
                 endDate,
+                allDayStartCalendarDate: event.allDay
+                  ? parseSerializedAllDayCalendarDate(event.start)
+                  : null,
+                allDayEndCalendarDateExclusive: event.allDay
+                  ? parseSerializedAllDayCalendarDate(event.end)
+                  : null,
               };
             })
             .filter((event): event is CalendarTileEvent => event !== null),
