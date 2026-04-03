@@ -13,28 +13,8 @@
   },
   "sections": [
     {
-      "id": "docs",
-      "eyebrow": "Documentation",
-      "title": "Use the public docs site",
-      "summary": "Hearth docs are published as a static Astro site on GitHub Pages instead of being served by the runtime server.",
-      "body": [
-        "The public docs site is for install guides, architecture, operational notes, Synology deployment, and module-development guidance.",
-        "The canonical docs source is `docs/content/app-docs.json`. Generated outputs include the Markdown mirror in `docs/APP_DOCS.md` and the Astro content module used by the docs site.",
-        "Keep the README short and use it as a front door that links people to the public docs site and the most important reference files."
-      ],
-      "bullets": [
-        "Run `pnpm docs:sync` after editing the structured docs source.",
-        "Use `pnpm docs:dev` for local docs authoring.",
-        "GitHub Pages publishes the built static site from the repo, so the docs stay available even when Hearth itself is offline."
-      ],
-      "code": {
-        "language": "bash",
-        "title": "Docs authoring workflow",
-        "content": "pnpm docs:sync\npnpm docs:dev\n\n# before pushing\npnpm verify"
-      }
-    },
-    {
       "id": "overview",
+      "group": "Getting Started",
       "eyebrow": "Platform",
       "title": "What Hearth does",
       "summary": "Hearth is a household display system for dashboards, layouts, photo-driven rotation, chores, calendars, weather, and site-local time-aware modules.",
@@ -51,6 +31,7 @@
     },
     {
       "id": "install",
+      "group": "Getting Started",
       "eyebrow": "Quick Start",
       "title": "Install and run locally",
       "summary": "Use the monorepo root commands. The root scripts already build shared packages first.",
@@ -67,6 +48,7 @@
     },
     {
       "id": "structure",
+      "group": "Architecture",
       "eyebrow": "Architecture",
       "title": "How the application is organised",
       "summary": "The repo is split into shared contracts, the module SDK, the server, and the web app that powers both admin and displays.",
@@ -84,6 +66,7 @@
     },
     {
       "id": "admin",
+      "group": "Operations",
       "eyebrow": "Usage",
       "title": "Use the admin app",
       "summary": "The admin flow is centred on Layouts, Settings, and Chores. Displays appear after they open the dashboard once.",
@@ -100,6 +83,7 @@
     },
     {
       "id": "deploy",
+      "group": "Operations",
       "eyebrow": "Deployment",
       "title": "Deploy to Synology",
       "summary": "Production deployment currently revolves around publishing the image, pulling it on Synology, and recreating the compose service.",
@@ -116,6 +100,7 @@
     },
     {
       "id": "modules",
+      "group": "Module Development",
       "eyebrow": "SDK",
       "title": "Build modules",
       "summary": "Hearth is SDK-first. New modules should be added as web SDK modules unless there is a strong reason to keep them outside that path.",
@@ -137,6 +122,7 @@
     },
     {
       "id": "time",
+      "group": "Module Development",
       "eyebrow": "Hardening",
       "title": "Write time-safe modules",
       "summary": "Any module that depends on household-local time, midnight rollover, or `today` must use the synced display-time utilities instead of raw browser time.",
@@ -158,6 +144,7 @@
     },
     {
       "id": "verify",
+      "group": "Quality",
       "eyebrow": "Quality",
       "title": "Test and verify changes",
       "summary": "Use the root scripts rather than ad hoc workspace commands so dependency builds and tests run in the supported order.",

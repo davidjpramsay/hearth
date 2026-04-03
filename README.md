@@ -24,7 +24,7 @@ It is built to run on low-power hardware (Raspberry Pi / mini PCs) and provides:
 
 ## Documentation
 
-- Public docs site: [https://davidjpramsay.github.io/hearth/](https://davidjpramsay.github.io/hearth/)
+- Public docs site: [https://davidjpramsay.github.io/hearth/](https://davidjpramsay.github.io/hearth/) (Astro Starlight)
 - Structured docs source: `docs/content/app-docs.json`
 - Generated Markdown mirror: `docs/APP_DOCS.md`
 - Generated Astro content module: `apps/docs/src/content/app-docs.generated.ts`
@@ -75,7 +75,7 @@ Browser smoke coverage uses Playwright and boots a clean local Hearth server aga
 pnpm exec playwright install chromium
 ```
 
-The public docs site is a standalone Astro app under `apps/docs` and is published through GitHub Pages. It is intentionally separate from the Hearth runtime server.
+The public docs site is a standalone Astro Starlight app under `apps/docs` and is published through GitHub Pages. It is intentionally separate from the Hearth runtime server.
 
 ## Recent Changelog
 

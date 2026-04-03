@@ -1,0 +1,59 @@
+export const docsSidebar = [
+  {
+    label: "Getting Started",
+    items: [
+      {
+        label: "What Hearth does",
+        slug: "overview",
+      },
+      {
+        label: "Install and run locally",
+        slug: "install",
+      },
+    ],
+  },
+  {
+    label: "Architecture",
+    items: [
+      {
+        label: "How the application is organised",
+        slug: "structure",
+      },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      {
+        label: "Use the admin app",
+        slug: "admin",
+      },
+      {
+        label: "Deploy to Synology",
+        slug: "deploy",
+      },
+    ],
+  },
+  {
+    label: "Module Development",
+    items: [
+      {
+        label: "Build modules",
+        slug: "modules",
+      },
+      {
+        label: "Write time-safe modules",
+        slug: "time",
+      },
+    ],
+  },
+  {
+    label: "Quality",
+    items: [
+      {
+        label: "Test and verify changes",
+        slug: "verify",
+      },
+    ],
+  },
+];

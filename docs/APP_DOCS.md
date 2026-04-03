@@ -14,7 +14,6 @@ This is the public documentation surface for Hearth. It explains what the system
 
 ## Sections
 
-- [Use the public docs site](#docs)
 - [What Hearth does](#overview)
 - [Install and run locally](#install)
 - [How the application is organised](#structure)
@@ -23,32 +22,6 @@ This is the public documentation surface for Hearth. It explains what the system
 - [Build modules](#modules)
 - [Write time-safe modules](#time)
 - [Test and verify changes](#verify)
-
-## Use the public docs site
-
-_Documentation_
-
-Hearth docs are published as a static Astro site on GitHub Pages instead of being served by the runtime server.
-
-The public docs site is for install guides, architecture, operational notes, Synology deployment, and module-development guidance.
-
-The canonical docs source is `docs/content/app-docs.json`. Generated outputs include the Markdown mirror in `docs/APP_DOCS.md` and the Astro content module used by the docs site.
-
-Keep the README short and use it as a front door that links people to the public docs site and the most important reference files.
-
-- Run `pnpm docs:sync` after editing the structured docs source.
-- Use `pnpm docs:dev` for local docs authoring.
-- GitHub Pages publishes the built static site from the repo, so the docs stay available even when Hearth itself is offline.
-
-### Docs authoring workflow
-
-```bash
-pnpm docs:sync
-pnpm docs:dev
-
-# before pushing
-pnpm verify
-```
 
 ## What Hearth does
 

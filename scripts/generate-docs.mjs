@@ -8,7 +8,8 @@ import prettier from "prettier";
 const rootDir = process.cwd();
 const docsContentPath = path.join(rootDir, "docs/content/app-docs.json");
 const markdownOutputPath = path.join(rootDir, "docs/APP_DOCS.md");
-const docsSiteModulePath = path.join(rootDir, "apps/docs/src/content/app-docs.generated.ts");
+const docsSiteContentDirPath = path.join(rootDir, "apps/docs/src/content/docs");
+const docsSiteSidebarPath = path.join(rootDir, "apps/docs/src/generated/starlight-sidebar.mjs");
 const checkMode = process.argv.includes("--check");
 
 const formatWithProjectPrettier = async (value, filepath) => {
@@ -20,6 +21,13 @@ const formatWithProjectPrettier = async (value, filepath) => {
 };
 
 const escapeInlineCode = (value) => value.replace(/`/g, "\\`");
+const escapeYamlString = (value) => JSON.stringify(value);
+const slugifySectionId = (value) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
 const formatCodeBlock = (code) =>
   code
@@ -76,28 +84,143 @@ const generateMarkdown = (content) => {
   ].join("\n");
 };
 
-const generateDocsSiteModule = (
-  content,
-) => `// This file is generated from docs/content/app-docs.json. Do not edit it directly.
-export const appDocsContent = ${JSON.stringify(content, null, 2)} as const;
-`;
+const groupSectionEntries = (sections) => {
+  const groups = [];
+  const groupMap = new Map();
+
+  for (const section of sections) {
+    const groupName = typeof section.group === "string" ? section.group : "Documentation";
+    const existingGroup = groupMap.get(groupName);
+    if (existingGroup) {
+      existingGroup.push(section);
+      continue;
+    }
+
+    const nextGroup = [section];
+    groupMap.set(groupName, nextGroup);
+    groups.push([groupName, nextGroup]);
+  }
+
+  return groups;
+};
+
+const generateIndexPage = (content) => {
+  const hero = content.hero;
+  const sections = content.sections ?? [];
+  const sectionLinks = sections.map(
+    (section) => `- [${section.title}](./${slugifySectionId(section.id)}/)`,
+  );
+  const highlightLines = hero.highlights.map((highlight) => `- ${highlight}`);
+
+  return [
+    "---",
+    `title: ${escapeYamlString(hero.eyebrow)}`,
+    `description: ${escapeYamlString(hero.summary)}`,
+    "---",
+    "",
+    `${hero.headline}`,
+    "",
+    `${hero.summary}`,
+    "",
+    "## Highlights",
+    "",
+    ...highlightLines,
+    "",
+    "## Start here",
+    "",
+    ...sectionLinks,
+    "",
+    "## Links",
+    "",
+    "- [GitHub repository](https://github.com/davidjpramsay/hearth)",
+    "- [Markdown mirror](https://github.com/davidjpramsay/hearth/blob/main/docs/APP_DOCS.md)",
+    "",
+  ].join("\n");
+};
+
+const generateSectionPage = (section) => {
+  const lines = [
+    "---",
+    `title: ${escapeYamlString(section.title)}`,
+    `description: ${escapeYamlString(section.summary)}`,
+    "---",
+    "",
+    `${section.summary}`,
+    "",
+    ...section.body.flatMap((paragraph) => [paragraph, ""]),
+  ];
+
+  const bulletsBlock = formatBullets(section.bullets);
+  if (bulletsBlock) {
+    lines.push("## Key Points", "", bulletsBlock.trimEnd(), "");
+  }
+
+  const codeBlock = formatCodeBlock(section.code);
+  if (codeBlock) {
+    lines.push(codeBlock.trimEnd(), "");
+  }
+
+  return lines.join("\n");
+};
+
+const generateStarlightSidebarModule = (content) => {
+  const sections = content.sections ?? [];
+  const groups = groupSectionEntries(sections).map(([label, items]) => ({
+    label,
+    items: items.map((section) => ({
+      label: section.title,
+      slug: slugifySectionId(section.id),
+    })),
+  }));
+
+  return `export const docsSidebar = ${JSON.stringify(groups, null, 2)};\n`;
+};
 
 const run = async () => {
   const rawContent = await fs.readFile(docsContentPath, "utf8");
   const parsedContent = JSON.parse(rawContent);
+  const sections = parsedContent.sections ?? [];
   const nextMarkdown = await formatWithProjectPrettier(
     generateMarkdown(parsedContent),
     markdownOutputPath,
   );
-  const nextDocsSiteModule = await formatWithProjectPrettier(
-    generateDocsSiteModule(parsedContent),
-    docsSiteModulePath,
+  const nextSidebarModule = await formatWithProjectPrettier(
+    generateStarlightSidebarModule(parsedContent),
+    docsSiteSidebarPath,
+  );
+  const nextIndexPage = await formatWithProjectPrettier(
+    generateIndexPage(parsedContent),
+    path.join(docsSiteContentDirPath, "index.md"),
+  );
+  const nextSectionPages = await Promise.all(
+    sections.map(async (section) => {
+      const filename = `${slugifySectionId(section.id)}.md`;
+      const filepath = path.join(docsSiteContentDirPath, filename);
+      const content = await formatWithProjectPrettier(generateSectionPage(section), filepath);
+      return { filepath, content };
+    }),
   );
 
   if (checkMode) {
     const existingMarkdown = await fs.readFile(markdownOutputPath, "utf8").catch(() => null);
-    const existingDocsSiteModule = await fs.readFile(docsSiteModulePath, "utf8").catch(() => null);
-    if (existingMarkdown !== nextMarkdown || existingDocsSiteModule !== nextDocsSiteModule) {
+    const existingSidebarModule = await fs.readFile(docsSiteSidebarPath, "utf8").catch(() => null);
+    const existingIndexPage = await fs
+      .readFile(path.join(docsSiteContentDirPath, "index.md"), "utf8")
+      .catch(() => null);
+
+    const pagesAreCurrent = await Promise.all(
+      nextSectionPages.map(async ({ filepath, content }) => {
+        const existingContent = await fs.readFile(filepath, "utf8").catch(() => null);
+        return existingContent === content;
+      }),
+    );
+
+    if (
+      existingMarkdown !== nextMarkdown ||
+      existingSidebarModule !== nextSidebarModule ||
+      existingIndexPage !== nextIndexPage ||
+      pagesAreCurrent.some((value) => value === false)
+    ) {
       console.error(
         "Generated docs are out of date. Run `pnpm docs:sync` to regenerate the docs artifacts.",
       );
@@ -108,8 +231,21 @@ const run = async () => {
   }
 
   await fs.writeFile(markdownOutputPath, nextMarkdown, "utf8");
-  await fs.mkdir(path.dirname(docsSiteModulePath), { recursive: true });
-  await fs.writeFile(docsSiteModulePath, nextDocsSiteModule, "utf8");
+  await fs.mkdir(docsSiteContentDirPath, { recursive: true });
+  await fs.mkdir(path.dirname(docsSiteSidebarPath), { recursive: true });
+  const existingEntries = await fs
+    .readdir(docsSiteContentDirPath, { withFileTypes: true })
+    .catch(() => []);
+  await Promise.all(
+    existingEntries
+      .filter((entry) => entry.isFile())
+      .map((entry) => fs.unlink(path.join(docsSiteContentDirPath, entry.name))),
+  );
+  await fs.writeFile(path.join(docsSiteContentDirPath, "index.md"), nextIndexPage, "utf8");
+  await Promise.all(
+    nextSectionPages.map(({ filepath, content }) => fs.writeFile(filepath, content, "utf8")),
+  );
+  await fs.writeFile(docsSiteSidebarPath, nextSidebarModule, "utf8");
 };
 
 run().catch((error) => {
