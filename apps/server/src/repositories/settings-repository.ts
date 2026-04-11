@@ -7,6 +7,7 @@ import {
   getRuntimeTimeZone,
   getLayoutSetLogicBranches,
   normalizeScreenProfileLayoutsConfig,
+  plannerDayWindowConfigSchema,
   photoCollectionsConfigSchema,
   screenProfileLayoutsSchema,
   siteTimeConfigSchema,
@@ -18,6 +19,7 @@ import {
   type AutoLayoutTarget,
   type CalendarFeedsConfig,
   type ChoresPayoutConfig,
+  type PlannerDayWindowConfig,
   type PhotoCollectionsConfig,
   type SiteTimeConfig,
   type ScreenProfileLayouts,
@@ -30,6 +32,7 @@ const SITE_TIME_CONFIG_KEY = "site_time_config";
 const SCREEN_PROFILE_LAYOUTS_KEY = "screen_profile_layouts";
 const PHOTO_COLLECTIONS_KEY = "photo_collections";
 const CALENDAR_FEEDS_KEY = "calendar_feeds";
+const PLANNER_DAY_WINDOW_KEY = "planner_day_window";
 const DEFAULT_TARGET_CYCLE_SECONDS = 20;
 const DEFAULT_PHOTO_ACTION_TYPE = DEFAULT_LAYOUT_LOGIC_PHOTO_ACTION_TYPE;
 const DEFAULT_SET_ID = "set-1";
@@ -499,5 +502,25 @@ export class SettingsRepository {
 
   setCalendarFeeds(config: CalendarFeedsConfig): void {
     this.setValue(CALENDAR_FEEDS_KEY, JSON.stringify(calendarFeedsConfigSchema.parse(config)));
+  }
+
+  getPlannerDayWindow(): PlannerDayWindowConfig {
+    const rawValue = this.getValue(PLANNER_DAY_WINDOW_KEY);
+    if (!rawValue) {
+      return plannerDayWindowConfigSchema.parse({});
+    }
+
+    try {
+      return plannerDayWindowConfigSchema.parse(JSON.parse(rawValue));
+    } catch {
+      return plannerDayWindowConfigSchema.parse({});
+    }
+  }
+
+  setPlannerDayWindow(config: PlannerDayWindowConfig): void {
+    this.setValue(
+      PLANNER_DAY_WINDOW_KEY,
+      JSON.stringify(plannerDayWindowConfigSchema.parse(config)),
+    );
   }
 }

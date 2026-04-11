@@ -180,6 +180,12 @@ export const registerChoresRoutes = (app: FastifyInstance, services: AppServices
       changedAt: new Date().toISOString(),
       memberId: member.id,
     });
+    publishChoreEvent(services, {
+      type: "planner-updated",
+      reason: "user-created",
+      changedAt: new Date().toISOString(),
+      userId: member.id,
+    });
 
     return reply.code(201).send(choreMemberSchema.parse(member));
   });
@@ -216,6 +222,12 @@ export const registerChoresRoutes = (app: FastifyInstance, services: AppServices
       changedAt: new Date().toISOString(),
       memberId: updated.id,
     });
+    publishChoreEvent(services, {
+      type: "planner-updated",
+      reason: "user-updated",
+      changedAt: new Date().toISOString(),
+      userId: updated.id,
+    });
 
     return reply.send(choreMemberSchema.parse(updated));
   });
@@ -241,6 +253,12 @@ export const registerChoresRoutes = (app: FastifyInstance, services: AppServices
       reason: "member-deleted",
       changedAt: new Date().toISOString(),
       memberId: params.data.id,
+    });
+    publishChoreEvent(services, {
+      type: "planner-updated",
+      reason: "user-deleted",
+      changedAt: new Date().toISOString(),
+      userId: params.data.id,
     });
 
     return reply.code(204).send();

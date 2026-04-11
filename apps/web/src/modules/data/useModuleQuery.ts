@@ -15,6 +15,8 @@ interface UseModuleQueryOptions<TData> {
   intervalMs?: number;
   staleMs?: number;
   enabled?: boolean;
+  eventSourceUrl?: string;
+  eventNames?: string[];
 }
 
 export interface UseModuleQueryResult<TData> {
@@ -37,7 +39,20 @@ const readCachedEntry = <TData,>(key: string): ModuleQueryCacheEntry<TData> | nu
 export const useModuleQuery = <TData,>(
   options: UseModuleQueryOptions<TData>,
 ): UseModuleQueryResult<TData> => {
-  const { enabled = true, intervalMs = 30_000, key, queryFn, staleMs = 10_000 } = options;
+  const {
+    enabled = true,
+    intervalMs = 30_000,
+    key,
+    queryFn,
+    staleMs = 10_000,
+    eventSourceUrl,
+    eventNames = [],
+  } = options;
+  const eventNamesKey = eventNames.join("\u0001");
+  const normalizedEventNames = useMemo(
+    () => eventNames.filter((eventName) => eventName.trim().length > 0),
+    [eventNamesKey],
+  );
   const cachedAtStart = useMemo(() => readCachedEntry<TData>(key), [key]);
   const browserOnline = useBrowserOnlineStatus();
   const [data, setData] = useState<TData | null>(cachedAtStart?.data ?? null);
@@ -48,6 +63,7 @@ export const useModuleQuery = <TData,>(
   );
   const dataRef = useRef<TData | null>(cachedAtStart?.data ?? null);
   const queryFnRef = useRef(queryFn);
+  const revalidateRef = useRef<() => Promise<void>>(async () => undefined);
   const connectivityState = useMemo(
     () =>
       resolveModuleConnectivityState({
@@ -109,6 +125,10 @@ export const useModuleQuery = <TData,>(
       setLoading(false);
     }
   }, [enabled, key]);
+
+  useEffect(() => {
+    revalidateRef.current = revalidate;
+  }, [revalidate]);
 
   useEffect(() => {
     if (!enabled) {
@@ -186,6 +206,28 @@ export const useModuleQuery = <TData,>(
       window.removeEventListener("focus", handleWindowFocus);
     };
   }, [enabled, intervalMs, key, revalidate, staleMs]);
+
+  useEffect(() => {
+    if (!enabled || !eventSourceUrl || normalizedEventNames.length === 0) {
+      return;
+    }
+
+    const eventSource = new EventSource(eventSourceUrl);
+    const handleInvalidate = () => {
+      void revalidateRef.current();
+    };
+
+    for (const eventName of normalizedEventNames) {
+      eventSource.addEventListener(eventName, handleInvalidate);
+    }
+
+    return () => {
+      for (const eventName of normalizedEventNames) {
+        eventSource.removeEventListener(eventName, handleInvalidate);
+      }
+      eventSource.close();
+    };
+  }, [enabled, eventSourceUrl, normalizedEventNames]);
 
   return {
     data,

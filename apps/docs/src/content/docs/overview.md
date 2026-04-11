@@ -1,9 +1,9 @@
 ---
 title: "What Hearth does"
-description: "Hearth is a household display system for dashboards, layouts, photo-driven rotation, chores, calendars, weather, and site-local time-aware modules."
+description: "Hearth is a household display system for dashboards, layouts, photo-driven rotation, chores, calendars, planner boards, weather, and site-local time-aware modules."
 ---
 
-Hearth is a household display system for dashboards, layouts, photo-driven rotation, chores, calendars, weather, and site-local time-aware modules.
+Hearth is a household display system for dashboards, layouts, photo-driven rotation, chores, calendars, planner boards, weather, and site-local time-aware modules.
 
 A display opens the dashboard, checks in with the server, receives the active layout or set, and then renders SDK modules inside the grid.
 

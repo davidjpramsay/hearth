@@ -2,16 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
-import { calendarModuleEventsResponseSchema } from "@hearth/shared";
-import { moduleDefinition as calendarModule } from "../src/modules/sdk/calendar.module";
+import { plannerTodayResponseSchema, type PlannerTodayResponse } from "@hearth/shared";
+import { moduleDefinition as plannerModule } from "../src/modules/sdk/homeschool-planner.module";
 import { syncDisplayTimeContext } from "../src/runtime/display-time";
 
 type Listener = EventListenerOrEventListenerObject;
 
-const WEDNESDAY_NOW_MS = Date.parse("2026-04-01T02:00:00.000Z");
-const FRIDAY_NOW_MS = Date.parse("2026-04-03T02:00:00.000Z");
-
-const originalDateNow = Date.now;
 const originalWindow = globalThis.window;
 const originalDocument = globalThis.document;
 const originalNavigator = globalThis.navigator;
@@ -26,6 +22,52 @@ const flushMicrotasks = async () => {
   await Promise.resolve();
 };
 
+const createResponse = (input: {
+  siteDate: string;
+  templateName: string | null;
+}): PlannerTodayResponse =>
+  plannerTodayResponseSchema.parse({
+    generatedAt: new Date("2026-04-06T08:00:00.000Z").toISOString(),
+    siteDate: input.siteDate,
+    dayWindow: {
+      startTime: "08:00",
+      endTime: "15:00",
+    },
+    users: [
+      {
+        id: 1,
+        name: "Alex",
+        createdAt: "2026-04-06T08:00:00.000Z",
+        updatedAt: "2026-04-06T08:00:00.000Z",
+      },
+    ],
+    template: input.templateName
+      ? {
+          id: 1,
+          name: input.templateName,
+          repeatDays: [1],
+          createdAt: "2026-04-06T08:00:00.000Z",
+          updatedAt: "2026-04-06T08:00:00.000Z",
+        }
+      : null,
+    blocks: input.templateName
+      ? [
+          {
+            id: 1,
+            templateId: 1,
+            userId: 1,
+            name: "Maths",
+            colour: "color-4",
+            notes: "Workbook",
+            startTime: "08:00",
+            endTime: "09:00",
+            createdAt: "2026-04-06T08:00:00.000Z",
+            updatedAt: "2026-04-06T08:00:00.000Z",
+          },
+        ]
+      : [],
+  });
+
 const callListener = (listener: Listener, event: Event): void => {
   if (typeof listener === "function") {
     listener(event);
@@ -35,54 +77,11 @@ const callListener = (listener: Listener, event: Event): void => {
   listener.handleEvent(event);
 };
 
-const createCalendarPayload = () =>
-  calendarModuleEventsResponseSchema.parse({
-    generatedAt: "2026-04-01T02:00:00.000Z",
-    sources: [{ id: "family", label: "Family", color: "color-6" }],
-    events: [
-      {
-        id: "wed",
-        source: "family",
-        sourceLabel: "Family",
-        sourceColor: "color-6",
-        title: "Wednesday catch-up",
-        start: "2026-04-01T00:00:00.000Z",
-        end: "2026-04-02T00:00:00.000Z",
-        allDay: true,
-        location: null,
-      },
-      {
-        id: "thu",
-        source: "family",
-        sourceLabel: "Family",
-        sourceColor: "color-6",
-        title: "Thursday errands",
-        start: "2026-04-02T00:00:00.000Z",
-        end: "2026-04-03T00:00:00.000Z",
-        allDay: true,
-        location: null,
-      },
-      {
-        id: "fri",
-        source: "family",
-        sourceLabel: "Family",
-        sourceColor: "color-6",
-        title: "Friday plan",
-        start: "2026-04-03T00:00:00.000Z",
-        end: "2026-04-04T00:00:00.000Z",
-        allDay: true,
-        location: null,
-      },
-    ],
-    warnings: [],
-  });
-
-const installBrowserShims = (responses: Array<unknown>) => {
+const installBrowserShims = (responses: Array<PlannerTodayResponse | Error>) => {
   const windowListeners = new Map<string, Set<Listener>>();
   const documentListeners = new Map<string, Set<Listener>>();
   const localStorageEntries = new Map<string, string>();
   let fetchCallCount = 0;
-  let nowMs = WEDNESDAY_NOW_MS;
   let visibilityState: DocumentVisibilityState = "visible";
 
   const windowShim = {
@@ -138,10 +137,6 @@ const installBrowserShims = (responses: Array<unknown>) => {
     },
   } as unknown as Document;
 
-  Object.defineProperty(Date, "now", {
-    configurable: true,
-    value: () => nowMs,
-  });
   Object.defineProperty(globalThis, "window", {
     configurable: true,
     value: windowShim,
@@ -183,18 +178,11 @@ const installBrowserShims = (responses: Array<unknown>) => {
   });
 
   return {
-    setNowMs: (value: number) => {
-      nowMs = value;
-    },
     getFetchCallCount: () => fetchCallCount,
   };
 };
 
 const restoreBrowserShims = () => {
-  Object.defineProperty(Date, "now", {
-    configurable: true,
-    value: originalDateNow,
-  });
   Object.defineProperty(globalThis, "window", {
     configurable: true,
     value: originalWindow,
@@ -225,72 +213,96 @@ const restoreBrowserShims = () => {
   });
 };
 
-const renderModule = () => {
-  const Component = calendarModule.runtime.Component as (
-    props: Record<string, unknown>,
-  ) => React.ReactElement;
-
-  return React.createElement(Component, {
-    instanceId: "calendar-test",
-    settings: calendarModule.settingsSchema.parse({
-      viewMode: "list",
-      daysToShow: 3,
-      refreshIntervalSeconds: 300,
-      use24Hour: true,
-      feedSelections: [],
-      legacyCalendars: [],
-    }),
-    data: null,
-    loading: false,
-    error: null,
-    isEditing: false,
+test("planner module shows a clear empty state when no plan is assigned", async () => {
+  const shims = installBrowserShims([
+    createResponse({ siteDate: "2026-04-06", templateName: null }),
+  ]);
+  syncDisplayTimeContext({
+    siteTimeZone: "Australia/Perth",
+    serverNowMs: new Date("2026-04-06T08:00:00.000Z").getTime(),
+    localReceivedAtMs: new Date("2026-04-06T08:00:00.000Z").getTime(),
   });
-};
 
-test("calendar module advances upcoming days when display time rolls over even after refresh failure", async () => {
-  const browser = installBrowserShims([createCalendarPayload(), new Error("Failed to fetch")]);
   let renderer: ReactTestRenderer | null = null;
 
   try {
-    syncDisplayTimeContext({
-      siteTimeZone: "Australia/Perth",
-      serverNowMs: WEDNESDAY_NOW_MS,
-      localStartedAtMs: WEDNESDAY_NOW_MS,
-      localReceivedAtMs: WEDNESDAY_NOW_MS,
-    });
-
     await act(async () => {
-      renderer = create(renderModule());
+      renderer = create(
+        React.createElement(plannerModule.runtime.Component, {
+          instanceId: "planner-1",
+          settings: plannerModule.settingsSchema.parse({}),
+          data: null,
+          loading: false,
+          error: null,
+          isEditing: false,
+        }),
+      );
       await flushMicrotasks();
     });
 
-    let tree = JSON.stringify(renderer?.toJSON());
-    assert.match(tree, /Wednesday catch-up/);
-    assert.match(tree, /Thursday errands/);
-    assert.match(tree, /Friday plan/);
-
-    browser.setNowMs(FRIDAY_NOW_MS);
-    syncDisplayTimeContext({
-      siteTimeZone: "Australia/Perth",
-      serverNowMs: FRIDAY_NOW_MS,
-      localStartedAtMs: FRIDAY_NOW_MS,
-      localReceivedAtMs: FRIDAY_NOW_MS,
-    });
-
-    await act(async () => {
-      await flushMicrotasks();
-    });
-
-    tree = JSON.stringify(renderer?.toJSON());
-    assert.doesNotMatch(tree, /Wednesday catch-up/);
-    assert.doesNotMatch(tree, /Thursday errands/);
-    assert.match(tree, /Friday plan/);
-    assert.equal(browser.getFetchCallCount(), 2);
+    const text = JSON.stringify(renderer!.toJSON());
+    assert.match(text, /No plan assigned for today/);
+    assert.equal(shims.getFetchCallCount(), 1);
   } finally {
+    if (renderer) {
+      await act(async () => {
+        renderer?.unmount();
+      });
+    }
+    restoreBrowserShims();
+  }
+});
+
+test("planner module refreshes when synced display time rolls into a new site day", async () => {
+  const shims = installBrowserShims([
+    createResponse({ siteDate: "2026-04-06", templateName: "Monday core" }),
+    createResponse({ siteDate: "2026-04-07", templateName: "Tuesday core" }),
+  ]);
+  const firstNowMs = new Date("2026-04-06T08:00:00.000Z").getTime();
+  syncDisplayTimeContext({
+    siteTimeZone: "Australia/Perth",
+    serverNowMs: firstNowMs,
+    localReceivedAtMs: firstNowMs,
+  });
+
+  let renderer: ReactTestRenderer | null = null;
+
+  try {
     await act(async () => {
-      renderer?.unmount();
+      renderer = create(
+        React.createElement(plannerModule.runtime.Component, {
+          instanceId: "planner-2",
+          settings: plannerModule.settingsSchema.parse({}),
+          data: null,
+          loading: false,
+          error: null,
+          isEditing: false,
+        }),
+      );
       await flushMicrotasks();
     });
+
+    assert.equal(shims.getFetchCallCount(), 1);
+    assert.match(JSON.stringify(renderer!.toJSON()), /Monday core/);
+
+    await act(async () => {
+      const secondNowMs = new Date("2026-04-07T08:00:05.000Z").getTime();
+      syncDisplayTimeContext({
+        siteTimeZone: "Australia/Perth",
+        serverNowMs: secondNowMs,
+        localReceivedAtMs: secondNowMs,
+      });
+      await flushMicrotasks();
+    });
+
+    assert.equal(shims.getFetchCallCount(), 2);
+    assert.match(JSON.stringify(renderer!.toJSON()), /Tuesday core/);
+  } finally {
+    if (renderer) {
+      await act(async () => {
+        renderer?.unmount();
+      });
+    }
     restoreBrowserShims();
   }
 });

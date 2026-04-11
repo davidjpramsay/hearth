@@ -84,6 +84,43 @@ CREATE TABLE IF NOT EXISTS chore_completions (
 
 CREATE INDEX IF NOT EXISTS idx_chore_completions_date ON chore_completions(completion_date);
 
+CREATE TABLE IF NOT EXISTS planner_templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  repeat_days_json TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS planner_template_blocks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  template_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  colour TEXT NOT NULL,
+  notes TEXT,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(template_id) REFERENCES planner_templates(id) ON DELETE CASCADE,
+  FOREIGN KEY(user_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_planner_template_blocks_template_id
+  ON planner_template_blocks(template_id);
+
+CREATE INDEX IF NOT EXISTS idx_planner_template_blocks_user_id
+  ON planner_template_blocks(user_id);
+
+CREATE TABLE IF NOT EXISTS planner_date_assignments (
+  assignment_date TEXT PRIMARY KEY,
+  template_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(template_id) REFERENCES planner_templates(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -110,6 +147,201 @@ const ensureColumnExists = (
   }
 
   db.exec(alterSql);
+};
+
+const tableExists = (db: Database.Database, table: string): boolean =>
+  Boolean(
+    db
+      .prepare<{ table: string }, { name: string }>(
+        `
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'table'
+          AND name = @table
+        `,
+      )
+      .get({ table }),
+  );
+
+const ensurePlannerBlocksReferenceMembers = (db: Database.Database): void => {
+  if (!tableExists(db, "planner_template_blocks")) {
+    return;
+  }
+
+  const foreignKeys = db
+    .prepare<
+      [],
+      { table: string; from: string }
+    >("PRAGMA foreign_key_list(planner_template_blocks)")
+    .all();
+  const userIdTarget = foreignKeys.find((entry) => entry.from === "user_id")?.table;
+
+  if (userIdTarget === "members") {
+    return;
+  }
+
+  const legacyUsers = tableExists(db, "planner_users")
+    ? db
+        .prepare<[], { id: number; name: string; created_at: string; updated_at: string }>(
+          `
+          SELECT id, name, created_at, updated_at
+          FROM planner_users
+          ORDER BY id ASC
+          `,
+        )
+        .all()
+    : [];
+  const legacyBlocks = db
+    .prepare<
+      [],
+      {
+        id: number;
+        template_id: number;
+        user_id: number;
+        name: string;
+        colour: string;
+        notes: string | null;
+        start_time: string;
+        end_time: string;
+        created_at: string;
+        updated_at: string;
+      }
+    >(
+      `
+      SELECT *
+      FROM planner_template_blocks
+      ORDER BY id ASC
+      `,
+    )
+    .all();
+
+  const findMemberById = db.prepare<{ id: number }, { id: number }>(
+    "SELECT id FROM members WHERE id = @id",
+  );
+  const findMemberByName = db.prepare<{ name: string }, { id: number }>(
+    `
+    SELECT id
+    FROM members
+    WHERE name = @name COLLATE NOCASE
+    ORDER BY id ASC
+    LIMIT 1
+    `,
+  );
+  const insertMemberWithId = db.prepare(
+    `
+    INSERT INTO members (id, name, avatar_url, weekly_allowance, created_at, updated_at)
+    VALUES (@id, @name, NULL, 0, @createdAt, @updatedAt)
+    `,
+  );
+  const idMapping = new Map<number, number>();
+
+  for (const user of legacyUsers) {
+    const existingById = findMemberById.get({ id: user.id });
+    if (existingById) {
+      idMapping.set(user.id, existingById.id);
+      continue;
+    }
+
+    const existingByName = findMemberByName.get({ name: user.name.trim() });
+    if (existingByName) {
+      idMapping.set(user.id, existingByName.id);
+      continue;
+    }
+
+    insertMemberWithId.run({
+      id: user.id,
+      name: user.name.trim(),
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+    });
+    idMapping.set(user.id, user.id);
+  }
+
+  for (const block of legacyBlocks) {
+    const mappedUserId = idMapping.get(block.user_id) ?? block.user_id;
+    if (findMemberById.get({ id: mappedUserId })) {
+      continue;
+    }
+
+    insertMemberWithId.run({
+      id: mappedUserId,
+      name: `Child ${mappedUserId}`,
+      createdAt: block.created_at,
+      updatedAt: block.updated_at,
+    });
+  }
+
+  db.exec("ALTER TABLE planner_template_blocks RENAME TO planner_template_blocks_legacy");
+  db.exec(`
+    CREATE TABLE planner_template_blocks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      template_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      colour TEXT NOT NULL,
+      notes TEXT,
+      start_time TEXT NOT NULL,
+      end_time TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(template_id) REFERENCES planner_templates(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES members(id) ON DELETE CASCADE
+    )
+  `);
+
+  const insertBlock = db.prepare(
+    `
+    INSERT INTO planner_template_blocks (
+      id,
+      template_id,
+      user_id,
+      name,
+      colour,
+      notes,
+      start_time,
+      end_time,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      @id,
+      @templateId,
+      @userId,
+      @name,
+      @colour,
+      @notes,
+      @startTime,
+      @endTime,
+      @createdAt,
+      @updatedAt
+    )
+    `,
+  );
+
+  for (const block of legacyBlocks) {
+    insertBlock.run({
+      id: block.id,
+      templateId: block.template_id,
+      userId: idMapping.get(block.user_id) ?? block.user_id,
+      name: block.name,
+      colour: block.colour,
+      notes: block.notes,
+      startTime: block.start_time,
+      endTime: block.end_time,
+      createdAt: block.created_at,
+      updatedAt: block.updated_at,
+    });
+  }
+
+  db.exec("DROP TABLE planner_template_blocks_legacy");
+  db.exec("DROP INDEX IF EXISTS idx_planner_template_blocks_template_id");
+  db.exec("DROP INDEX IF EXISTS idx_planner_template_blocks_user_id");
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_planner_template_blocks_template_id ON planner_template_blocks(template_id)",
+  );
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_planner_template_blocks_user_id ON planner_template_blocks(user_id)",
+  );
 };
 
 const MAX_LAYOUT_NAME_LENGTH = 80;
@@ -620,6 +852,12 @@ export const createDatabase = (filePath: string): Database.Database => {
     "weekly_allowance",
     "ALTER TABLE members ADD COLUMN weekly_allowance REAL NOT NULL DEFAULT 0",
   );
+  ensureColumnExists(
+    db,
+    "planner_templates",
+    "repeat_days_json",
+    "ALTER TABLE planner_templates ADD COLUMN repeat_days_json TEXT NOT NULL DEFAULT '[]'",
+  );
   ensureColumnExists(db, "chores", "starts_on", "ALTER TABLE chores ADD COLUMN starts_on TEXT");
   ensureColumnExists(
     db,
@@ -638,6 +876,7 @@ export const createDatabase = (filePath: string): Database.Database => {
   ensureLayoutNameUniqueIndex(db);
   ensureUniqueDeviceNames(db);
   ensureDeviceNameUniqueIndex(db);
+  ensurePlannerBlocksReferenceMembers(db);
   seedDefaultLayoutsAndSettings(db);
 
   return db;

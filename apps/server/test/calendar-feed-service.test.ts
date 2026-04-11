@@ -66,7 +66,7 @@ test("CalendarFeedService serializes all-day events as calendar days", async (t)
       {
         source: icsPath,
         label: "Family",
-        color: "#22D3EE",
+        color: "color-6",
       },
     ],
     refreshIntervalSeconds: 300,
@@ -77,7 +77,7 @@ test("CalendarFeedService serializes all-day events as calendar days", async (t)
     {
       id: result.sources[0]?.id,
       label: "Family",
-      color: "#22D3EE",
+      color: "color-6",
     },
   ]);
 
@@ -133,7 +133,7 @@ test("CalendarFeedService falls back to a persisted response after a cold-start 
       {
         source: icsPath,
         label: "Planning",
-        color: "#22D3EE",
+        color: "color-6",
       },
     ],
     refreshIntervalSeconds: 300,
@@ -151,7 +151,7 @@ test("CalendarFeedService falls back to a persisted response after a cold-start 
       {
         source: icsPath,
         label: "Planning",
-        color: "#22D3EE",
+        color: "color-6",
       },
     ],
     refreshIntervalSeconds: 300,
@@ -207,7 +207,7 @@ test("CalendarFeedService resolves saved feed ids through the global registry", 
           id: "school",
           name: "School",
           url: icsPath,
-          color: "#34D399",
+          color: "color-4",
           enabled: true,
         },
       ],
@@ -223,7 +223,7 @@ test("CalendarFeedService resolves saved feed ids through the global registry", 
       {
         feedId: "school",
         labelOverride: "Kids School",
-        colorOverride: "#60A5FA",
+        colorOverride: "color-7",
       },
     ],
     refreshIntervalSeconds: 300,
@@ -234,10 +234,10 @@ test("CalendarFeedService resolves saved feed ids through the global registry", 
     {
       id: "school",
       label: "Kids School",
-      color: "#60A5FA",
+      color: "color-7",
     },
   ]);
   assert.equal(result.events[0]?.source, "school");
   assert.equal(result.events[0]?.sourceLabel, "Kids School");
-  assert.equal(result.events[0]?.sourceColor, "#60A5FA");
+  assert.equal(result.events[0]?.sourceColor, "color-7");
 });

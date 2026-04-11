@@ -27,7 +27,7 @@ This is the public documentation surface for Hearth. It explains what the system
 
 _Platform_
 
-Hearth is a household display system for dashboards, layouts, photo-driven rotation, chores, calendars, weather, and site-local time-aware modules.
+Hearth is a household display system for dashboards, layouts, photo-driven rotation, chores, calendars, planner boards, weather, and site-local time-aware modules.
 
 A display opens the dashboard, checks in with the server, receives the active layout or set, and then renders SDK modules inside the grid.
 
@@ -83,17 +83,22 @@ apps/web owns the dashboard runtime, admin pages, module implementations, and sy
 
 _Usage_
 
-The admin flow is centred on Layouts, Settings, and Chores. Displays appear after they open the dashboard once.
+The admin flow is centred on Layouts, Settings, Children, Chores, and School. Displays appear after they open the dashboard once.
 
 Use Layouts to build grid-based pages, attach SDK modules, and configure photo/set logic.
 
 Use Settings to manage connected displays, household timezone, saved calendar feeds, and runtime/device details.
 
-Use Chores to manage members, payouts, schedules, and household task behavior.
+Use Children to manage the shared child roster that feeds both chores and school planning.
+
+Use Chores to manage payouts, schedules, and household task behavior for those children.
+
+Use School to manage reusable day plans, assign them to repeat weekdays, and edit their timetables.
 
 - Admin login lives at `/admin/login`.
 - The dashboard display runtime lives at `/`.
 - Saved calendar feeds are global and can be referenced by calendar modules by ID.
+- School day plans are global, each weekday can only belong to one plan, and the School module renders the plan that matches today's household weekday.
 
 ## Deploy to Synology
 
@@ -152,7 +157,7 @@ For `site-local` modules, read time and timezone from `apps/web/src/runtime/disp
 
 If a module caches snapshots locally and its content is day-scoped, validate the snapshot against the current household date before reusing it.
 
-- Good references: clock, chores, calendar, bible-verse.
+- Good references: clock, chores, calendar, bible-verse, homeschool-planner.
 - Do not trust raw `new Date()` for household-day grouping on displays.
 - Use timezone-aware helpers from `@hearth/shared` for day comparisons.
 

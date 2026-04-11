@@ -12,6 +12,7 @@ Hearth runtime is SDK-first:
 - `calendar`
 - `photos`
 - `chores`
+- `homeschool-planner`
 - `weather`
 - `bible-verse`
 - `welcome`
@@ -87,6 +88,7 @@ Hearth runtime is SDK-first:
   - `apps/web/src/modules/sdk/chores.module.tsx`
   - `apps/web/src/modules/sdk/calendar.module.tsx`
   - `apps/web/src/modules/sdk/bible-verse.module.tsx`
+  - `apps/web/src/modules/sdk/homeschool-planner.module.tsx`
 - Server adapters:
   - `apps/server/src/modules/adapters/server-status.ts`
   - `apps/server/src/modules/adapters/kobo-reader.ts`

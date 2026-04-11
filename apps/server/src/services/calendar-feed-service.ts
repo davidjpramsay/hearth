@@ -8,10 +8,13 @@ import {
   calendarModuleConfigSchema,
   calendarModuleEventSchema,
   calendarModuleEventsResponseSchema,
+  getThemeColorSlotByIndex,
+  normalizeThemeColorSlot,
   serializeCalendarEventBoundary,
   type CalendarFeedsConfig,
   type CalendarModuleEvent,
   type CalendarModuleEventsResponse,
+  type ThemeColorSlot,
 } from "@hearth/shared";
 import { z } from "zod";
 import { config } from "../config.js";
@@ -27,22 +30,12 @@ const CALENDAR_RANGE_DAYS_PAST = 1;
 const CALENDAR_RANGE_DAYS_AHEAD = 120;
 const MAX_RETURNED_EVENTS = 700;
 const FETCH_TIMEOUT_MS = 10_000;
+const CALENDAR_SOURCE_CONCURRENCY = 4;
 const CALENDAR_PERSISTED_RESPONSE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const CALENDAR_PERSISTED_SOURCE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const REMOTE_PROTOCOL_REGEX = /^(https?|webcals?):\/\//i;
 const WEB_CAL_DOUBLE_SLASH_REGEX = /^webcals?:\/\//i;
 const WEB_CAL_SINGLE_SLASH_REGEX = /^webcals?:\/(?!\/)/i;
-const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
-const DEFAULT_CALENDAR_COLORS = [
-  "#22D3EE",
-  "#60A5FA",
-  "#A78BFA",
-  "#34D399",
-  "#F59E0B",
-  "#FB7185",
-  "#F97316",
-  "#38BDF8",
-];
 
 const cachedCalendarSourceEventSchema = z.object({
   uid: z.string().min(1),
@@ -74,8 +67,34 @@ interface ResolvedSource {
   id: string;
   source: string;
   label: string;
-  color: string;
+  color: ThemeColorSlot;
 }
+
+const mapWithConcurrencyLimit = async <TInput, TOutput>(
+  items: TInput[],
+  limit: number,
+  mapper: (item: TInput) => Promise<TOutput>,
+): Promise<TOutput[]> => {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const results = new Array<TOutput>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.max(1, Math.min(limit, items.length));
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        results[currentIndex] = await mapper(items[currentIndex]!);
+      }
+    }),
+  );
+
+  return results;
+};
 
 const addDays = (date: Date, days: number): Date => new Date(date.getTime() + days * DAY_MS);
 
@@ -120,21 +139,7 @@ const toSourceLabel = (source: string): string => {
 const toLegacyPublicSourceId = (source: string): string =>
   `legacy-${createHash("sha256").update(source).digest("hex").slice(0, 16)}`;
 
-const defaultCalendarColor = (index: number): string =>
-  DEFAULT_CALENDAR_COLORS[index % DEFAULT_CALENDAR_COLORS.length] ?? "#22D3EE";
-
-const normalizeColor = (input: string | null | undefined): string | null => {
-  if (typeof input !== "string") {
-    return null;
-  }
-
-  const trimmed = input.trim();
-  if (!HEX_COLOR_REGEX.test(trimmed)) {
-    return null;
-  }
-
-  return trimmed.toUpperCase();
-};
+const defaultCalendarColor = (index: number): ThemeColorSlot => getThemeColorSlotByIndex(index);
 
 const buildPersistedCalendarResponseKey = (sources: ResolvedSource[]): string =>
   `calendar-response:${createHash("sha256").update(JSON.stringify(sources)).digest("hex")}`;
@@ -185,6 +190,7 @@ const materializeSourceEvents = (
 
 export class CalendarFeedService {
   private readonly sourceCache = new Map<string, SourceCacheEntry>();
+  private readonly inFlightSourceLoads = new Map<string, Promise<SourceLoadResult>>();
 
   constructor(
     private readonly moduleStateRepository: ModuleStateRepository | null = null,
@@ -198,18 +204,16 @@ export class CalendarFeedService {
       calendarFeedsConfigSchema.parse({});
 
     const enabledFeeds = configuredFeeds.feeds.filter((feed) => feed.enabled);
-    await Promise.all(
-      enabledFeeds.map((feed) =>
-        this.loadSourceEvents({
-          source: {
-            id: feed.id,
-            source: feed.url,
-            label: feed.name,
-            color: normalizeColor(feed.color) ?? "#22D3EE",
-          },
-          refreshMs: 0,
-        }).catch(() => null),
-      ),
+    await mapWithConcurrencyLimit(enabledFeeds, CALENDAR_SOURCE_CONCURRENCY, async (feed) =>
+      this.loadSourceEvents({
+        source: {
+          id: feed.id,
+          source: feed.url,
+          label: feed.name,
+          color: normalizeThemeColorSlot(feed.color),
+        },
+        refreshMs: 0,
+      }).catch(() => null),
     );
   }
 
@@ -231,13 +235,14 @@ export class CalendarFeedService {
 
     const persistedResponseKey = buildPersistedCalendarResponseKey(resolved.sources);
     const refreshMs = Math.max(parsedConfig.refreshIntervalSeconds, 30) * 1000;
-    const sourceResults = await Promise.all(
-      resolved.sources.map((source) =>
+    const sourceResults = await mapWithConcurrencyLimit(
+      resolved.sources,
+      CALENDAR_SOURCE_CONCURRENCY,
+      (source) =>
         this.loadSourceEvents({
           source,
           refreshMs,
         }),
-      ),
     );
 
     const warnings = [...resolved.warnings];
@@ -338,8 +343,8 @@ export class CalendarFeedService {
         source,
         label: selection.labelOverride?.trim() ? selection.labelOverride.trim() : feed.name,
         color:
-          normalizeColor(selection.colorOverride) ??
-          normalizeColor(feed.color) ??
+          (selection.colorOverride ? normalizeThemeColorSlot(selection.colorOverride) : null) ??
+          normalizeThemeColorSlot(feed.color) ??
           defaultCalendarColor(sources.length),
       });
     }
@@ -355,7 +360,9 @@ export class CalendarFeedService {
         id: toLegacyPublicSourceId(source),
         source,
         label: legacyCalendar.label?.trim() ? legacyCalendar.label.trim() : toSourceLabel(source),
-        color: normalizeColor(legacyCalendar.color) ?? defaultCalendarColor(sources.length),
+        color:
+          (legacyCalendar.color ? normalizeThemeColorSlot(legacyCalendar.color) : null) ??
+          defaultCalendarColor(sources.length),
       });
     }
 
@@ -380,56 +387,69 @@ export class CalendarFeedService {
         sourceStatus: "memory-cache",
       };
     }
-
-    try {
-      const sourceBody = await this.loadSourceBody(source.source);
-      const events = this.parseEventsFromIcs(sourceBody, source.source);
-
-      this.sourceCache.set(source.source, {
-        fetchedAtMs: now,
-        events,
-      });
-      writePersistedModuleResponse(
-        this.moduleStateRepository,
-        buildPersistedCalendarSourceKey(source.source),
-        cachedCalendarSourceSnapshotSchema.parse({ events }),
-      );
-
-      return {
-        events: materializeSourceEvents(events, source),
-        warning: null,
-        sourceStatus: "live",
-      };
-    } catch (error) {
-      if (cached) {
-        return {
-          events: materializeSourceEvents(cached.events, source),
-          warning: `Using cached data for "${source.label}" after refresh failure.`,
-          sourceStatus: "memory-cache",
-        };
-      }
-
-      const persistedSource = readPersistedModuleResponse({
-        repository: this.moduleStateRepository,
-        key: buildPersistedCalendarSourceKey(source.source),
-        parse: (payload) => cachedCalendarSourceSnapshotSchema.parse(payload),
-        maxAgeMs: CALENDAR_PERSISTED_SOURCE_MAX_AGE_MS,
-      });
-
-      if (persistedSource) {
-        return {
-          events: materializeSourceEvents(persistedSource.payload.events, source),
-          warning: `Using saved feed snapshot for "${source.label}" while refresh is unavailable.`,
-          sourceStatus: "persisted-cache",
-        };
-      }
-
-      return {
-        events: [],
-        warning: `Failed to load "${source.label}": ${summarizeError(error)}`,
-        sourceStatus: "failed",
-      };
+    const existingLoad = this.inFlightSourceLoads.get(source.source);
+    if (existingLoad) {
+      return existingLoad;
     }
+
+    const loadPromise = (async () => {
+      try {
+        const sourceBody = await this.loadSourceBody(source.source);
+        const events = this.parseEventsFromIcs(sourceBody, source.source);
+
+        this.sourceCache.set(source.source, {
+          fetchedAtMs: now,
+          events,
+        });
+        writePersistedModuleResponse(
+          this.moduleStateRepository,
+          buildPersistedCalendarSourceKey(source.source),
+          cachedCalendarSourceSnapshotSchema.parse({ events }),
+        );
+
+        return {
+          events: materializeSourceEvents(events, source),
+          warning: null,
+          sourceStatus: "live",
+        } satisfies SourceLoadResult;
+      } catch (error) {
+        if (cached) {
+          return {
+            events: materializeSourceEvents(cached.events, source),
+            warning: `Using cached data for "${source.label}" after refresh failure.`,
+            sourceStatus: "memory-cache",
+          } satisfies SourceLoadResult;
+        }
+
+        const persistedSource = readPersistedModuleResponse({
+          repository: this.moduleStateRepository,
+          key: buildPersistedCalendarSourceKey(source.source),
+          parse: (payload) => cachedCalendarSourceSnapshotSchema.parse(payload),
+          maxAgeMs: CALENDAR_PERSISTED_SOURCE_MAX_AGE_MS,
+        });
+
+        if (persistedSource) {
+          return {
+            events: materializeSourceEvents(persistedSource.payload.events, source),
+            warning: `Using saved feed snapshot for "${source.label}" while refresh is unavailable.`,
+            sourceStatus: "persisted-cache",
+          } satisfies SourceLoadResult;
+        }
+
+        return {
+          events: [],
+          warning: `Failed to load "${source.label}": ${summarizeError(error)}`,
+          sourceStatus: "failed",
+        } satisfies SourceLoadResult;
+      }
+    })().finally(() => {
+      if (this.inFlightSourceLoads.get(source.source) === loadPromise) {
+        this.inFlightSourceLoads.delete(source.source);
+      }
+    });
+
+    this.inFlightSourceLoads.set(source.source, loadPromise);
+    return loadPromise;
   }
 
   private async loadSourceBody(source: string): Promise<string> {

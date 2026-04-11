@@ -36,11 +36,32 @@ export interface SiteTimeUpdatedEvent {
   siteTimezone: string;
 }
 
+export interface PlannerUpdatedEvent {
+  type: "planner-updated";
+  changedAt: string;
+  reason:
+    | "day-window-updated"
+    | "user-created"
+    | "user-updated"
+    | "user-deleted"
+    | "template-created"
+    | "template-updated"
+    | "template-deleted"
+    | "template-duplicated"
+    | "template-blocks-updated"
+    | "assignment-updated"
+    | "assignment-deleted";
+  userId?: number;
+  templateId?: number;
+  date?: string;
+}
+
 export type AppEvent =
   | LayoutUpdatedEvent
   | ChoresUpdatedEvent
   | DisplayDeviceUpdatedEvent
-  | SiteTimeUpdatedEvent;
+  | SiteTimeUpdatedEvent
+  | PlannerUpdatedEvent;
 
 type Listener = (event: AppEvent) => void;
 

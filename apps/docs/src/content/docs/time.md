@@ -13,7 +13,7 @@ If a module caches snapshots locally and its content is day-scoped, validate the
 
 ## Key Points
 
-- Good references: clock, chores, calendar, bible-verse.
+- Good references: clock, chores, calendar, bible-verse, homeschool-planner.
 - Do not trust raw `new Date()` for household-day grouping on displays.
 - Use timezone-aware helpers from `@hearth/shared` for day comparisons.
 

@@ -112,4 +112,43 @@ test.describe("Hearth smoke", () => {
       )
       .toBe(true);
   });
+
+  test("set logic editor connects start into a time gate and selects it", async ({ page }) => {
+    await loginAsAdmin(page);
+
+    const edgeCountBefore = await page.locator(".react-flow__edge").count();
+    await page.getByRole("button", { name: "Time Gate Node" }).click();
+    await page.waitForTimeout(300);
+
+    const startHandle = page.locator('[data-nodeid="__start__"][data-handlepos="bottom"]');
+    const latestTimeGateTarget = page
+      .locator('[data-nodeid^="action-"][data-handlepos="top"]')
+      .last();
+
+    const startBox = await startHandle.boundingBox();
+    const targetBox = await latestTimeGateTarget.boundingBox();
+
+    expect(startBox).not.toBeNull();
+    expect(targetBox).not.toBeNull();
+
+    await page.mouse.move(startBox!.x + startBox!.width / 2, startBox!.y + startBox!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      targetBox!.x + targetBox!.width / 2,
+      targetBox!.y + targetBox!.height / 2,
+      { steps: 18 },
+    );
+    await page.mouse.up();
+
+    await expect
+      .poll(async () => page.locator(".react-flow__edge").count())
+      .toBeGreaterThan(edgeCountBefore);
+
+    const latestTimeGateNode = page
+      .locator(".react-flow__node")
+      .filter({ hasText: "Time Gate Node" })
+      .last();
+    await latestTimeGateNode.click();
+    await expect(page.getByText("Edit the selected time gate node settings.")).toBeVisible();
+  });
 });

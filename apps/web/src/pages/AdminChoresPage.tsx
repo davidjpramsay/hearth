@@ -1,20 +1,18 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   createChoreItem,
-  createChoreMember,
   deleteChoreItem,
-  deleteChoreMember,
   getChoresDashboard,
   setChoreCompletion,
   updateChoresPayoutConfig,
   updateChoreItem,
-  updateChoreMember,
 } from "../api/client";
 import { logoutAdminSession } from "../auth/session";
 import { getAuthToken } from "../auth/storage";
 import { useNavigate } from "react-router-dom";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
 import { PageShell } from "../components/PageShell";
+import { useModuleQuery } from "../modules/data/useModuleQuery";
 import {
   getRuntimeTimeZone,
   toCalendarDateInTimeZone,
@@ -26,13 +24,6 @@ import {
 } from "@hearth/shared";
 
 type ChoreScheduleType = ChoreSchedule["type"];
-
-interface MemberFormState {
-  id: number | null;
-  name: string;
-  avatarUrl: string;
-  weeklyAllowance: string;
-}
 
 interface ChoreFormState {
   id: number | null;
@@ -93,13 +84,6 @@ const clampIsoDateToRange = (
   return date;
 };
 
-const emptyMemberForm = (): MemberFormState => ({
-  id: null,
-  name: "",
-  avatarUrl: "",
-  weeklyAllowance: "0",
-});
-
 const emptyChoreForm = (referenceDate: string): ChoreFormState => ({
   id: null,
   name: "",
@@ -151,7 +135,6 @@ export const AdminChoresPage = () => {
   const [board, setBoard] = useState<ChoresBoardResponse | null>(null);
   const [members, setMembers] = useState<ChoresBoardResponse["members"]>([]);
   const [chores, setChores] = useState<ChoreRecord[]>([]);
-  const [memberForm, setMemberForm] = useState<MemberFormState>(emptyMemberForm);
   const [choreForm, setChoreForm] = useState<ChoreFormState>(() => emptyChoreForm(todayDate()));
   const [payoutConfig, setPayoutConfig] = useState<ChoresPayoutConfig>({
     mode: "all-or-nothing",
@@ -159,7 +142,6 @@ export const AdminChoresPage = () => {
     paydayDayOfWeek: 6,
     siteTimezone: getRuntimeTimeZone(),
   });
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -172,88 +154,29 @@ export const AdminChoresPage = () => {
     setSelectedDate((current) => clampIsoDateToRange(current, snapshot.selectableWeekRange));
   }, []);
 
-  const loadData = useCallback(
-    async (options?: { background?: boolean }) => {
-      if (!token) {
-        navigate("/admin/login", { replace: true });
-        return;
-      }
-
-      if (!options?.background) {
-        setLoading(true);
-      }
-      setError(null);
-
-      try {
-        applyDashboardState(await getChoresDashboard(token));
-      } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Failed to load chores");
-      } finally {
-        if (!options?.background) {
-          setLoading(false);
-        }
-      }
-    },
-    [applyDashboardState, navigate, token],
-  );
-
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
+  const choresQuery = useModuleQuery<ChoresDashboardResponse>({
+    key: `admin-chores:${token ?? "anonymous"}`,
+    enabled: Boolean(token),
+    queryFn: async () => getChoresDashboard(token!),
+    intervalMs: FALLBACK_REFRESH_INTERVAL_MS,
+    staleMs: 0,
+    eventSourceUrl: "/api/events/layouts",
+    eventNames: ["chores-updated", "site-time-updated"],
+  });
+  const loading = choresQuery.loading && board === null;
+  const activeError = error ?? choresQuery.error;
 
   useEffect(() => {
     if (!token) {
-      return;
+      navigate("/admin/login", { replace: true });
     }
-
-    const eventSource = new EventSource("/api/events/layouts");
-    const handleUpdate = () => {
-      void loadData();
-    };
-
-    eventSource.addEventListener("chores-updated", handleUpdate);
-    eventSource.addEventListener("site-time-updated", handleUpdate);
-
-    return () => {
-      eventSource.removeEventListener("chores-updated", handleUpdate);
-      eventSource.removeEventListener("site-time-updated", handleUpdate);
-      eventSource.close();
-    };
-  }, [loadData, token]);
+  }, [navigate, token]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      void loadData({ background: true });
-    }, FALLBACK_REFRESH_INTERVAL_MS);
-
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, [loadData]);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void loadData({ background: true });
-      }
-    };
-    const handlePageShow = () => {
-      void loadData({ background: true });
-    };
-    const handleWindowFocus = () => {
-      void loadData({ background: true });
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("pageshow", handlePageShow);
-    window.addEventListener("focus", handleWindowFocus);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("pageshow", handlePageShow);
-      window.removeEventListener("focus", handleWindowFocus);
-    };
-  }, [loadData]);
+    if (choresQuery.data) {
+      applyDashboardState(choresQuery.data);
+    }
+  }, [applyDashboardState, choresQuery.data]);
 
   const currentWeekRange = useMemo(
     () => getWeekRangeForPayday(siteToday, payoutConfig.paydayDayOfWeek),
@@ -362,44 +285,11 @@ export const AdminChoresPage = () => {
         ...changes,
       });
       setPayoutConfig(updated);
-      await loadData();
+      await choresQuery.revalidate();
     } catch (configError) {
       setError(
         configError instanceof Error ? configError.message : "Failed to update chores settings",
       );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onSubmitMember = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!token) {
-      return;
-    }
-
-    setBusy(true);
-    setError(null);
-    try {
-      const weeklyAllowance = Math.max(0, Number(memberForm.weeklyAllowance) || 0);
-      if (memberForm.id === null) {
-        await createChoreMember(token, {
-          name: memberForm.name,
-          avatarUrl: memberForm.avatarUrl || null,
-          weeklyAllowance,
-        });
-      } else {
-        await updateChoreMember(token, memberForm.id, {
-          name: memberForm.name,
-          avatarUrl: memberForm.avatarUrl || null,
-          weeklyAllowance,
-        });
-      }
-
-      setMemberForm(emptyMemberForm());
-      await loadData();
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Failed to save child");
     } finally {
       setBusy(false);
     }
@@ -440,7 +330,7 @@ export const AdminChoresPage = () => {
       }
 
       setChoreForm(emptyChoreForm(siteToday));
-      await loadData();
+      await choresQuery.revalidate();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Failed to save chore");
     } finally {
@@ -474,77 +364,32 @@ export const AdminChoresPage = () => {
   return (
     <PageShell
       title="Chores"
-      subtitle="Manage children, schedules, completions, and weekly payout totals."
+      subtitle="Manage chores, completions, and weekly payout totals for the shared children list."
       rightActions={<AdminNavActions current="chores" onLogout={onLogout} />}
     >
-      {error ? (
+      {activeError ? (
         <p className="mb-4 rounded border border-rose-500/70 bg-rose-500/10 px-3 py-2 text-rose-200">
-          {error}
+          {activeError}
         </p>
       ) : null}
 
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">
-            {memberForm.id === null ? "Add child" : "Edit child"}
-          </h2>
-          <form onSubmit={onSubmitMember} className="space-y-3">
-            <label className="block space-y-1">
-              <span className="text-sm text-slate-300">Name</span>
-              <input
-                required
-                className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
-                value={memberForm.name}
-                onChange={(event) =>
-                  setMemberForm((current) => ({ ...current, name: event.target.value }))
-                }
-              />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-sm text-slate-300">Avatar URL (optional)</span>
-              <input
-                className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
-                value={memberForm.avatarUrl}
-                onChange={(event) =>
-                  setMemberForm((current) => ({ ...current, avatarUrl: event.target.value }))
-                }
-              />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-sm text-slate-300">Weekly allowance ($)</span>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
-                value={memberForm.weeklyAllowance}
-                onChange={(event) =>
-                  setMemberForm((current) => ({
-                    ...current,
-                    weeklyAllowance: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={busy}
-                className="rounded bg-cyan-500 px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-60"
-              >
-                {memberForm.id === null ? "Create child" : "Save child"}
-              </button>
-              {memberForm.id !== null ? (
-                <button
-                  type="button"
-                  onClick={() => setMemberForm(emptyMemberForm())}
-                  className="rounded border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-slate-300"
-                >
-                  Cancel edit
-                </button>
-              ) : null}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-100">Shared children</h2>
+              <p className="mt-1 text-sm text-slate-300">
+                Child names and allowances are now managed in Admin &gt; Children.
+              </p>
             </div>
-          </form>
+            <button
+              type="button"
+              onClick={() => navigate("/children")}
+              className="rounded-lg border border-cyan-400/60 px-3 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300"
+            >
+              Open Children
+            </button>
+          </div>
 
           <div className="mt-4 space-y-2">
             {members.map((member) => (
@@ -561,51 +406,14 @@ export const AdminChoresPage = () => {
                     <p className="text-xs text-slate-300">{member.avatarUrl}</p>
                   ) : null}
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMemberForm({
-                        id: member.id,
-                        name: member.name,
-                        avatarUrl: member.avatarUrl ?? "",
-                        weeklyAllowance: String(member.weeklyAllowance),
-                      })
-                    }
-                    className="rounded border border-slate-500 px-2 py-1 text-xs text-slate-200 hover:border-slate-300"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!token) {
-                        return;
-                      }
-                      setBusy(true);
-                      try {
-                        await deleteChoreMember(token, member.id);
-                        if (memberForm.id === member.id) {
-                          setMemberForm(emptyMemberForm());
-                        }
-                        await loadData();
-                      } catch (deleteError) {
-                        setError(
-                          deleteError instanceof Error
-                            ? deleteError.message
-                            : "Failed to delete member",
-                        );
-                      } finally {
-                        setBusy(false);
-                      }
-                    }}
-                    className="rounded border border-rose-500/70 px-2 py-1 text-xs text-rose-200 hover:bg-rose-500/20"
-                  >
-                    Delete
-                  </button>
-                </div>
+                <span className="text-xs text-slate-400">Used in chores and school</span>
               </div>
             ))}
+            {members.length === 0 ? (
+              <p className="rounded border border-slate-700 bg-slate-950/50 px-3 py-3 text-sm text-slate-300">
+                Add a child in Admin &gt; Children before creating chores.
+              </p>
+            ) : null}
           </div>
         </article>
 
@@ -835,7 +643,7 @@ export const AdminChoresPage = () => {
                       if (choreForm.id === chore.id) {
                         setChoreForm(emptyChoreForm(siteToday));
                       }
-                      await loadData();
+                      await choresQuery.revalidate();
                     } catch (deleteError) {
                       setError(
                         deleteError instanceof Error
@@ -952,7 +760,7 @@ export const AdminChoresPage = () => {
           <h2 className="mb-3 text-lg font-semibold text-slate-100">Weekly payout (per child)</h2>
           <div className="mb-3 rounded border border-slate-700 bg-slate-950/70 px-3 py-2">
             <label className="block space-y-1">
-              <span className="text-sm text-slate-300">Allowance payout rule</span>
+              <span className="text-sm text-slate-300">Allowance rule</span>
               <select
                 className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-100"
                 value={payoutConfig.mode}
@@ -962,16 +770,12 @@ export const AdminChoresPage = () => {
                   });
                 }}
               >
-                <option value="all-or-nothing">
-                  All-or-nothing: pay full allowance only at 100% recurring completion
-                </option>
-                <option value="proportional">
-                  Proportional: pay allowance by recurring completion percentage
-                </option>
+                <option value="all-or-nothing">Full allowance at 100%</option>
+                <option value="proportional">Proportional to completion</option>
               </select>
             </label>
             <label className="mt-2 flex items-center justify-between text-sm text-slate-200">
-              <span>Treat one-off chore values as bonus</span>
+              <span>One-off chores pay bonus</span>
               <input
                 type="checkbox"
                 checked={payoutConfig.oneOffBonusEnabled}
@@ -983,7 +787,7 @@ export const AdminChoresPage = () => {
               />
             </label>
             <label className="mt-2 block space-y-1">
-              <span className="text-sm text-slate-300">Payday (last day of week)</span>
+              <span className="text-sm text-slate-300">Payday</span>
               <select
                 className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-100"
                 value={payoutConfig.paydayDayOfWeek}
@@ -1002,33 +806,24 @@ export const AdminChoresPage = () => {
             </label>
             <div className="mt-2 space-y-2">
               <p className="text-sm text-slate-300">
-                Household timezone:{" "}
+                Timezone:{" "}
                 <span className="font-semibold text-slate-100">{payoutConfig.siteTimezone}</span>
-              </p>
-              <p className="text-xs text-slate-400">
-                Household timezone controls site-local modules. Manage it from Settings so clocks,
-                chores, time gates, and verse-of-the-day all stay aligned.
               </p>
               <button
                 type="button"
                 onClick={() => navigate("/devices")}
                 className="rounded border border-slate-500 px-2 py-1 text-xs text-slate-200 hover:border-slate-300"
               >
-                Open settings
+                Settings
               </button>
             </div>
             <p className="mt-2 text-xs text-slate-300">
-              Current week: {formatDateLabel(currentWeekRange.startDate)} to{" "}
-              {formatDateLabel(currentWeekRange.endDate)} in {payoutConfig.siteTimezone}. The
-              completion tracker resets at midnight after payday.
-            </p>
-            <p className="mt-2 text-xs text-slate-300">
-              Each child has an editable weekly allowance. Recurring chores determine allowance
-              payout. One-off chores are bonus-only when enabled.
+              Week: {formatDateLabel(currentWeekRange.startDate)} to{" "}
+              {formatDateLabel(currentWeekRange.endDate)}. Resets after payday.
             </p>
           </div>
           <p className="mb-2 text-sm text-slate-300">
-            Completed this week: {board?.stats.weeklyCompletedCount ?? 0}
+            This week: {board?.stats.weeklyCompletedCount ?? 0} completed
           </p>
 
           <div className="space-y-2">

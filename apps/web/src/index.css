@@ -55,6 +55,43 @@
   --color-status-error: #fb7185;
   --color-status-error-rgb: 251 113 133;
 
+  --theme-palette-color-1: #fb7185;
+  --theme-palette-color-1-rgb: 251 113 133;
+  --theme-palette-color-1-foreground: #020617;
+  --theme-palette-color-2: #f97316;
+  --theme-palette-color-2-rgb: 249 115 22;
+  --theme-palette-color-2-foreground: #020617;
+  --theme-palette-color-3: #f59e0b;
+  --theme-palette-color-3-rgb: 245 158 11;
+  --theme-palette-color-3-foreground: #020617;
+  --theme-palette-color-4: #22c55e;
+  --theme-palette-color-4-rgb: 34 197 94;
+  --theme-palette-color-4-foreground: #020617;
+  --theme-palette-color-5: #14b8a6;
+  --theme-palette-color-5-rgb: 20 184 166;
+  --theme-palette-color-5-foreground: #020617;
+  --theme-palette-color-6: #22d3ee;
+  --theme-palette-color-6-rgb: 34 211 238;
+  --theme-palette-color-6-foreground: #020617;
+  --theme-palette-color-7: #3b82f6;
+  --theme-palette-color-7-rgb: 59 130 246;
+  --theme-palette-color-7-foreground: #f8fafc;
+  --theme-palette-color-8: #6366f1;
+  --theme-palette-color-8-rgb: 99 102 241;
+  --theme-palette-color-8-foreground: #f8fafc;
+  --theme-palette-color-9: #8b5cf6;
+  --theme-palette-color-9-rgb: 139 92 246;
+  --theme-palette-color-9-foreground: #f8fafc;
+  --theme-palette-color-10: #ec4899;
+  --theme-palette-color-10-rgb: 236 72 153;
+  --theme-palette-color-10-foreground: #020617;
+  --theme-palette-color-11: #94a3b8;
+  --theme-palette-color-11-rgb: 148 163 184;
+  --theme-palette-color-11-foreground: #020617;
+  --theme-palette-color-12: #eab308;
+  --theme-palette-color-12-rgb: 234 179 8;
+  --theme-palette-color-12-foreground: #020617;
+
   --app-bg-gradient: radial-gradient(circle at top, #1e293b, #020617 60%);
 
   --tone-slate-100-rgb: 241 245 249;

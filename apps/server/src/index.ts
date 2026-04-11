@@ -5,6 +5,7 @@ import { ChoresRepository } from "./repositories/chores-repository.js";
 import { DeviceRepository } from "./repositories/device-repository.js";
 import { LayoutRepository } from "./repositories/layout-repository.js";
 import { ModuleStateRepository } from "./repositories/module-state-repository.js";
+import { PlannerRepository } from "./repositories/planner-repository.js";
 import { SettingsRepository } from "./repositories/settings-repository.js";
 import { CalendarFeedService } from "./services/calendar-feed-service.js";
 import { DatabaseBackupService } from "./services/database-backup-service.js";
@@ -29,6 +30,7 @@ const layoutRepository = new LayoutRepository(database, {
   calendarEncryptionSecret: config.calendarEncryptionSecret,
 });
 const choresRepository = new ChoresRepository(database);
+const plannerRepository = new PlannerRepository(database);
 const deviceRepository = new DeviceRepository(database);
 const moduleStateRepository = new ModuleStateRepository(database);
 const settingsRepository = new SettingsRepository(database, {
@@ -69,6 +71,7 @@ const backupService = new DatabaseBackupService(database, {
 const services = {
   layoutRepository,
   choresRepository,
+  plannerRepository,
   deviceRepository,
   settingsRepository,
   moduleStateRepository,

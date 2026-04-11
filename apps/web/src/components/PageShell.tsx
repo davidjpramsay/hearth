@@ -18,12 +18,14 @@ export const PageShell = ({ title, subtitle, rightActions, children }: PageShell
       boxSizing: "border-box",
     }}
   >
-    <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 className="font-display text-3xl font-bold text-slate-100">{title}</h1>
-        {subtitle ? <p className="mt-1 text-slate-300">{subtitle}</p> : null}
+    {rightActions ? (
+      <div className="mb-6 flex w-full flex-wrap items-center justify-end gap-3">
+        {rightActions}
       </div>
-      <div className="flex flex-wrap items-end gap-3">{rightActions}</div>
+    ) : null}
+    <header className="mb-6">
+      <h1 className="font-display text-3xl font-bold text-slate-100">{title}</h1>
+      {subtitle ? <p className="mt-1 text-slate-300">{subtitle}</p> : null}
     </header>
     {children}
   </main>

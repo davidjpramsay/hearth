@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  getThemeColorSlotByIndex,
   type CalendarFeed,
   type CalendarFeedsConfig,
   getRuntimeTimeZone,
@@ -27,6 +28,7 @@ import { getServerStatus, type ServerStatusResponse } from "../api/server-status
 import { logoutAdminSession } from "../auth/session";
 import { getAuthToken } from "../auth/storage";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
+import { ThemePalettePicker } from "../components/admin/ThemePalettePicker";
 import { PageShell } from "../components/PageShell";
 import { getSupportedTimeZoneOptions } from "../time-zone-options";
 import { THEME_OPTIONS, type ThemeId } from "../theme/theme";
@@ -481,7 +483,7 @@ export const AdminDevicesPage = () => {
           id: createCalendarFeedId(current.feeds),
           name: "",
           url: "",
-          color: "#22D3EE",
+          color: getThemeColorSlotByIndex(current.feeds.length),
           enabled: true,
         },
       ],
@@ -507,7 +509,7 @@ export const AdminDevicesPage = () => {
         id: normalizeCalendarFeedId(feed.id),
         name: feed.name.trim().slice(0, 80),
         url: feed.url.trim(),
-        color: feed.color.trim().toUpperCase(),
+        color: feed.color,
       })),
     };
 
@@ -801,14 +803,13 @@ export const AdminDevicesPage = () => {
                 <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
                   <label className="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
                     <span className="text-xs font-medium text-slate-300">Colour</span>
-                    <input
-                      className="h-9 w-14 cursor-pointer rounded border border-slate-700 bg-slate-800 p-1"
-                      type="color"
+                    <ThemePalettePicker
+                      compact
                       value={feed.color}
-                      onChange={(event) =>
+                      onChange={(slot) =>
                         updateCalendarFeedDraft(index, (current) => ({
                           ...current,
-                          color: event.target.value.toUpperCase(),
+                          color: slot,
                         }))
                       }
                     />

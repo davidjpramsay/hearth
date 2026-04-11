@@ -31,8 +31,8 @@ const layoutNameSchema = z.string().trim().min(1).max(80);
 const screenSetIdSchema = z.string().trim().min(1).max(80);
 const screenSetNameSchema = z.string().trim().min(1).max(80);
 const autoPhotoOrientationSchema = z.enum(["portrait", "landscape"]);
-const logicNodeIdSchema = z.string().trim().min(1).max(64);
-const logicEdgeIdSchema = z.string().trim().min(1).max(96);
+const logicNodeIdSchema = z.string().trim().min(1).max(192);
+const logicEdgeIdSchema = z.string().trim().min(1).max(192);
 const logicHandleIdSchema = z.string().trim().min(1).max(64);
 const actionTypeSchema = z.string().trim().min(1).max(120);
 const conditionTypeSchema = z.string().trim().min(1).max(120);
@@ -408,12 +408,35 @@ type PhotoRouterBranchKey = (typeof PHOTO_ROUTER_BRANCH_KEYS)[number];
 
 const PHOTO_ROUTER_NEXT_HANDLE = "next";
 
-const toPhotoRouterConnectionId = (input: {
+const toConnectionHash = (value: string): string => {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+};
+
+const toConnectionSegment = (value: string): string => value.trim().slice(0, 18);
+
+export const toPhotoRouterConnectionId = (input: {
   source: string;
   sourceHandle?: string | null;
   target: string;
-}): string =>
-  [input.source.trim(), input.sourceHandle?.trim() || "default", input.target.trim()].join("::");
+}): string => {
+  const source = input.source.trim();
+  const sourceHandle = input.sourceHandle?.trim() || "default";
+  const target = input.target.trim();
+  const seed = `${source}::${sourceHandle}::${target}`;
+
+  return [
+    "edge",
+    toConnectionHash(seed),
+    toConnectionSegment(source),
+    toConnectionSegment(sourceHandle),
+    toConnectionSegment(target),
+  ].join(":");
+};
 
 const isPhotoRouterBranchKey = (value: string | null | undefined): value is PhotoRouterBranchKey =>
   value === "fallback" || value === "portrait" || value === "landscape";

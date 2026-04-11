@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
   type DragEvent,
@@ -17,9 +18,8 @@ import {
   Panel,
   Position,
   ReactFlow,
-  applyEdgeChanges,
-  applyNodeChanges,
   getBezierPath,
+  useUpdateNodeInternals,
   type Connection,
   type Edge,
   type EdgeChange,
@@ -43,6 +43,7 @@ import {
   parseClockTimeToMinutes,
   getPrimaryPhotoRouterBlock,
   setPrimaryPhotoRouterBlock,
+  toPhotoRouterConnectionId,
   weatherLocationSearchResponseSchema,
   type LayoutSetAuthoring,
   type PhotoRouterBlock,
@@ -84,7 +85,7 @@ interface SetLogicEditorProps {
   layoutOptions: LayoutOption[];
   photoCollectionOptions: PhotoCollectionOption[];
   runtimeHealth?: RuntimeHealthReport;
-  onChange: (nextAuthoring: LayoutSetAuthoring) => void;
+  onChange: (nextAuthoring: LayoutSetAuthoring) => void | Promise<void>;
 }
 
 type ConditionalTrigger = "portrait-photo";
@@ -99,6 +100,7 @@ interface RouterNodeData extends Record<string, unknown> {
   kindLabel: string;
   actionSummary: string;
   sourceLabel: string | null;
+  onSelect?: () => void;
   onRemove?: () => void;
   routes: Array<{
     key: string;
@@ -116,6 +118,7 @@ interface LayoutNodeData extends Record<string, unknown> {
   title: string;
   subtitle: string;
   routeLabel: string;
+  onSelect?: () => void;
   onRemove?: () => void;
 }
 
@@ -133,12 +136,16 @@ const ROUTER_NODE_ROUTE_ROW_HEIGHT = 68;
 const LAYOUT_NODE_WIDTH = 260;
 const LAYOUT_NODE_HEIGHT = 92;
 const TERMINAL_NODE_SIZE = 96;
+const GRAPH_TARGET_HANDLE_WIDTH = 72;
+const GRAPH_TARGET_HANDLE_HEIGHT = 28;
+const GRAPH_ENDPOINT_HANDLE_SIZE = 20;
 const START_NODE_GAP = 128;
 const END_NODE_GAP = 168;
-const DEFAULT_ROUTER_POSITION = { x: 420, y: 48 };
+const DEFAULT_ROUTER_POSITION = { x: 420, y: 180 };
 const DEFAULT_DETACHED_ORIGIN = { x: 96, y: 980 };
 const DEFAULT_DETACHED_X_GAP = 332;
 const DEFAULT_DETACHED_Y_GAP = 168;
+const GRAPH_NODE_DRAG_HANDLE_SELECTOR = ".hearth-graph-node-drag-handle";
 const ROUTER_ROUTE_ORDER = ["portrait", "fallback"] as const;
 const EDGE_DASH_PATTERN = "8 12";
 const DEFAULT_TIME_GATE_DURATION_MINUTES = 60;
@@ -492,7 +499,7 @@ const LocationSearchFieldEditor = ({
           type="text"
           value={locationValue}
           placeholder={field.placeholder}
-          className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+          className={GRAPH_TEXT_INPUT_CLASS}
           onChange={(event) =>
             onPatch({
               [field.key]: event.target.value,
@@ -644,13 +651,6 @@ const getNextTimeGateWindow = (gates: PhotoRouterTimeGate[]): PhotoRouterTimeGat
   return null;
 };
 
-const toConnectionId = (input: {
-  source: string;
-  sourceHandle?: string | null;
-  target: string;
-}): string =>
-  [input.source.trim(), input.sourceHandle?.trim() || "default", input.target.trim()].join("::");
-
 const toPhotoSourceLabel = (
   collectionId: string | null | undefined,
   photoCollectionOptions: PhotoCollectionOption[],
@@ -793,6 +793,12 @@ const createEdge = (input: {
   selectable: true,
 });
 
+const GRAPH_TEXT_INPUT_CLASS =
+  "cursor-text h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100";
+const GRAPH_SELECT_INPUT_CLASS =
+  "cursor-pointer h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100";
+const GRAPH_CHECKBOX_CLASS = "cursor-pointer";
+
 const ParamFieldEditor = ({
   field,
   params,
@@ -815,6 +821,7 @@ const ParamFieldEditor = ({
         <input
           type="checkbox"
           checked={toParamBooleanValue(value)}
+          className={GRAPH_CHECKBOX_CLASS}
           onChange={(event) => onPatch({ [field.key]: event.target.checked })}
         />
       </label>
@@ -834,7 +841,7 @@ const ParamFieldEditor = ({
           max={field.max}
           step={field.step ?? 1}
           value={toParamNumberValue(value, fallback)}
-          className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+          className={GRAPH_TEXT_INPUT_CLASS}
           onChange={(event) => {
             const parsed = Number.parseFloat(event.target.value);
             if (!Number.isFinite(parsed)) {
@@ -854,7 +861,7 @@ const ParamFieldEditor = ({
           {field.label}
         </span>
         <select
-          className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+          className={GRAPH_SELECT_INPUT_CLASS}
           value={toParamStringValue(value)}
           onChange={(event) => onPatch({ [field.key]: event.target.value })}
         >
@@ -876,95 +883,129 @@ const ParamFieldEditor = ({
       <input
         type="text"
         value={toParamStringValue(value)}
-        className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+        className={GRAPH_TEXT_INPUT_CLASS}
         onChange={(event) => onPatch({ [field.key]: event.target.value })}
       />
     </label>
   );
 };
 
-const RouterNode = ({ data, selected }: NodeProps<RouterNodeType>) => (
-  <div
-    className={`relative rounded-2xl border bg-slate-950/95 px-4 py-4 shadow-[0_0_0_1px_rgba(15,23,42,0.75)] ${
-      selected ? "border-cyan-300 shadow-[0_0_0_2px_rgba(34,211,238,0.35)]" : "border-slate-700"
-    }`}
-  >
-    <Handle
-      type="target"
-      position={Position.Top}
-      className="!h-3 !w-3 !border-none !bg-slate-300"
-      style={{ top: -7 }}
-    />
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-200/90">
-          {data.kindLabel}
-        </p>
-        <h4 className="mt-1 text-lg font-semibold text-slate-100">{data.title}</h4>
-        <p className="mt-2 text-sm text-slate-300">{data.actionSummary}</p>
-        {data.sourceLabel ? (
-          <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
-            Source: {data.sourceLabel}
+const RouterNode = ({ id, data, selected }: NodeProps<RouterNodeType>) => {
+  const updateNodeInternals = useUpdateNodeInternals();
+  const routeHandleKey = data.routes.map((route) => route.key).join("|");
+
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, routeHandleKey, updateNodeInternals]);
+
+  return (
+    <div
+      onClick={() => data.onSelect?.()}
+      className={`relative rounded-2xl border bg-slate-950/95 px-4 py-4 shadow-[0_0_0_1px_rgba(15,23,42,0.75)] ${
+        selected ? "border-cyan-300 shadow-[0_0_0_2px_rgba(34,211,238,0.35)]" : "border-slate-700"
+      }`}
+    >
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="nodrag nopan !pointer-events-auto !border-0 !bg-transparent"
+        isConnectable
+        style={{
+          top: -14,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: GRAPH_TARGET_HANDLE_WIDTH,
+          height: GRAPH_TARGET_HANDLE_HEIGHT,
+          zIndex: 30,
+          pointerEvents: "all",
+          opacity: 0.001,
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-0 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-slate-950 bg-slate-300 shadow-sm"
+      />
+      <div
+        className={`flex items-start justify-between gap-3 ${
+          data.onRemove ? "hearth-graph-node-drag-handle cursor-grab active:cursor-grabbing" : ""
+        }`}
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-200/90">
+            {data.kindLabel}
           </p>
+          <h4 className="mt-1 text-lg font-semibold text-slate-100">{data.title}</h4>
+          <p className="mt-2 text-sm text-slate-300">{data.actionSummary}</p>
+          {data.sourceLabel ? (
+            <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
+              Source: {data.sourceLabel}
+            </p>
+          ) : null}
+        </div>
+        {data.onRemove ? (
+          <button
+            type="button"
+            className="nodrag nopan rounded border border-rose-400/70 px-2.5 py-1.5 text-xs font-semibold text-rose-100 hover:bg-rose-500/20"
+            onTouchStart={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              data.onRemove?.();
+            }}
+          >
+            Remove
+          </button>
         ) : null}
       </div>
-      {data.onRemove ? (
-        <button
-          type="button"
-          className="nodrag nopan rounded border border-rose-400/70 px-2.5 py-1.5 text-xs font-semibold text-rose-100 hover:bg-rose-500/20"
-          onTouchStart={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-          onMouseDown={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            data.onRemove?.();
-          }}
-        >
-          Remove
-        </button>
-      ) : null}
-    </div>
 
-    <div className={`mt-4 grid gap-2 ${data.routes.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
-      {data.routes.map((route) => (
-        <div
-          key={route.key}
-          className={`relative rounded-lg border px-3 py-2 text-sm ${route.borderClassName} ${route.bgClassName}`}
-        >
-          {route.connectable !== false ? (
-            <Handle
-              type="source"
-              id={route.key}
-              position={Position.Bottom}
-              className="!h-3 !w-3 !border-none"
-              style={{
-                bottom: -7,
-                left: "50%",
-                transform: "translateX(-50%)",
-                backgroundColor: route.color,
-              }}
-            />
-          ) : null}
-          <div className="text-center">
-            <span className="block font-semibold">{route.label}</span>
-            <span className="mt-1 block text-[11px] uppercase tracking-wide opacity-80">
-              {route.enabled ? `${route.count} linked` : `disabled · ${route.count} linked`}
-            </span>
+      <div
+        className={`pointer-events-none mt-4 overflow-visible pb-4 grid gap-2 ${data.routes.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}
+      >
+        {data.routes.map((route) => (
+          <div
+            key={route.key}
+            className={`pointer-events-none relative overflow-visible rounded-lg border px-3 py-2 text-sm ${route.borderClassName} ${route.bgClassName}`}
+          >
+            {route.connectable !== false ? (
+              <Handle
+                type="source"
+                id={route.key}
+                position={Position.Bottom}
+                className="nodrag nopan !z-30 !pointer-events-auto !h-4 !w-4 !border-2 !border-slate-950"
+                isConnectable
+                style={{
+                  bottom: -12,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  backgroundColor: route.color,
+                  zIndex: 30,
+                  pointerEvents: "all",
+                }}
+              />
+            ) : null}
+            <div className="text-center">
+              <span className="block font-semibold">{route.label}</span>
+              <span className="mt-1 block text-[11px] uppercase tracking-wide opacity-80">
+                {route.enabled ? `${route.count} linked` : `disabled · ${route.count} linked`}
+              </span>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const LayoutNode = ({ data, selected }: NodeProps<StepNodeType>) => (
   <div
+    onClick={() => data.onSelect?.()}
     className={`rounded-xl border bg-slate-950/95 px-4 py-3 shadow-[0_0_0_1px_rgba(15,23,42,0.75)] ${
       selected ? "border-cyan-300 shadow-[0_0_0_2px_rgba(34,211,238,0.35)]" : "border-slate-700"
     }`}
@@ -972,18 +1013,31 @@ const LayoutNode = ({ data, selected }: NodeProps<StepNodeType>) => (
     <Handle
       type="target"
       position={Position.Top}
-      className="!h-3 !w-3 !border-none !bg-slate-300"
-      style={{ top: -7 }}
+      className="nodrag nopan !pointer-events-auto !border-0 !bg-transparent"
+      style={{
+        top: -14,
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: GRAPH_TARGET_HANDLE_WIDTH,
+        height: GRAPH_TARGET_HANDLE_HEIGHT,
+        zIndex: 30,
+        pointerEvents: "all",
+        opacity: 0.001,
+      }}
+    />
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute left-1/2 top-0 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-slate-950 bg-slate-300 shadow-sm"
     />
     <Handle
       type="source"
       id="next"
       position={Position.Bottom}
-      className="!h-3 !w-3 !border-none !bg-slate-300"
-      style={{ bottom: -7 }}
+      className="nodrag nopan !pointer-events-auto !h-4 !w-4 !border-2 !border-slate-950 !bg-slate-300"
+      style={{ bottom: -8, zIndex: 20, pointerEvents: "all" }}
     />
 
-    <div className="flex items-start justify-between gap-3">
+    <div className="hearth-graph-node-drag-handle flex cursor-grab items-start justify-between gap-3 active:cursor-grabbing">
       <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
           Layout
@@ -1031,17 +1085,35 @@ const TerminalNode = ({ data }: NodeProps<TerminalNodeType>) => (
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!h-3 !w-3 !border-none !bg-slate-300"
-        style={{ bottom: -7 }}
+        className="nodrag nopan !pointer-events-auto !border-0 !bg-transparent !opacity-0"
+        style={{
+          bottom: -10,
+          width: GRAPH_ENDPOINT_HANDLE_SIZE,
+          height: GRAPH_ENDPOINT_HANDLE_SIZE,
+          zIndex: 30,
+          pointerEvents: "all",
+        }}
       />
     ) : (
       <Handle
         type="target"
         position={Position.Top}
-        className="!h-3 !w-3 !border-none !bg-slate-300"
-        style={{ top: -7 }}
+        className="nodrag nopan !pointer-events-auto !border-0 !bg-transparent !opacity-0"
+        style={{
+          top: -10,
+          width: GRAPH_ENDPOINT_HANDLE_SIZE,
+          height: GRAPH_ENDPOINT_HANDLE_SIZE,
+          zIndex: 30,
+          pointerEvents: "all",
+        }}
       />
     )}
+    <div
+      aria-hidden="true"
+      className={`pointer-events-none absolute left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border-2 border-slate-950 bg-slate-300 shadow-sm ${
+        data.tone === "start" ? "-bottom-2" : "-top-2"
+      }`}
+    />
     <div>
       {data.tone === "end" ? (
         <p className="text-[11px] font-semibold uppercase tracking-[0.28em] opacity-75">
@@ -1182,6 +1254,97 @@ const edgeTypes = {
   hearthEdge: GraphEdge,
 };
 
+interface GraphEditorState {
+  block: PhotoRouterBlock;
+  selectedNodeId: string | null;
+  editorError: string | null;
+  isCanvasInteractive: boolean;
+  draftNodePositions: Record<string, { x: number; y: number }>;
+}
+
+type GraphEditorAction =
+  | { type: "sync-from-props"; block: PhotoRouterBlock }
+  | { type: "set-block"; block: PhotoRouterBlock }
+  | { type: "select-node"; nodeId: string | null }
+  | { type: "set-editor-error"; message: string | null }
+  | { type: "toggle-canvas-interactive" }
+  | {
+      type: "merge-draft-node-positions";
+      positions: Record<string, { x: number; y: number }>;
+    }
+  | { type: "clear-draft-node-positions"; nodeIds?: string[] };
+
+const coerceSelectedNodeId = (
+  block: PhotoRouterBlock,
+  selectedNodeId: string | null,
+): string | null =>
+  selectedNodeId !== null && block.nodes.some((node) => node.id === selectedNodeId)
+    ? selectedNodeId
+    : null;
+
+const graphEditorReducer = (
+  state: GraphEditorState,
+  action: GraphEditorAction,
+): GraphEditorState => {
+  switch (action.type) {
+    case "sync-from-props":
+      return {
+        ...state,
+        block: action.block,
+        selectedNodeId: coerceSelectedNodeId(action.block, state.selectedNodeId),
+        draftNodePositions: {},
+      };
+    case "set-block":
+      return {
+        ...state,
+        block: action.block,
+        selectedNodeId: coerceSelectedNodeId(action.block, state.selectedNodeId),
+        draftNodePositions: {},
+      };
+    case "select-node":
+      return {
+        ...state,
+        selectedNodeId: action.nodeId,
+      };
+    case "set-editor-error":
+      return {
+        ...state,
+        editorError: action.message,
+      };
+    case "toggle-canvas-interactive":
+      return {
+        ...state,
+        isCanvasInteractive: !state.isCanvasInteractive,
+      };
+    case "merge-draft-node-positions":
+      return {
+        ...state,
+        draftNodePositions: {
+          ...state.draftNodePositions,
+          ...action.positions,
+        },
+      };
+    case "clear-draft-node-positions":
+      if (!action.nodeIds || action.nodeIds.length === 0) {
+        return {
+          ...state,
+          draftNodePositions: {},
+        };
+      }
+
+      return {
+        ...state,
+        draftNodePositions: Object.fromEntries(
+          Object.entries(state.draftNodePositions).filter(
+            ([nodeId]) => !action.nodeIds!.includes(nodeId),
+          ),
+        ),
+      };
+    default:
+      return state;
+  }
+};
+
 const getDefaultGraphNodePosition = (input: {
   node: PhotoRouterGraphNode;
   index: number;
@@ -1195,6 +1358,68 @@ const getDefaultGraphNodePosition = (input: {
         x: DEFAULT_DETACHED_ORIGIN.x + (input.index % 3) * DEFAULT_DETACHED_X_GAP,
         y: DEFAULT_DETACHED_ORIGIN.y + Math.floor(input.index / 3) * DEFAULT_DETACHED_Y_GAP,
       };
+
+const getNextRouterInsertPosition = (block: PhotoRouterBlock): { x: number; y: number } => {
+  const routerCount = block.nodes.filter(
+    (node) => isPhotoOrientationNode(node) || isTimeGateNode(node),
+  ).length;
+
+  return {
+    x: DEFAULT_ROUTER_POSITION.x + (routerCount % 2) * 420,
+    y: DEFAULT_ROUTER_POSITION.y + Math.floor(routerCount / 2) * 260,
+  };
+};
+
+const getNextLayoutInsertPosition = (block: PhotoRouterBlock): { x: number; y: number } => {
+  const layoutCount = block.nodes.filter((node) => isLayoutGraphNode(node)).length;
+
+  return {
+    x: DEFAULT_DETACHED_ORIGIN.x + (layoutCount % 3) * DEFAULT_DETACHED_X_GAP,
+    y: DEFAULT_DETACHED_ORIGIN.y + Math.floor(layoutCount / 3) * DEFAULT_DETACHED_Y_GAP,
+  };
+};
+
+const doNodeRectsOverlap = (
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+): boolean =>
+  a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+
+const resolveInsertPosition = (input: {
+  block: PhotoRouterBlock;
+  desiredPosition: { x: number; y: number };
+  nodeSize: { width: number; height: number };
+}): { x: number; y: number } => {
+  const existingRects = input.block.nodes.map((node, index) => {
+    const position =
+      input.block.nodePositions[node.id] ?? getDefaultGraphNodePosition({ node, index });
+    const size = getGraphNodeSize(node);
+    return {
+      x: position.x - 24,
+      y: position.y - 24,
+      width: size.width + 48,
+      height: size.height + 48,
+    };
+  });
+
+  for (let attempt = 0; attempt < 18; attempt += 1) {
+    const candidate = {
+      x: roundPosition(input.desiredPosition.x + (attempt % 3) * 40),
+      y: roundPosition(input.desiredPosition.y + Math.floor(attempt / 3) * 36),
+      width: input.nodeSize.width,
+      height: input.nodeSize.height,
+    };
+
+    if (!existingRects.some((rect) => doNodeRectsOverlap(candidate, rect))) {
+      return { x: candidate.x, y: candidate.y };
+    }
+  }
+
+  return {
+    x: roundPosition(input.desiredPosition.x),
+    y: roundPosition(input.desiredPosition.y),
+  };
+};
 
 const getGraphNodeSize = (
   node: PhotoRouterGraphNode | null | undefined,
@@ -1214,6 +1439,7 @@ const buildFlowGraph = (input: {
   selectedNodeId: string | null;
   photoCollectionOptions: PhotoCollectionOption[];
   onRemoveNode: (nodeId: string) => void;
+  onSelectNode: (nodeId: string) => void;
   isCanvasInteractive: boolean;
 }): { nodes: Node[]; edges: Edge[] } => {
   const routerNodes = input.block.nodes.filter(
@@ -1274,11 +1500,17 @@ const buildFlowGraph = (input: {
         (startAnchorEntry?.position.x ?? firstGraphNodePosition.x) +
         startAnchorSize.width / 2 -
         TERMINAL_NODE_SIZE / 2,
-      y: Math.max(24, (startAnchorEntry?.position.y ?? firstGraphNodePosition.y) - START_NODE_GAP),
+      y: Math.max(
+        24,
+        (startAnchorEntry?.position.y ?? firstGraphNodePosition.y) -
+          START_NODE_GAP -
+          TERMINAL_NODE_SIZE,
+      ),
     },
     draggable: input.isCanvasInteractive,
     selectable: false,
     deletable: false,
+    zIndex: 1000,
     style: {
       width: TERMINAL_NODE_SIZE,
       height: TERMINAL_NODE_SIZE,
@@ -1352,7 +1584,9 @@ const buildFlowGraph = (input: {
       type: "routerNode",
       position: input.block.nodePositions[node.id] ?? getDefaultGraphNodePosition({ node, index }),
       draggable: input.isCanvasInteractive,
+      dragHandle: GRAPH_NODE_DRAG_HANDLE_SELECTOR,
       selectable: true,
+      connectable: true,
       deletable: true,
       style: {
         width: ROUTER_NODE_WIDTH,
@@ -1371,6 +1605,7 @@ const buildFlowGraph = (input: {
             : isTimeGate
               ? "Household timezone"
               : toPhotoSourceLabel(node.photoActionCollectionId, input.photoCollectionOptions),
+        onSelect: () => input.onSelectNode(node.id),
         onRemove: () => input.onRemoveNode(node.id),
         routes,
       },
@@ -1392,7 +1627,9 @@ const buildFlowGraph = (input: {
           index: routerNodes.length + index,
         }),
       draggable: input.isCanvasInteractive,
+      dragHandle: GRAPH_NODE_DRAG_HANDLE_SELECTOR,
       selectable: true,
+      connectable: true,
       deletable: true,
       style: {
         width: LAYOUT_NODE_WIDTH,
@@ -1412,6 +1649,7 @@ const buildFlowGraph = (input: {
           layoutName: node.layoutName,
           cycleSeconds: node.cycleSeconds,
         }),
+        onSelect: () => input.onSelectNode(node.id),
         onRemove: () => input.onRemoveNode(node.id),
         routeLabel:
           incomingCount > 0
@@ -1446,6 +1684,7 @@ const buildFlowGraph = (input: {
     draggable: input.isCanvasInteractive,
     selectable: false,
     deletable: false,
+    zIndex: 1000,
     style: {
       width: TERMINAL_NODE_SIZE,
       height: TERMINAL_NODE_SIZE,
@@ -1499,21 +1738,45 @@ export const SetLogicEditor = ({
   const latestAuthoringRef = useRef(authoring);
   const latestBlockRef = useRef(block);
   const selectedNodeIdRef = useRef<string | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [editorError, setEditorError] = useState<string | null>(null);
-  const [isCanvasInteractive, setIsCanvasInteractive] = useState(true);
+  const [state, dispatch] = useReducer(graphEditorReducer, {
+    block,
+    selectedNodeId: null,
+    editorError: null,
+    isCanvasInteractive: true,
+    draftNodePositions: {},
+  });
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<Node, Edge> | null>(
     null,
+  );
+  const hasPerformedInitialFitRef = useRef(false);
+  const draftBlock = state.block;
+  const selectedNodeId = state.selectedNodeId;
+  const editorError = state.editorError;
+  const isCanvasInteractive = state.isCanvasInteractive;
+  const effectiveBlock = useMemo(
+    () => ({
+      ...draftBlock,
+      nodePositions: {
+        ...draftBlock.nodePositions,
+        ...state.draftNodePositions,
+      },
+    }),
+    [draftBlock, state.draftNodePositions],
   );
 
   useEffect(() => {
     latestAuthoringRef.current = authoring;
     latestBlockRef.current = block;
+    dispatch({
+      type: "sync-from-props",
+      block,
+    });
   }, [authoring, block]);
 
   useEffect(() => {
     selectedNodeIdRef.current = selectedNodeId;
-  }, [selectedNodeId]);
+    latestBlockRef.current = draftBlock;
+  }, [draftBlock, selectedNodeId]);
 
   const updateBlock = useCallback(
     (updater: (current: PhotoRouterBlock) => PhotoRouterBlock) => {
@@ -1527,26 +1790,51 @@ export const SetLogicEditor = ({
         });
         const validationIssue = getLayoutSetAuthoringValidationIssues(nextAuthoring)[0] ?? null;
         if (validationIssue) {
-          setEditorError(validationIssue.message);
+          dispatch({
+            type: "set-editor-error",
+            message: validationIssue.message,
+          });
           return;
         }
 
         latestAuthoringRef.current = nextAuthoring;
-        latestBlockRef.current = getPrimaryPhotoRouterBlock(nextAuthoring);
-        setEditorError(null);
-        onChange(nextAuthoring);
+        const normalizedNextBlock = getPrimaryPhotoRouterBlock(nextAuthoring);
+        latestBlockRef.current = normalizedNextBlock;
+        dispatch({
+          type: "set-block",
+          block: normalizedNextBlock,
+        });
+        dispatch({
+          type: "set-editor-error",
+          message: null,
+        });
+        void Promise.resolve(onChange(nextAuthoring)).catch((error) => {
+          latestAuthoringRef.current = currentAuthoring;
+          latestBlockRef.current = currentBlock;
+          dispatch({
+            type: "set-block",
+            block: currentBlock,
+          });
+          dispatch({
+            type: "set-editor-error",
+            message: error instanceof Error ? error.message : "Unable to apply this graph edit.",
+          });
+        });
       } catch (error) {
-        setEditorError(error instanceof Error ? error.message : "Unable to apply this graph edit.");
+        dispatch({
+          type: "set-editor-error",
+          message: error instanceof Error ? error.message : "Unable to apply this graph edit.",
+        });
       }
     },
     [onChange],
   );
 
   const addLayoutNodeAtPosition = useCallback(
-    (position: { x: number; y: number }) => {
+    (position?: { x: number; y: number }) => {
       const fallbackLayoutName =
         layoutOptions[0]?.name ??
-        block.nodes.find((node): node is PhotoRouterLayoutNode => isLayoutGraphNode(node))
+        draftBlock.nodes.find((node): node is PhotoRouterLayoutNode => isLayoutGraphNode(node))
           ?.layoutName ??
         "";
 
@@ -1563,25 +1851,34 @@ export const SetLogicEditor = ({
         actionParams: getDefaultActionParams(LOGIC_ACTION_TYPES[0]?.id),
       };
 
-      setSelectedNodeId(nextLayoutNode.id);
+      const nextPosition = resolveInsertPosition({
+        block: draftBlock,
+        desiredPosition: position ?? getNextLayoutInsertPosition(draftBlock),
+        nodeSize: getGraphNodeSize(nextLayoutNode),
+      });
+
+      dispatch({
+        type: "select-node",
+        nodeId: nextLayoutNode.id,
+      });
       updateBlock((current) => ({
         ...current,
         nodes: [...current.nodes, nextLayoutNode],
         nodePositions: {
           ...current.nodePositions,
           [nextLayoutNode.id]: {
-            x: roundPosition(position.x),
-            y: roundPosition(position.y),
+            x: roundPosition(nextPosition.x),
+            y: roundPosition(nextPosition.y),
           },
         },
       }));
     },
-    [block.nodes, layoutOptions, updateBlock],
+    [draftBlock, layoutOptions, updateBlock],
   );
 
   const addActionNodeAtPosition = useCallback(
-    (kind: ActionNodeKind, position: { x: number; y: number }) => {
-      const existingActionCount = block.nodes.filter(
+    (kind: ActionNodeKind, position?: { x: number; y: number }) => {
+      const existingActionCount = draftBlock.nodes.filter(
         (node) => isPhotoOrientationNode(node) && getActionNodeKind(node.photoActionType) === kind,
       ).length;
       const nextConditionType =
@@ -1607,28 +1904,37 @@ export const SetLogicEditor = ({
         },
       };
 
-      setSelectedNodeId(nextActionNode.id);
+      const nextPosition = resolveInsertPosition({
+        block: draftBlock,
+        desiredPosition: position ?? getNextRouterInsertPosition(draftBlock),
+        nodeSize: getGraphNodeSize(nextActionNode),
+      });
+
+      dispatch({
+        type: "select-node",
+        nodeId: nextActionNode.id,
+      });
       updateBlock((current) => ({
         ...current,
         nodes: [...current.nodes, nextActionNode],
         nodePositions: {
           ...current.nodePositions,
           [nextActionNode.id]: {
-            x: roundPosition(position.x),
-            y: roundPosition(position.y),
+            x: roundPosition(nextPosition.x),
+            y: roundPosition(nextPosition.y),
           },
         },
       }));
     },
-    [block.nodes, updateBlock],
+    [draftBlock, updateBlock],
   );
 
   const addTimeGateNodeAtPosition = useCallback(
-    (position: { x: number; y: number }) => {
-      const existingTimeGateCount = block.nodes.filter((node) => isTimeGateNode(node)).length;
+    (position?: { x: number; y: number }) => {
+      const existingTimeGateCount = draftBlock.nodes.filter((node) => isTimeGateNode(node)).length;
       const initialGate =
         getNextTimeGateWindow(
-          block.nodes
+          draftBlock.nodes
             .filter((node): node is PhotoRouterTimeGateNode => isTimeGateNode(node))
             .flatMap((node) => node.gates),
         ) ??
@@ -1644,20 +1950,29 @@ export const SetLogicEditor = ({
         gates: [initialGate],
       };
 
-      setSelectedNodeId(nextTimeGateNode.id);
+      const nextPosition = resolveInsertPosition({
+        block: draftBlock,
+        desiredPosition: position ?? getNextRouterInsertPosition(draftBlock),
+        nodeSize: getGraphNodeSize(nextTimeGateNode),
+      });
+
+      dispatch({
+        type: "select-node",
+        nodeId: nextTimeGateNode.id,
+      });
       updateBlock((current) => ({
         ...current,
         nodes: [...current.nodes, nextTimeGateNode],
         nodePositions: {
           ...current.nodePositions,
           [nextTimeGateNode.id]: {
-            x: roundPosition(position.x),
-            y: roundPosition(position.y),
+            x: roundPosition(nextPosition.x),
+            y: roundPosition(nextPosition.y),
           },
         },
       }));
     },
-    [block.nodes, updateBlock],
+    [draftBlock, updateBlock],
   );
 
   const handleNodesDelete = useCallback(
@@ -1671,7 +1986,10 @@ export const SetLogicEditor = ({
         return;
       }
 
-      setSelectedNodeId(null);
+      dispatch({
+        type: "select-node",
+        nodeId: null,
+      });
       updateBlock((current) => {
         const remainingNodes = current.nodes.filter((node) => !deletedNodeIds.has(node.id));
         const remainingNodeIds = new Set(remainingNodes.map((node) => node.id));
@@ -1712,7 +2030,7 @@ export const SetLogicEditor = ({
       handleNodesDelete([
         {
           id: nodeId,
-          position: block.nodePositions[nodeId] ?? {
+          position: draftBlock.nodePositions[nodeId] ?? {
             x: 0,
             y: 0,
           },
@@ -1720,52 +2038,42 @@ export const SetLogicEditor = ({
         } as Node,
       ]);
     },
-    [block.nodePositions, handleNodesDelete],
+    [draftBlock.nodePositions, handleNodesDelete],
   );
 
   const graph = useMemo(
     () =>
       buildFlowGraph({
-        block,
+        block: effectiveBlock,
         selectedNodeId,
         photoCollectionOptions,
         onRemoveNode: removeNodeById,
+        onSelectNode: (nodeId) =>
+          dispatch({
+            type: "select-node",
+            nodeId,
+          }),
         isCanvasInteractive,
       }),
-    [block, isCanvasInteractive, photoCollectionOptions, removeNodeById, selectedNodeId],
+    [effectiveBlock, isCanvasInteractive, photoCollectionOptions, removeNodeById, selectedNodeId],
   );
-  const [nodes, setNodes] = useState<Node[]>(graph.nodes);
-  const [edges, setEdges] = useState<Edge[]>(graph.edges);
 
   useEffect(() => {
-    setNodes(graph.nodes);
-    setEdges(graph.edges);
-  }, [graph]);
-
-  useEffect(() => {
-    if (!reactFlowInstance) {
+    if (!reactFlowInstance || hasPerformedInitialFitRef.current) {
       return;
     }
 
+    hasPerformedInitialFitRef.current = true;
     requestAnimationFrame(() => {
       reactFlowInstance.fitView({
         padding: 0.2,
         duration: 180,
       });
     });
-  }, [graph.nodes.map((node) => node.id).join("|"), reactFlowInstance]);
-
-  useEffect(() => {
-    if (selectedNodeId === null) {
-      return;
-    }
-    if (block.nodes.some((node) => node.id === selectedNodeId)) {
-      return;
-    }
-    setSelectedNodeId(null);
-  }, [block, selectedNodeId]);
+  }, [reactFlowInstance]);
 
   const isValidConnection = (candidate: Edge | Connection): boolean => {
+    const currentBlock = latestBlockRef.current;
     const source = candidate.source?.trim();
     const target = candidate.target?.trim();
     if (!source || !target || source === target) {
@@ -1774,7 +2082,7 @@ export const SetLogicEditor = ({
     if (source === END_NODE_ID || target === START_NODE_ID) {
       return false;
     }
-    if (target !== END_NODE_ID && !block.nodes.some((node) => node.id === target)) {
+    if (target !== END_NODE_ID && !currentBlock.nodes.some((node) => node.id === target)) {
       return false;
     }
 
@@ -1782,18 +2090,18 @@ export const SetLogicEditor = ({
       return target !== END_NODE_ID;
     }
 
-    const sourceNode = getGraphNodeById(block, source);
+    const sourceNode = getGraphNodeById(currentBlock, source);
     if (!sourceNode) {
       return false;
     }
 
     if (isLayoutGraphNode(sourceNode)) {
-      return !wouldCreateGraphCycle(block, source, target);
+      return !wouldCreateGraphCycle(currentBlock, source, target);
     }
 
     return (
       getConnectableSourceHandles(sourceNode).includes(candidate.sourceHandle?.trim() ?? "") &&
-      !wouldCreateGraphCycle(block, source, target)
+      !wouldCreateGraphCycle(currentBlock, source, target)
     );
   };
 
@@ -1824,7 +2132,7 @@ export const SetLogicEditor = ({
               !(entry.source === source && (entry.sourceHandle?.trim() || null) === sourceHandle),
           ),
           {
-            id: toConnectionId({
+            id: toPhotoRouterConnectionId({
               source,
               sourceHandle,
               target,
@@ -1842,20 +2150,39 @@ export const SetLogicEditor = ({
     if (!isCanvasInteractive) {
       return;
     }
-    setNodes((current) => applyNodeChanges(changes, current));
-  };
+    const positionUpdates = Object.fromEntries(
+      changes
+        .filter(
+          (
+            change,
+          ): change is NodeChange & { type: "position"; position: { x: number; y: number } } =>
+            change.type === "position" &&
+            change.position !== undefined &&
+            change.id !== START_NODE_ID &&
+            change.id !== END_NODE_ID,
+        )
+        .map((change) => [change.id, change.position]),
+    );
 
-  const handleEdgesChange = (changes: EdgeChange[]) => {
-    if (!isCanvasInteractive) {
+    if (Object.keys(positionUpdates).length === 0) {
       return;
     }
-    setEdges((current) => applyEdgeChanges(changes, current));
+    dispatch({
+      type: "merge-draft-node-positions",
+      positions: positionUpdates,
+    });
   };
+
+  const handleEdgesChange = (_changes: EdgeChange[]) => {};
 
   const handleNodeDragStop = (_event: unknown, node: Node) => {
     if (!isCanvasInteractive) {
       return;
     }
+    dispatch({
+      type: "clear-draft-node-positions",
+      nodeIds: [node.id],
+    });
     updateBlock((current) => ({
       ...current,
       nodePositions: {
@@ -1929,19 +2256,19 @@ export const SetLogicEditor = ({
   };
 
   const selectedLayoutNode = selectedNodeId
-    ? (block.nodes.find(
+    ? (draftBlock.nodes.find(
         (node): node is PhotoRouterLayoutNode =>
           node.id === selectedNodeId && isLayoutGraphNode(node),
       ) ?? null)
     : null;
   const selectedActionNode = selectedNodeId
-    ? (block.nodes.find(
+    ? (draftBlock.nodes.find(
         (node): node is PhotoRouterPhotoOrientationNode =>
           node.id === selectedNodeId && isPhotoOrientationNode(node),
       ) ?? null)
     : null;
   const selectedTimeGateNode = selectedNodeId
-    ? (block.nodes.find(
+    ? (draftBlock.nodes.find(
         (node): node is PhotoRouterTimeGateNode =>
           node.id === selectedNodeId && isTimeGateNode(node),
       ) ?? null)
@@ -2036,7 +2363,7 @@ export const SetLogicEditor = ({
   useEffect(() => {
     let hasChanges = false;
 
-    for (const node of block.nodes) {
+    for (const node of draftBlock.nodes) {
       if (!isPhotoOrientationNode(node)) {
         continue;
       }
@@ -2082,7 +2409,7 @@ export const SetLogicEditor = ({
         };
       }),
     }));
-  }, [block.nodes, updateBlock]);
+  }, [draftBlock.nodes, updateBlock]);
 
   const renderConditionalSettings = (
     actionKind: ActionNodeKind,
@@ -2134,7 +2461,7 @@ export const SetLogicEditor = ({
               Condition
             </span>
             <select
-              className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+              className={GRAPH_SELECT_INPUT_CLASS}
               value={normalizedConditionType ?? ""}
               onChange={(event) =>
                 updateBranch((current) => ({
@@ -2208,12 +2535,7 @@ export const SetLogicEditor = ({
                 event.dataTransfer.setData(GRAPH_NODE_DRAG_TYPE, "layout-node");
                 event.dataTransfer.effectAllowed = "copy";
               }}
-              onClick={() =>
-                addLayoutNodeAtPosition({
-                  x: DEFAULT_DETACHED_ORIGIN.x,
-                  y: DEFAULT_DETACHED_ORIGIN.y,
-                })
-              }
+              onClick={() => addLayoutNodeAtPosition()}
             >
               <span className="block text-sm font-semibold">Layout Node</span>
             </button>
@@ -2228,7 +2550,7 @@ export const SetLogicEditor = ({
                 event.dataTransfer.setData(GRAPH_NODE_DRAG_TYPE, "photo-node");
                 event.dataTransfer.effectAllowed = "copy";
               }}
-              onClick={() => addActionNodeAtPosition("photo", DEFAULT_ROUTER_POSITION)}
+              onClick={() => addActionNodeAtPosition("photo")}
             >
               <span className="block text-sm font-semibold">Photo Orientation Node</span>
             </button>
@@ -2240,12 +2562,7 @@ export const SetLogicEditor = ({
                 event.dataTransfer.setData(GRAPH_NODE_DRAG_TYPE, "warning-node");
                 event.dataTransfer.effectAllowed = "copy";
               }}
-              onClick={() =>
-                addActionNodeAtPosition("warning", {
-                  x: DEFAULT_ROUTER_POSITION.x + 48,
-                  y: DEFAULT_ROUTER_POSITION.y + 48,
-                })
-              }
+              onClick={() => addActionNodeAtPosition("warning")}
             >
               <span className="block text-sm font-semibold">Warning Node</span>
             </button>
@@ -2257,12 +2574,7 @@ export const SetLogicEditor = ({
                 event.dataTransfer.setData(GRAPH_NODE_DRAG_TYPE, "time-node");
                 event.dataTransfer.effectAllowed = "copy";
               }}
-              onClick={() =>
-                addTimeGateNodeAtPosition({
-                  x: DEFAULT_ROUTER_POSITION.x + 96,
-                  y: DEFAULT_ROUTER_POSITION.y + 96,
-                })
-              }
+              onClick={() => addTimeGateNodeAtPosition()}
             >
               <span className="block text-sm font-semibold">Time Gate Node</span>
             </button>
@@ -2275,8 +2587,8 @@ export const SetLogicEditor = ({
           onDragOver={handleDragOver}
         >
           <ReactFlow
-            nodes={nodes}
-            edges={edges}
+            nodes={graph.nodes}
+            edges={graph.edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             proOptions={{ hideAttribution: true }}
@@ -2287,9 +2599,18 @@ export const SetLogicEditor = ({
             onNodeDragStop={handleNodeDragStop}
             onNodesDelete={handleNodesDelete}
             onEdgesDelete={handleEdgesDelete}
-            onNodeClick={(_event, node) => setSelectedNodeId(node.id)}
-            onPaneClick={() => setSelectedNodeId(null)}
-            fitView
+            onNodeClick={(_event, node) =>
+              dispatch({
+                type: "select-node",
+                nodeId: node.id,
+              })
+            }
+            onPaneClick={() =>
+              dispatch({
+                type: "select-node",
+                nodeId: null,
+              })
+            }
             minZoom={0.35}
             maxZoom={1.5}
             deleteKeyCode={["Backspace", "Delete"]}
@@ -2298,6 +2619,7 @@ export const SetLogicEditor = ({
             zoomOnScroll={isCanvasInteractive}
             zoomOnPinch={isCanvasInteractive}
             zoomOnDoubleClick={isCanvasInteractive}
+            connectionRadius={64}
             connectionLineType={ConnectionLineType.SimpleBezier}
             connectionLineStyle={{
               stroke: "#cbd5e1",
@@ -2360,7 +2682,9 @@ export const SetLogicEditor = ({
                   title={isCanvasInteractive ? "Lock canvas" : "Unlock canvas"}
                   active={!isCanvasInteractive}
                   onClick={() => {
-                    setIsCanvasInteractive((current) => !current);
+                    dispatch({
+                      type: "toggle-canvas-interactive",
+                    });
                   }}
                 >
                   <LockIcon locked={!isCanvasInteractive} />
@@ -2409,7 +2733,7 @@ export const SetLogicEditor = ({
                       Layout
                     </span>
                     <select
-                      className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+                      className={GRAPH_SELECT_INPUT_CLASS}
                       value={selectedLayoutNode.layoutName}
                       onChange={(event) =>
                         updateSelectedLayoutNode((current) => ({
@@ -2436,7 +2760,7 @@ export const SetLogicEditor = ({
                       max={3600}
                       step={1}
                       value={selectedLayoutNode.cycleSeconds}
-                      className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+                      className={GRAPH_TEXT_INPUT_CLASS}
                       onChange={(event) => {
                         const parsed = Number.parseInt(event.target.value, 10);
                         if (!Number.isFinite(parsed)) {
@@ -2474,7 +2798,7 @@ export const SetLogicEditor = ({
                           Photo source override
                         </span>
                         <select
-                          className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+                          className={GRAPH_SELECT_INPUT_CLASS}
                           value={photoCollectionId}
                           onChange={(event) =>
                             updateSelectedLayoutNode((current) => ({
@@ -2533,7 +2857,7 @@ export const SetLogicEditor = ({
                     <input
                       type="text"
                       value={selectedActionNode.title}
-                      className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+                      className={GRAPH_TEXT_INPUT_CLASS}
                       onChange={(event) =>
                         updateSelectedActionNode((current) => ({
                           ...current,
@@ -2549,7 +2873,7 @@ export const SetLogicEditor = ({
                         Photo source
                       </span>
                       <select
-                        className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+                        className={GRAPH_SELECT_INPUT_CLASS}
                         value={selectedActionNode.photoActionCollectionId ?? ""}
                         onChange={(event) =>
                           updateSelectedActionNode((current) => ({
@@ -2599,7 +2923,7 @@ export const SetLogicEditor = ({
                     <input
                       type="text"
                       value={selectedTimeGateNode.title}
-                      className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+                      className={GRAPH_TEXT_INPUT_CLASS}
                       onChange={(event) =>
                         updateSelectedTimeGateNode((current) => ({
                           ...current,
@@ -2680,7 +3004,7 @@ export const SetLogicEditor = ({
                             <input
                               type="time"
                               value={gate.startTime}
-                              className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+                              className={GRAPH_TEXT_INPUT_CLASS}
                               onChange={(event) =>
                                 updateSelectedTimeGateNode((current) => ({
                                   ...current,
@@ -2703,7 +3027,7 @@ export const SetLogicEditor = ({
                             <input
                               type="time"
                               value={gate.endTime}
-                              className="h-10 w-full rounded border border-slate-700 bg-slate-800 px-3 text-sm text-slate-100"
+                              className={GRAPH_TEXT_INPUT_CLASS}
                               onChange={(event) =>
                                 updateSelectedTimeGateNode((current) => ({
                                   ...current,

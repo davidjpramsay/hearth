@@ -839,8 +839,9 @@ export const AdminLayoutsPage = () => {
 
     const validationIssue = getLayoutSetAuthoringValidationIssues(nextAuthoringRaw)[0] ?? null;
     if (validationIssue) {
-      setError(`Set logic error: ${validationIssue.message}`);
-      return;
+      const message = `Set logic error: ${validationIssue.message}`;
+      setError(message);
+      throw new Error(message);
     }
 
     let nextConfig: ScreenFamilyLayoutConfig;
@@ -851,8 +852,9 @@ export const AdminLayoutsPage = () => {
         knownLayoutNames,
       });
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Failed to build set routing");
-      return;
+      const message = error instanceof Error ? error.message : "Failed to build set routing";
+      setError(message);
+      throw new Error(message);
     }
     const runtimeHealth = analyzeSetRuntimeHealth({
       graph: nextConfig.logicGraph,
@@ -860,8 +862,9 @@ export const AdminLayoutsPage = () => {
     });
     const blockingIssue = runtimeHealth.issues.find((issue) => issue.severity === "error");
     if (blockingIssue) {
-      setError(`Set logic error: ${blockingIssue.message}`);
-      return;
+      const message = `Set logic error: ${blockingIssue.message}`;
+      setError(message);
+      throw new Error(message);
     }
 
     try {
@@ -881,7 +884,10 @@ export const AdminLayoutsPage = () => {
       });
       setError(null);
     } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : "Failed to update set routing");
+      const message =
+        updateError instanceof Error ? updateError.message : "Failed to update set routing";
+      setError(message);
+      throw new Error(message);
     }
   };
 
@@ -1127,9 +1133,6 @@ export const AdminLayoutsPage = () => {
                   }
                 }}
               />
-              <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
-                v{layout.version}
-              </span>
               <button
                 type="button"
                 onClick={() => navigate(`/admin/layouts/${layout.id}`)}

@@ -1,8 +1,14 @@
 import { z } from "zod";
 import { withModulePresentation } from "./presentation.js";
+import {
+  DEFAULT_THEME_COLOR_SLOT,
+  getThemeColorSlotByIndex,
+  themeColorSlotSchema,
+  themeColorSlotValueSchema,
+} from "../theme-palette.js";
 
 export const calendarViewModeSchema = z.enum(["list", "week", "month"]);
-export const calendarColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+export const calendarColorSchema = themeColorSlotValueSchema;
 export const calendarFeedIdSchema = z
   .string()
   .trim()
@@ -16,7 +22,7 @@ export const calendarFeedSchema = z.object({
   id: calendarFeedIdSchema,
   name: calendarFeedNameSchema,
   url: calendarFeedUrlSchema,
-  color: calendarColorSchema.default("#22D3EE"),
+  color: calendarColorSchema.default(DEFAULT_THEME_COLOR_SLOT),
   enabled: z.boolean().default(true),
 });
 
@@ -46,13 +52,13 @@ export const calendarFeedsConfigSchema = z
 export const calendarFeedSelectionSchema = z.object({
   feedId: calendarFeedIdSchema,
   labelOverride: z.string().trim().max(120).nullable().default(null),
-  colorOverride: calendarColorSchema.nullable().default(null),
+  colorOverride: themeColorSlotSchema.nullable().default(null),
 });
 
 export const legacyCalendarSourceSchema = z.object({
   source: calendarFeedUrlSchema,
   label: z.string().trim().max(120).nullable().default(null),
-  color: calendarColorSchema.nullable().default(null),
+  color: themeColorSlotValueSchema.nullable().default(null),
 });
 
 const migrateLegacyCalendarModuleConfig = (input: unknown): unknown => {
@@ -77,7 +83,10 @@ const migrateLegacyCalendarModuleConfig = (input: unknown): unknown => {
     legacyCalendars: calendars.map((entry, index) => ({
       source: typeof entry === "string" ? entry : "",
       label: typeof calendarLabels[index] === "string" ? calendarLabels[index] : null,
-      color: typeof calendarColors[index] === "string" ? calendarColors[index] : null,
+      color:
+        typeof calendarColors[index] === "string"
+          ? calendarColors[index]
+          : getThemeColorSlotByIndex(index),
     })),
   };
 };
@@ -124,14 +133,14 @@ export const calendarModuleConfigSchema = z.preprocess(
 export const calendarModuleSourceSchema = z.object({
   id: z.string().trim().min(1).max(120),
   label: z.string().trim().min(1).max(120),
-  color: calendarColorSchema,
+  color: themeColorSlotSchema,
 });
 
 export const calendarModuleEventSchema = z.object({
   id: z.string().min(1),
   source: z.string().min(1),
   sourceLabel: z.string().min(1),
-  sourceColor: calendarColorSchema.nullable().default(null),
+  sourceColor: themeColorSlotSchema.nullable().default(null),
   title: z.string().min(1),
   start: z.string().datetime({ offset: true }),
   end: z.string().datetime({ offset: true }).nullable(),

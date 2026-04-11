@@ -59,6 +59,7 @@ Current examples:
 - `apps/web/src/modules/sdk/chores.module.tsx`
 - `apps/web/src/modules/sdk/calendar.module.tsx`
 - `apps/web/src/modules/sdk/bible-verse.module.tsx`
+- `apps/web/src/modules/sdk/homeschool-planner.module.tsx`
 
 ## Verify
 

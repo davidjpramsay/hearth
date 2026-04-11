@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import {
+  DEFAULT_THEME_COLOR_SLOT,
   type CalendarFeed,
   calendarModuleConfigSchema,
   calendarModuleEventsResponseSchema,
+  getThemeColorSlotByIndex,
   getMillisecondsUntilNextCalendarDateInTimeZone,
   parseCalendarEventBoundary,
   toCalendarDateInTimeZone,
   type CalendarModuleConfig,
   type CalendarModuleEvent,
   type CalendarModuleSource,
+  type ThemeColorSlot,
 } from "@hearth/shared";
 import { defineModule } from "@hearth/module-sdk";
 import { getCalendarFeeds } from "../../api/client";
@@ -25,21 +28,16 @@ import {
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
+import {
+  getThemePaletteColorVar,
+  getThemePaletteForegroundVar,
+  getThemePaletteRgbVar,
+} from "../../theme/theme";
+import { ThemePalettePicker } from "../../components/admin/ThemePalettePicker";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CALENDAR_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const CALENDAR_CLOCK_TICK_MS = 60 * 1000;
-const CALENDAR_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
-const CALENDAR_FALLBACK_COLORS = [
-  "#22D3EE",
-  "#60A5FA",
-  "#A78BFA",
-  "#34D399",
-  "#F59E0B",
-  "#FB7185",
-  "#F97316",
-  "#38BDF8",
-];
 type CalendarDateKey = `${number}-${number}-${number}`;
 
 type CalendarTileEvent = CalendarModuleEvent & {
@@ -99,46 +97,7 @@ export const buildRollingMonthGrid = (
   };
 };
 
-const readThemeCalendarColor = (variableName: string, fallback: string): string => {
-  if (typeof window === "undefined") {
-    return fallback;
-  }
-
-  const resolved = getComputedStyle(document.documentElement)
-    .getPropertyValue(variableName)
-    .trim()
-    .toUpperCase();
-
-  return CALENDAR_COLOR_REGEX.test(resolved) ? resolved : fallback;
-};
-
-const defaultCalendarColor = (index: number): string => {
-  const palette = [
-    readThemeCalendarColor("--color-text-accent", CALENDAR_FALLBACK_COLORS[0] ?? "#22D3EE"),
-    readThemeCalendarColor("--color-status-ok", CALENDAR_FALLBACK_COLORS[3] ?? "#34D399"),
-    readThemeCalendarColor("--color-status-loading", CALENDAR_FALLBACK_COLORS[4] ?? "#F59E0B"),
-    readThemeCalendarColor("--color-status-error", CALENDAR_FALLBACK_COLORS[5] ?? "#FB7185"),
-    readThemeCalendarColor("--color-text-secondary", CALENDAR_FALLBACK_COLORS[1] ?? "#60A5FA"),
-    readThemeCalendarColor("--color-text-muted", CALENDAR_FALLBACK_COLORS[6] ?? "#F97316"),
-    readThemeCalendarColor("--color-text-accent", CALENDAR_FALLBACK_COLORS[7] ?? "#38BDF8"),
-    readThemeCalendarColor("--color-status-ok", CALENDAR_FALLBACK_COLORS[2] ?? "#A78BFA"),
-  ];
-
-  return palette[index % palette.length] ?? palette[0] ?? "#22D3EE";
-};
-
-const normalizeCalendarColor = (value: string | undefined): string | null => {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  if (!CALENDAR_COLOR_REGEX.test(trimmed)) {
-    return null;
-  }
-
-  return trimmed.toUpperCase();
-};
+const defaultCalendarColor = (index: number): ThemeColorSlot => getThemeColorSlotByIndex(index);
 
 const buildCalendarFeedOptionMap = (feeds: CalendarFeed[]): Map<string, CalendarFeed> =>
   new Map(feeds.map((feed) => [feed.id, feed]));
@@ -157,27 +116,18 @@ const loadCalendarFeedOptions = async (): Promise<CalendarFeed[]> => {
   }
 };
 
-const alphaHex = (color: string, alpha: number): string => {
-  const clamped = Math.max(0, Math.min(1, alpha));
-  const alphaChannel = Math.round(clamped * 255)
-    .toString(16)
-    .padStart(2, "0")
-    .toUpperCase();
-  return `${color}${alphaChannel}`;
-};
-
-const eventAccentStyle = (color: string | null): CSSProperties | undefined => {
-  if (!color) {
+const eventAccentStyle = (colorSlot: ThemeColorSlot | null): CSSProperties | undefined => {
+  if (!colorSlot) {
     return undefined;
   }
 
   return {
-    borderColor: alphaHex(color, 0.9),
-    background: `linear-gradient(135deg, ${alphaHex(color, 0.35)} 0%, ${alphaHex(
-      color,
-      0.22,
-    )} 100%)`,
-    boxShadow: `inset 0 0 0 1px ${alphaHex(color, 0.38)}`,
+    borderColor: `rgb(${getThemePaletteRgbVar(colorSlot)} / 0.9)`,
+    background: `linear-gradient(135deg, rgb(${getThemePaletteRgbVar(
+      colorSlot,
+    )} / 0.35) 0%, rgb(${getThemePaletteRgbVar(colorSlot)} / 0.22) 100%)`,
+    boxShadow: `inset 0 0 0 1px rgb(${getThemePaletteRgbVar(colorSlot)} / 0.38)`,
+    color: getThemePaletteForegroundVar(colorSlot),
   };
 };
 
@@ -645,7 +595,7 @@ export const moduleDefinition = defineModule({
                       <span
                         className="rounded-full"
                         style={{
-                          backgroundColor: entry.color,
+                          backgroundColor: getThemePaletteColorVar(entry.color),
                           width: "0.5rem",
                           height: "0.5rem",
                         }}
@@ -721,7 +671,7 @@ export const moduleDefinition = defineModule({
                       <span
                         className="rounded-full"
                         style={{
-                          backgroundColor: entry.color,
+                          backgroundColor: getThemePaletteColorVar(entry.color),
                           width: "0.5rem",
                           height: "0.5rem",
                         }}
@@ -784,7 +734,7 @@ export const moduleDefinition = defineModule({
                       <span
                         className="rounded-full"
                         style={{
-                          backgroundColor: entry.color,
+                          backgroundColor: getThemePaletteColorVar(entry.color),
                           width: "0.5rem",
                           height: "0.5rem",
                         }}
@@ -910,9 +860,7 @@ export const moduleDefinition = defineModule({
             const effectiveLabel =
               selection.labelOverride?.trim() || feed?.name || `Missing feed: ${selection.feedId}`;
             const effectiveColor =
-              normalizeCalendarColor(selection.colorOverride ?? undefined) ??
-              normalizeCalendarColor(feed?.color) ??
-              defaultCalendarColor(index);
+              selection.colorOverride ?? feed?.color ?? defaultCalendarColor(index);
 
             return {
               selection,
@@ -1073,7 +1021,7 @@ export const moduleDefinition = defineModule({
                         <span
                           className="inline-block h-3 w-3 shrink-0 rounded-full"
                           style={{
-                            backgroundColor: normalizeCalendarColor(feed.color) ?? "#22D3EE",
+                            backgroundColor: getThemePaletteColorVar(feed.color),
                           }}
                         />
                         <div className="min-w-0">
@@ -1120,7 +1068,9 @@ export const moduleDefinition = defineModule({
                         <div className="flex items-center gap-2">
                           <span
                             className="inline-block h-3 w-3 rounded-full"
-                            style={{ backgroundColor: entry.effectiveColor }}
+                            style={{
+                              backgroundColor: getThemePaletteColorVar(entry.effectiveColor),
+                            }}
                           />
                           <p className="truncate font-medium text-slate-100">
                             {entry.effectiveLabel}
@@ -1198,7 +1148,7 @@ export const moduleDefinition = defineModule({
                     ) : null}
 
                     <label className="flex items-center justify-between">
-                      <span>Use default color</span>
+                      <span>Use default colour</span>
                       <input
                         type="checkbox"
                         checked={entry.selection.colorOverride === null}
@@ -1210,20 +1160,18 @@ export const moduleDefinition = defineModule({
                       />
                     </label>
                     {entry.selection.colorOverride !== null ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          className="h-9 w-12 cursor-pointer rounded border border-slate-600 bg-slate-800 p-1"
-                          type="color"
+                      <div className="space-y-2">
+                        <ThemePalettePicker
+                          compact
                           value={entry.effectiveColor}
-                          onChange={(event) =>
+                          onChange={(slot) =>
                             updateFeedSelection(entry.index, {
-                              colorOverride:
-                                normalizeCalendarColor(event.target.value) ?? entry.effectiveColor,
+                              colorOverride: slot,
                             })
                           }
                         />
                         <p className="text-xs text-slate-400">
-                          Default: {entry.feed?.color ?? "not available"}
+                          Default: {entry.feed?.color ?? DEFAULT_THEME_COLOR_SLOT}
                         </p>
                       </div>
                     ) : null}
@@ -1242,8 +1190,7 @@ export const moduleDefinition = defineModule({
               </p>
               <div className="space-y-2">
                 {settings.legacyCalendars.map((entry, index) => {
-                  const effectiveColor =
-                    normalizeCalendarColor(entry.color ?? undefined) ?? defaultCalendarColor(index);
+                  const effectiveColor = entry.color ?? defaultCalendarColor(index);
 
                   return (
                     <div
@@ -1264,13 +1211,12 @@ export const moduleDefinition = defineModule({
                         />
                       </label>
                       <div className="flex gap-2">
-                        <input
-                          className="h-9 w-12 cursor-pointer rounded border border-slate-600 bg-slate-800 p-1"
-                          type="color"
+                        <ThemePalettePicker
+                          compact
                           value={effectiveColor}
-                          onChange={(event) =>
+                          onChange={(slot) =>
                             updateLegacyCalendar(index, {
-                              color: normalizeCalendarColor(event.target.value) ?? effectiveColor,
+                              color: slot,
                             })
                           }
                         />

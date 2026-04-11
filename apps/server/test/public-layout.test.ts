@@ -33,12 +33,12 @@ test("sanitizeLayoutRecordForPublicDisplay redacts calendar URLs and photo folde
               {
                 source: "webcal://secret.example.com/private-feed-1",
                 label: "School",
-                color: "#22D3EE",
+                color: "color-6",
               },
               {
                 source: "webcal://secret.example.com/private-feed-2",
                 label: null,
-                color: "#60A5FA",
+                color: "color-7",
               },
             ],
             daysToShow: 14,
@@ -75,12 +75,12 @@ test("sanitizeLayoutRecordForPublicDisplay redacts calendar URLs and photo folde
     {
       source: "Calendar 1",
       label: "School",
-      color: "#22D3EE",
+      color: "color-6",
     },
     {
       source: "Calendar 2",
       label: null,
-      color: "#60A5FA",
+      color: "color-7",
     },
   ]);
   assert.equal(sanitized.config.modules[1]?.config.folderPath, "/photos");

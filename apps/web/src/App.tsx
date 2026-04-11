@@ -10,9 +10,19 @@ const AdminChoresPage = lazy(async () => {
   return { default: module.AdminChoresPage };
 });
 
+const AdminChildrenPage = lazy(async () => {
+  const module = await import("./pages/AdminChildrenPage");
+  return { default: module.AdminChildrenPage };
+});
+
 const AdminDevicesPage = lazy(async () => {
   const module = await import("./pages/AdminDevicesPage");
   return { default: module.AdminDevicesPage };
+});
+
+const AdminPlannerPage = lazy(async () => {
+  const module = await import("./pages/AdminPlannerPage");
+  return { default: module.AdminPlannerPage };
 });
 
 const AdminLayoutEditorPage = lazy(async () => {
@@ -86,8 +96,21 @@ export const App = () => {
           element={<RequireAuth>{withRouteSuspense(<AdminChoresPage />)}</RequireAuth>}
         />
         <Route
+          path="/children"
+          element={<RequireAuth>{withRouteSuspense(<AdminChildrenPage />)}</RequireAuth>}
+        />
+        <Route
           path="/devices"
           element={<RequireAuth>{withRouteSuspense(<AdminDevicesPage />)}</RequireAuth>}
+        />
+        <Route
+          path="/school"
+          element={<RequireAuth>{withRouteSuspense(<AdminPlannerPage />)}</RequireAuth>}
+        />
+        <Route path="/planner" element={<Navigate to="/school" replace />} />
+        <Route
+          path="/admin/children"
+          element={<RequireAuth>{withRouteSuspense(<AdminChildrenPage />)}</RequireAuth>}
         />
         <Route
           path="/admin/chores"
@@ -97,6 +120,11 @@ export const App = () => {
           path="/admin/devices"
           element={<RequireAuth>{withRouteSuspense(<AdminDevicesPage />)}</RequireAuth>}
         />
+        <Route
+          path="/admin/school"
+          element={<RequireAuth>{withRouteSuspense(<AdminPlannerPage />)}</RequireAuth>}
+        />
+        <Route path="/admin/planner" element={<Navigate to="/admin/school" replace />} />
         <Route
           path="/admin/layouts"
           element={<RequireAuth>{withRouteSuspense(<AdminLayoutsPage />)}</RequireAuth>}
