@@ -17,7 +17,7 @@ export const docsSidebar = [
     items: [
       {
         label: "How the application is organised",
-        slug: "structure",
+        slug: "application-structure",
       },
     ],
   },
@@ -39,7 +39,7 @@ export const docsSidebar = [
     items: [
       {
         label: "Build modules",
-        slug: "modules",
+        slug: "build-sdk-modules",
       },
       {
         label: "Write time-safe modules",
@@ -52,7 +52,7 @@ export const docsSidebar = [
     items: [
       {
         label: "Test and verify changes",
-        slug: "verify",
+        slug: "quality-checks",
       },
     ],
   },

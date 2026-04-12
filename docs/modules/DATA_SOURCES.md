@@ -16,6 +16,9 @@ Use `useModuleQuery(...)`:
 
 - polling interval
 - cache
+- stale-response protection
+- focus / visibility refresh
+- optional invalidation-triggered refresh
 - stale-while-revalidate behaviour
 - unified loading/error state
 

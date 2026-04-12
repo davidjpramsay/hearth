@@ -151,4 +151,64 @@ test.describe("Hearth smoke", () => {
     await latestTimeGateNode.click();
     await expect(page.getByText("Edit the selected time gate node settings.")).toBeVisible();
   });
+
+  test("set logic editor keeps the graph visible after dragging a node across another node", async ({
+    page,
+  }) => {
+    await loginAsAdmin(page);
+
+    await page.getByRole("button", { name: "Time Gate Node" }).click();
+    await page.getByRole("button", { name: "Layout Node" }).click();
+    const nodeCountAfterAdd = await page.locator(".react-flow__node").count();
+
+    const latestTimeGateNode = page
+      .locator(".react-flow__node")
+      .filter({ hasText: "Time Gate Node" })
+      .last();
+    const latestLayoutNode = page.locator(".react-flow__node").filter({ hasText: "Layout" }).last();
+
+    const timeGateBox = await latestTimeGateNode.boundingBox();
+    const layoutBox = await latestLayoutNode.boundingBox();
+
+    expect(timeGateBox).not.toBeNull();
+    expect(layoutBox).not.toBeNull();
+
+    await page.mouse.move(layoutBox!.x + layoutBox!.width / 2, layoutBox!.y + 24);
+    await page.mouse.down();
+    await page.mouse.move(
+      timeGateBox!.x + timeGateBox!.width / 2,
+      timeGateBox!.y + timeGateBox!.height / 2,
+      { steps: 20 },
+    );
+    await page.mouse.up();
+
+    await expect(page.locator(".react-flow__node")).toHaveCount(nodeCountAfterAdd);
+
+    await page.reload();
+    await expect(page.locator(".react-flow__node")).toHaveCount(nodeCountAfterAdd);
+  });
+
+  test("set logic editor persists time gate windows after reload", async ({ page }) => {
+    await loginAsAdmin(page);
+
+    await page.getByRole("button", { name: "Time Gate Node" }).click();
+    const latestTimeGateNode = page
+      .locator(".react-flow__node")
+      .filter({ hasText: "Time Gate Node" })
+      .last();
+    await latestTimeGateNode.click();
+    await expect(page.getByText("Edit the selected time gate node settings.")).toBeVisible();
+
+    const gateCountBefore = await page.locator("text=/Gate \\d+/").count();
+    await page.getByRole("button", { name: "Add window" }).click();
+    await expect(page.locator("text=/Gate \\d+/")).toHaveCount(gateCountBefore + 1);
+
+    await page.reload();
+    const latestTimeGateNodeAfterReload = page
+      .locator(".react-flow__node")
+      .filter({ hasText: "Time Gate Node" })
+      .last();
+    await latestTimeGateNodeAfterReload.click();
+    await expect(page.locator("text=/Gate \\d+/")).toHaveCount(gateCountBefore + 1);
+  });
 });

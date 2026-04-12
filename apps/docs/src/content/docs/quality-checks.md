@@ -11,6 +11,8 @@ The root `verify` script is the canonical local and CI verification path.
 
 Avoid relying on `pnpm -r test` as a repo health signal because workspace build ordering can create false negatives.
 
+Set-logic graph rules now have pure helper coverage plus browser smoke tests for connection and persistence regressions.
+
 ### Supported verification commands
 
 ```bash

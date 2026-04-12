@@ -16,12 +16,12 @@ This is the public documentation surface for Hearth. It explains what the system
 
 - [What Hearth does](#overview)
 - [Install and run locally](#install)
-- [How the application is organised](#structure)
+- [How the application is organised](#application-structure)
 - [Use the admin app](#admin)
 - [Deploy to Synology](#deploy)
-- [Build modules](#modules)
+- [Build modules](#build-sdk-modules)
 - [Write time-safe modules](#time)
-- [Test and verify changes](#verify)
+- [Test and verify changes](#quality-checks)
 
 ## What Hearth does
 
@@ -75,9 +75,12 @@ apps/server owns authenticated admin routes, module data endpoints, persistence,
 
 apps/web owns the dashboard runtime, admin pages, module implementations, and synced display-time behavior.
 
+The set-logic editor is split into a reducer, pure graph helpers, React Flow node components, inspector UI, and canvas shell so graph rules are testable without being buried inside one render file.
+
 - `apps/web/src/modules/sdk` holds built-in SDK modules.
 - `apps/web/src/runtime/display-time.ts` is the synced household time source for site-local modules.
 - `apps/server/src/routes` and `apps/server/src/services` contain module-facing APIs and backend logic.
+- `apps/web/src/components/admin/set-logic-editor` contains the extracted set-logic editor internals.
 
 ## Use the admin app
 
@@ -135,8 +138,11 @@ Modules declare a manifest, settings schema, optional data schema, runtime compo
 
 If a module needs secrets or provider calls, move those concerns to the server and consume a server route from the module.
 
+Use the shared module data hooks instead of hand-rolled fetch effects so polling, cache reuse, focus refresh, visibility refresh, and SSE invalidation follow one path.
+
 - Auto-discovery is handled by the web registry.
-- Use `useModuleQuery` for polling and `useModuleStream` for SSE.
+- Use `useModuleQuery` for polling, cache, and invalidation-aware refreshes.
+- Use `useModuleStream` for direct SSE topic subscriptions when a module truly needs streaming state.
 - Keep provider secrets and private feed URLs server-side.
 
 ### Scaffold a new module
@@ -185,6 +191,8 @@ The root `test` script prepares shared package artifacts first and then runs pac
 The root `verify` script is the canonical local and CI verification path.
 
 Avoid relying on `pnpm -r test` as a repo health signal because workspace build ordering can create false negatives.
+
+Set-logic graph rules now have pure helper coverage plus browser smoke tests for connection and persistence regressions.
 
 ### Supported verification commands
 

@@ -1,0 +1,102 @@
+---
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import docsContent from "../../../../docs/content/app-docs.json";
+
+const { hero, sections } = docsContent;
+const startLinks = sections.map((section) => ({
+  href: `/${section.id
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")}/`,
+  label: section.title,
+}));
+---
+
+<StarlightPage
+  hasSidebar={false}
+  frontmatter={{
+    title: hero.eyebrow,
+    description: hero.summary,
+    template: "splash",
+    hero: {
+      title: hero.headline,
+      tagline: hero.summary,
+      actions: [
+        { text: "Start here", link: startLinks[0]?.href ?? "/overview/", variant: "primary" },
+        { text: "GitHub repo", link: "https://github.com/davidjpramsay/hearth" },
+        {
+          text: "Markdown mirror",
+          link: "https://github.com/davidjpramsay/hearth/blob/main/docs/APP_DOCS.md",
+        },
+      ],
+    },
+    editUrl: false,
+  }}
+>
+  <div class="docs-home-grid">
+    <section class="docs-home-card">
+      <h2>Highlights</h2>
+      <ul>
+        {hero.highlights.map((highlight) => <li>{highlight}</li>)}
+      </ul>
+    </section>
+    <section class="docs-home-card">
+      <h2>Start Here</h2>
+      <ul>
+        {startLinks.map((link) => (
+          <li>
+            <a href={link.href}>{link.label}</a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  </div>
+</StarlightPage>
+
+<style>
+  .docs-home-grid {
+    display: grid;
+    gap: 1.5rem;
+    margin-top: 1rem;
+  }
+
+  .docs-home-card {
+    border: 1px solid var(--sl-color-hairline-shade);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, rgb(17 33 59 / 0.58), rgb(10 18 32 / 0.92));
+    padding: 1.25rem;
+  }
+
+  .docs-home-card h2 {
+    margin: 0 0 1rem;
+    font-size: var(--sl-text-xl);
+    color: var(--sl-color-white);
+  }
+
+  .docs-home-card ul {
+    margin: 0;
+    padding-left: 1.2rem;
+    color: var(--sl-color-gray-2);
+  }
+
+  .docs-home-card li + li {
+    margin-top: 0.7rem;
+  }
+
+  .docs-home-card a {
+    color: var(--sl-color-white);
+    text-decoration: none;
+  }
+
+  .docs-home-card a:hover {
+    color: var(--sl-color-accent-high);
+  }
+
+  @media (min-width: 50rem) {
+    .docs-home-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: 2rem;
+    }
+  }
+</style>

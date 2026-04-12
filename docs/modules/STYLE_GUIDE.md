@@ -61,9 +61,10 @@ Use typography roles for structure, then utility classes only for emphasis and s
 
 ## Data handling
 
-- Use `useModuleQuery` for polling.
+- Use `useModuleQuery` for polling, deduped refresh, and invalidation-aware revalidation.
 - Use `useModuleStream` for SSE.
 - Keep display components resilient to null/partial data.
+- Avoid stacking manual `setInterval`, focus, visibility, and SSE refresh effects on top of each other when `useModuleQuery` can own the lifecycle.
 
 ## Time handling
 

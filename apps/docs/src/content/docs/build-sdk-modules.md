@@ -11,10 +11,13 @@ Modules declare a manifest, settings schema, optional data schema, runtime compo
 
 If a module needs secrets or provider calls, move those concerns to the server and consume a server route from the module.
 
+Use the shared module data hooks instead of hand-rolled fetch effects so polling, cache reuse, focus refresh, visibility refresh, and SSE invalidation follow one path.
+
 ## Key Points
 
 - Auto-discovery is handled by the web registry.
-- Use `useModuleQuery` for polling and `useModuleStream` for SSE.
+- Use `useModuleQuery` for polling, cache, and invalidation-aware refreshes.
+- Use `useModuleStream` for direct SSE topic subscriptions when a module truly needs streaming state.
 - Keep provider secrets and private feed URLs server-side.
 
 ### Scaffold a new module

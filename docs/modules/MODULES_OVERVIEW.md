@@ -40,9 +40,17 @@ Hearth runtime is SDK-first:
 
 3. Standard data layer (`apps/web/src/modules/data`)
 
-- `useModuleQuery(...)` for polling + cache + SWR
+- `useModuleQuery(...)` for polling + cache + SWR + invalidation-aware refresh
 - `useModuleStream(...)` for SSE topic subscriptions
 - `apps/web/src/runtime/display-time.ts` for synced household time / timezone on display clients
+
+Set-logic editor internals now live under `apps/web/src/components/admin/set-logic-editor/*`:
+
+- `reducer.ts` for authoritative editor state
+- `graph.ts` for pure graph rules and React Flow model building
+- `components.tsx` for node renderers and shared editor UI atoms
+- `inspector.tsx` for node/settings editing panels
+- `canvas-shell.tsx` for palette + canvas composition
 
 4. Module UI shell (`apps/web/src/modules/ui/ModuleFrame.tsx`)
 

@@ -36,10 +36,11 @@ Impact: reduces external API calls and lowers CPU/network churn.
 ## Calendar Module
 
 - Calendar source payloads are cached with refresh interval control.
+- Calendar feed refresh now uses bounded concurrency instead of fanning out every selected ICS fetch at once.
 - Failed refreshes can serve cached events with warnings.
 - API responses use stable source ids instead of raw calendar URLs.
 
-Impact: stable dashboard behavior during network hiccups.
+Impact: stable dashboard behavior during network hiccups and lower request-path burst pressure when multiple feeds refresh together.
 
 ## Chores Module
 
@@ -59,6 +60,8 @@ Impact: lower unnecessary schedule expansion and predictable week rollover behav
 - Photos orientation events are emitted from real image frames only, reducing spurious switches.
 - In set mode, Photos slideshow interval follows the active set rule timer (`cycleSeconds`) for synchronized layout/photo cadence.
 - In set mode, resolved photo collections are scoped by set/rule context; playback state remains isolated by screen session.
+- The admin layout editor is route-lazy and manually chunked so React Flow and set-logic editor code do not inflate the base runtime bundle.
+- Set-logic graph rules are extracted into pure helpers, reducing render-path complexity and making connection rules easier to test directly.
 
 ## Recommended Hardware Setup
 

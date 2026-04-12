@@ -77,8 +77,16 @@ pnpm exec playwright install chromium
 
 The public docs site is a standalone Astro Starlight app under `apps/docs` and is published through GitHub Pages. It is intentionally separate from the Hearth runtime server.
 
+Recent reliability and performance hardening:
+
+- set-logic editor internals now live under `apps/web/src/components/admin/set-logic-editor/*` instead of one monolithic file
+- graph rules have pure helper coverage plus Playwright regressions for time-gate connections and graph persistence
+- `useModuleQuery` is the unified fetch lifecycle for polling/invalidation-aware module and admin data refresh
+- the web build manually chunks React Flow and set-logic editor code so the layout editor does not bloat the main runtime bundle
+
 ## Recent Changelog
 
+- April 12, 2026: split the set-logic editor into reducer/graph/component/inspector/canvas-shell modules, added focused graph helper tests plus Playwright editor regressions, and manually chunked the web build so React Flow + set-logic code stay out of the main app bundle.
 - March 19, 2026: hardened admin 401 recovery so expired/invalid stored tokens are cleared and redirected back to `/admin/login`, and reset display bootstrap state on device updates so deleted displays do not resurrect stale routing on re-checkin.
 - March 19, 2026: added shared build-update detection so admin pages now show a reload prompt when a newer bundle is deployed, while the dashboard display path still auto-reloads itself.
 - March 19, 2026: added Playwright browser smoke coverage for admin login/logout, first-run display registration, and admin layout creation against a clean local test server.

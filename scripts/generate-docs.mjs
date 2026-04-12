@@ -104,40 +104,6 @@ const groupSectionEntries = (sections) => {
   return groups;
 };
 
-const generateIndexPage = (content) => {
-  const hero = content.hero;
-  const sections = content.sections ?? [];
-  const sectionLinks = sections.map(
-    (section) => `- [${section.title}](./${slugifySectionId(section.id)}/)`,
-  );
-  const highlightLines = hero.highlights.map((highlight) => `- ${highlight}`);
-
-  return [
-    "---",
-    `title: ${escapeYamlString(hero.eyebrow)}`,
-    `description: ${escapeYamlString(hero.summary)}`,
-    "---",
-    "",
-    `${hero.headline}`,
-    "",
-    `${hero.summary}`,
-    "",
-    "## Highlights",
-    "",
-    ...highlightLines,
-    "",
-    "## Start here",
-    "",
-    ...sectionLinks,
-    "",
-    "## Links",
-    "",
-    "- [GitHub repository](https://github.com/davidjpramsay/hearth)",
-    "- [Markdown mirror](https://github.com/davidjpramsay/hearth/blob/main/docs/APP_DOCS.md)",
-    "",
-  ].join("\n");
-};
-
 const generateSectionPage = (section) => {
   const lines = [
     "---",
@@ -188,10 +154,6 @@ const run = async () => {
     generateStarlightSidebarModule(parsedContent),
     docsSiteSidebarPath,
   );
-  const nextIndexPage = await formatWithProjectPrettier(
-    generateIndexPage(parsedContent),
-    path.join(docsSiteContentDirPath, "index.md"),
-  );
   const nextSectionPages = await Promise.all(
     sections.map(async (section) => {
       const filename = `${slugifySectionId(section.id)}.md`;
@@ -204,9 +166,6 @@ const run = async () => {
   if (checkMode) {
     const existingMarkdown = await fs.readFile(markdownOutputPath, "utf8").catch(() => null);
     const existingSidebarModule = await fs.readFile(docsSiteSidebarPath, "utf8").catch(() => null);
-    const existingIndexPage = await fs
-      .readFile(path.join(docsSiteContentDirPath, "index.md"), "utf8")
-      .catch(() => null);
 
     const pagesAreCurrent = await Promise.all(
       nextSectionPages.map(async ({ filepath, content }) => {
@@ -218,7 +177,6 @@ const run = async () => {
     if (
       existingMarkdown !== nextMarkdown ||
       existingSidebarModule !== nextSidebarModule ||
-      existingIndexPage !== nextIndexPage ||
       pagesAreCurrent.some((value) => value === false)
     ) {
       console.error(
@@ -241,7 +199,6 @@ const run = async () => {
       .filter((entry) => entry.isFile())
       .map((entry) => fs.unlink(path.join(docsSiteContentDirPath, entry.name))),
   );
-  await fs.writeFile(path.join(docsSiteContentDirPath, "index.md"), nextIndexPage, "utf8");
   await Promise.all(
     nextSectionPages.map(({ filepath, content }) => fs.writeFile(filepath, content, "utf8")),
   );

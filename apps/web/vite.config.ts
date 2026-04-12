@@ -72,4 +72,38 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("/src/components/admin/set-logic-editor/")) {
+            return "set-logic-editor-core";
+          }
+          if (id.includes("/src/components/admin/SetLogicEditor.tsx")) {
+            return "set-logic-editor-shell";
+          }
+          if (id.includes("/node_modules/@xyflow/react/")) {
+            return "vendor-reactflow";
+          }
+          if (
+            id.includes("/node_modules/react/") ||
+            id.includes("/node_modules/react-dom/") ||
+            id.includes("/node_modules/react-router-dom/")
+          ) {
+            return "vendor-react";
+          }
+          if (
+            id.includes("/node_modules/react-grid-layout/") ||
+            id.includes("/node_modules/react-resizable/")
+          ) {
+            return "vendor-layout";
+          }
+          if (id.includes("/node_modules/workbox-window/")) {
+            return "vendor-pwa";
+          }
+          return undefined;
+        },
+      },
+    },
+  },
 });
