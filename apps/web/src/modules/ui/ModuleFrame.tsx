@@ -12,6 +12,8 @@ interface ModuleFrameProps {
   statusLabel?: string;
   lastUpdatedMs?: number | null;
   disconnected?: boolean;
+  disconnectedTitle?: string | null;
+  disconnectedLabel?: string | null;
   onRemove?: () => void;
   onSelect?: () => void;
   children: ReactNode;
@@ -42,6 +44,8 @@ export const ModuleFrame = ({
   statusLabel,
   lastUpdatedMs,
   disconnected = false,
+  disconnectedTitle = null,
+  disconnectedLabel = null,
   onRemove,
   onSelect,
   children,
@@ -61,7 +65,13 @@ export const ModuleFrame = ({
       onTouchStartCapture={() => onSelect?.()}
       className="module-frame"
     >
-      {hideHeader ? <ModuleConnectionBadge visible={disconnected} /> : null}
+      {hideHeader ? (
+        <ModuleConnectionBadge
+          visible={disconnected}
+          title={disconnectedTitle ?? undefined}
+          label={disconnectedLabel}
+        />
+      ) : null}
       {hideHeader ? <div className="module-drag-handle module-frame__drag-strip" /> : null}
       {!hideHeader ? (
         <div className="module-drag-handle module-frame__header">
@@ -70,7 +80,12 @@ export const ModuleFrame = ({
             {subtitle ? <p className="module-frame__subtitle">{subtitle}</p> : null}
           </div>
           <div className="flex items-center gap-2">
-            <ModuleConnectionBadge visible={disconnected} variant="inline" />
+            <ModuleConnectionBadge
+              visible={disconnected}
+              variant="inline"
+              title={disconnectedTitle ?? undefined}
+              label={disconnectedLabel}
+            />
             {showStatusMeta ? (
               <div className="module-frame__meta">
                 {statusLabel ? <span className="text-accent">{statusLabel}</span> : null}

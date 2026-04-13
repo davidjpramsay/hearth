@@ -19,6 +19,7 @@ import {
 import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
+import { ModuleSkeleton } from "../ui/ModuleSkeleton";
 
 const LAYOUT_CROSSFADE_DATA_ATTRIBUTE = "data-hearth-layout-crossfade";
 const PHOTO_SNAPSHOT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -520,12 +521,12 @@ export const moduleDefinition = defineModule({
 
       return (
         <div className="relative h-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950">
-          <ModuleConnectionBadge visible={connectivityState.showDisconnected} />
-          {loading ? (
-            <div className="module-copy-meta flex h-full items-center justify-center text-slate-300">
-              Loading photos...
-            </div>
-          ) : null}
+          <ModuleConnectionBadge
+            visible={connectivityState.showDisconnected}
+            title={connectivityState.disconnectedTitle ?? undefined}
+            label={connectivityState.disconnectedLabel}
+          />
+          {loading ? <ModuleSkeleton variant="media" /> : null}
 
           {!loading && connectivityState.blockingError ? (
             <div className="module-copy-meta flex h-full items-center justify-center px-3 text-center text-rose-200">

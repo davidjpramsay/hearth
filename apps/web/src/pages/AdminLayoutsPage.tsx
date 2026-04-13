@@ -1346,6 +1346,7 @@ export const AdminLayoutsPage = () => {
 
                 <Suspense fallback={<GraphEditorLoading />}>
                   <SetLogicEditor
+                    draftStorageKey={`set-logic:${setId}`}
                     authoring={setConfig.logicBlocks}
                     layoutOptions={layoutOptions}
                     photoCollectionOptions={photoCollectionOptions}

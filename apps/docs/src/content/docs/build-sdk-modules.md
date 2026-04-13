@@ -19,6 +19,7 @@ Use the shared module data hooks instead of hand-rolled fetch effects so polling
 - Use `useModuleQuery` for polling, cache, and invalidation-aware refreshes.
 - Use `useModuleStream` for direct SSE topic subscriptions when a module truly needs streaming state.
 - Keep provider secrets and private feed URLs server-side.
+- Block-style modules should store theme palette slots, not raw hex colours.
 
 ### Scaffold a new module
 

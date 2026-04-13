@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  calendarFeedsConfigSchema,
   getThemeColorSlotByIndex,
   type CalendarFeed,
   type CalendarFeedsConfig,
@@ -28,12 +29,14 @@ import { getServerStatus, type ServerStatusResponse } from "../api/server-status
 import { logoutAdminSession } from "../auth/session";
 import { getAuthToken } from "../auth/storage";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
+import { AdminSection, AdminSectionHeader } from "../components/admin/AdminSection";
 import { ThemePalettePicker } from "../components/admin/ThemePalettePicker";
 import { PageShell } from "../components/PageShell";
 import { getSupportedTimeZoneOptions } from "../time-zone-options";
 import { THEME_OPTIONS, type ThemeId } from "../theme/theme";
 
 type DeviceRoutingMode = "set" | "layout";
+type AutosaveState = "idle" | "saving" | "saved" | "error";
 
 interface DeviceDraft {
   name: string;
@@ -56,6 +59,9 @@ const defaultCalendarFeedsConfig: CalendarFeedsConfig = {
   feeds: [],
 };
 const ADMIN_TIME_ZONE_DATALIST_ID = "admin-household-time-zones";
+const AUTOSAVE_DELAY_MS = 800;
+const RECENT_DEVICE_THRESHOLD_MS = 15 * 60 * 1000;
+const STALE_DEVICE_THRESHOLD_MS = 60 * 60 * 1000;
 
 const normalizeCalendarFeedId = (value: string): string =>
   value
@@ -216,6 +222,41 @@ const formatTimestamp = (value: string | null): string => {
   return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleString() : value;
 };
 
+const formatDurationMinutes = (value: number): string => {
+  if (value <= 0) {
+    return "Unavailable";
+  }
+
+  if (value < 60) {
+    return `${value} min`;
+  }
+
+  const hours = Math.round((value / 60) * 10) / 10;
+  return `${hours} hr`;
+};
+
+const formatBytes = (value: number | null | undefined): string => {
+  if (value === null || value === undefined || value < 0) {
+    return "Unavailable";
+  }
+
+  if (value < 1024) {
+    return `${value} B`;
+  }
+
+  const kb = value / 1024;
+  if (kb < 1024) {
+    return `${kb.toFixed(1)} KB`;
+  }
+
+  const mb = kb / 1024;
+  if (mb < 1024) {
+    return `${mb.toFixed(1)} MB`;
+  }
+
+  return `${(mb / 1024).toFixed(1)} GB`;
+};
+
 const formatDateTimeAtTimeZone = (value: string | number | null, timeZone?: string): string => {
   if (value === null) {
     return "Unavailable";
@@ -268,7 +309,30 @@ const hasValidRoutingTarget = (draft: DeviceDraft): boolean => {
   return draft.layoutName.trim().length > 0;
 };
 
+const autosaveStatusText = (input: {
+  state: AutosaveState;
+  dirty: boolean;
+  error?: string | null;
+  idleLabel?: string;
+  savedLabel?: string;
+}): string => {
+  if (input.error && input.state === "error") {
+    return input.error;
+  }
+  if (input.state === "saving") {
+    return "Saving…";
+  }
+  if (input.state === "saved") {
+    return input.savedLabel ?? "Saved";
+  }
+  if (input.dirty) {
+    return input.idleLabel ?? "Changes save automatically.";
+  }
+  return input.savedLabel ?? "Saved";
+};
+
 export const AdminDevicesPage = () => {
+  const token = getAuthToken();
   const navigate = useNavigate();
   const [devices, setDevices] = useState<DisplayDevice[]>([]);
   const [screenProfileLayouts, setScreenProfileLayouts] =
@@ -277,14 +341,16 @@ export const AdminDevicesPage = () => {
   const [drafts, setDrafts] = useState<Record<string, DeviceDraft>>({});
   const [siteTimeConfig, setSiteTimeConfig] = useState<SiteTimeConfig>(defaultSiteTimeConfig);
   const [siteTimeZoneDraft, setSiteTimeZoneDraft] = useState(defaultSiteTimeConfig.siteTimezone);
-  const [siteTimeBusy, setSiteTimeBusy] = useState(false);
+  const [siteTimeSaveState, setSiteTimeSaveState] = useState<AutosaveState>("idle");
+  const [siteTimeSaveError, setSiteTimeSaveError] = useState<string | null>(null);
   const [calendarFeedsConfig, setCalendarFeedsConfig] = useState<CalendarFeedsConfig>(
     defaultCalendarFeedsConfig,
   );
   const [savedCalendarFeedsConfig, setSavedCalendarFeedsConfig] = useState<CalendarFeedsConfig>(
     defaultCalendarFeedsConfig,
   );
-  const [calendarFeedsBusy, setCalendarFeedsBusy] = useState(false);
+  const [calendarFeedsSaveState, setCalendarFeedsSaveState] = useState<AutosaveState>("idle");
+  const [calendarFeedsSaveError, setCalendarFeedsSaveError] = useState<string | null>(null);
   const [serverStatus, setServerStatus] = useState<ServerStatusResponse | null>(null);
   const [serverStatusReceivedAtMs, setServerStatusReceivedAtMs] = useState<number | null>(null);
   const [serverStatusError, setServerStatusError] = useState<string | null>(null);
@@ -294,6 +360,11 @@ export const AdminDevicesPage = () => {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [clockTickMs, setClockTickMs] = useState(() => Date.now());
+  const [deviceSaveStates, setDeviceSaveStates] = useState<Record<string, AutosaveState>>({});
+  const [deviceSaveErrors, setDeviceSaveErrors] = useState<Record<string, string | null>>({});
+  const siteTimeAutosaveTimerRef = useRef<number | null>(null);
+  const calendarFeedsAutosaveTimerRef = useRef<number | null>(null);
+  const deviceAutosaveTimerRef = useRef<Record<string, number>>({});
 
   const availableSetOptions = useMemo(
     () =>
@@ -325,6 +396,23 @@ export const AdminDevicesPage = () => {
   }, [devices]);
   const timeZoneOptions = useMemo(() => getSupportedTimeZoneOptions(), []);
   const siteTimeZoneIsValid = isValidIanaTimeZone(siteTimeZoneDraft.trim());
+  const siteTimeDirty = siteTimeZoneDraft.trim() !== siteTimeConfig.siteTimezone;
+  const normalizedCalendarFeedsDraft = useMemo<CalendarFeedsConfig>(
+    () => ({
+      feeds: calendarFeedsConfig.feeds.map((feed) => ({
+        ...feed,
+        id: normalizeCalendarFeedId(feed.id),
+        name: feed.name.trim().slice(0, 80),
+        url: feed.url.trim(),
+        color: feed.color,
+      })),
+    }),
+    [calendarFeedsConfig],
+  );
+  const calendarFeedsValidation = useMemo(
+    () => calendarFeedsConfigSchema.safeParse(normalizedCalendarFeedsDraft),
+    [normalizedCalendarFeedsDraft],
+  );
   const effectiveServerNowMs = useMemo(() => {
     if (!serverStatus || serverStatusReceivedAtMs === null) {
       return null;
@@ -348,9 +436,37 @@ export const AdminDevicesPage = () => {
       ),
     [devices],
   );
+  const deviceHealthSummary = useMemo(() => {
+    const nowMs = Date.now();
+    let recentCount = 0;
+    let staleCount = 0;
+
+    for (const device of devices) {
+      const seenAtMs = Date.parse(device.lastSeenAt);
+      if (!Number.isFinite(seenAtMs)) {
+        staleCount += 1;
+        continue;
+      }
+
+      const ageMs = nowMs - seenAtMs;
+      if (ageMs <= RECENT_DEVICE_THRESHOLD_MS) {
+        recentCount += 1;
+      }
+      if (ageMs > STALE_DEVICE_THRESHOLD_MS) {
+        staleCount += 1;
+      }
+    }
+
+    return {
+      total: devices.length,
+      recentCount,
+      staleCount,
+      latestSeenAt: latestDeviceSeenAt,
+    };
+  }, [devices, latestDeviceSeenAt]);
   const calendarFeedsDirty = useMemo(
-    () => JSON.stringify(calendarFeedsConfig) !== JSON.stringify(savedCalendarFeedsConfig),
-    [calendarFeedsConfig, savedCalendarFeedsConfig],
+    () => JSON.stringify(normalizedCalendarFeedsDraft) !== JSON.stringify(savedCalendarFeedsConfig),
+    [normalizedCalendarFeedsDraft, savedCalendarFeedsConfig],
   );
   const householdNowMs = effectiveServerNowMs ?? clockTickMs;
   const householdTimeStatusLabel = effectiveServerNowMs
@@ -395,6 +511,10 @@ export const AdminDevicesPage = () => {
       setSiteTimeZoneDraft(siteTimeResponse.siteTimezone);
       setCalendarFeedsConfig(calendarFeedsResponse);
       setSavedCalendarFeedsConfig(calendarFeedsResponse);
+      setSiteTimeSaveState("idle");
+      setSiteTimeSaveError(null);
+      setCalendarFeedsSaveState("idle");
+      setCalendarFeedsSaveError(null);
       setServerStatus(serverStatusResult.data);
       setServerStatusReceivedAtMs(serverStatusResult.data ? Date.now() : null);
       setServerStatusError(serverStatusResult.error);
@@ -415,6 +535,8 @@ export const AdminDevicesPage = () => {
           ]),
         ),
       );
+      setDeviceSaveStates({});
+      setDeviceSaveErrors({});
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load devices");
     }
@@ -437,34 +559,6 @@ export const AdminDevicesPage = () => {
   const onLogout = useCallback(() => {
     logoutAdminSession();
   }, []);
-
-  const onSaveSiteTime = async () => {
-    const token = getAuthToken();
-    if (!token) {
-      navigate("/admin/login", { replace: true });
-      return;
-    }
-
-    if (!siteTimeZoneIsValid) {
-      setError("Enter a valid IANA timezone such as Australia/Perth.");
-      return;
-    }
-
-    try {
-      setSiteTimeBusy(true);
-      setError(null);
-      const updated = await updateSiteTimeConfig(token, {
-        siteTimezone: siteTimeZoneDraft.trim(),
-      });
-      setSiteTimeConfig(updated);
-      setSiteTimeZoneDraft(updated.siteTimezone);
-      await loadData();
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Failed to update household time");
-    } finally {
-      setSiteTimeBusy(false);
-    }
-  };
 
   const updateCalendarFeedDraft = (
     index: number,
@@ -496,35 +590,50 @@ export const AdminDevicesPage = () => {
     }));
   };
 
-  const onSaveCalendarFeeds = async () => {
+  const setDeviceSaveState = useCallback(
+    (deviceId: string, state: AutosaveState, nextError: string | null = null) => {
+      setDeviceSaveStates((current) => ({
+        ...current,
+        [deviceId]: state,
+      }));
+      setDeviceSaveErrors((current) => ({
+        ...current,
+        [deviceId]: nextError,
+      }));
+    },
+    [],
+  );
+
+  const saveCalendarFeeds = useCallback(async () => {
     const token = getAuthToken();
     if (!token) {
       navigate("/admin/login", { replace: true });
       return;
     }
-
-    const normalizedPayload: CalendarFeedsConfig = {
-      feeds: calendarFeedsConfig.feeds.map((feed) => ({
-        ...feed,
-        id: normalizeCalendarFeedId(feed.id),
-        name: feed.name.trim().slice(0, 80),
-        url: feed.url.trim(),
-        color: feed.color,
-      })),
-    };
+    if (!calendarFeedsValidation.success) {
+      setCalendarFeedsSaveState("error");
+      setCalendarFeedsSaveError(
+        calendarFeedsValidation.error.issues[0]?.message ?? "Calendar feeds are not valid yet.",
+      );
+      return;
+    }
 
     try {
-      setCalendarFeedsBusy(true);
-      setError(null);
-      const saved = await updateCalendarFeeds(token, normalizedPayload);
-      setCalendarFeedsConfig(saved);
+      setCalendarFeedsSaveState("saving");
+      setCalendarFeedsSaveError(null);
+      const saved = await updateCalendarFeeds(token, calendarFeedsValidation.data);
       setSavedCalendarFeedsConfig(saved);
+      setCalendarFeedsConfig((current) =>
+        JSON.stringify(current) === JSON.stringify(calendarFeedsValidation.data) ? saved : current,
+      );
+      setCalendarFeedsSaveState("saved");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Failed to update calendar feeds");
-    } finally {
-      setCalendarFeedsBusy(false);
+      setCalendarFeedsSaveState("error");
+      setCalendarFeedsSaveError(
+        saveError instanceof Error ? saveError.message : "Failed to update calendar feeds",
+      );
     }
-  };
+  }, [calendarFeedsValidation, navigate]);
 
   const updateDraft = (deviceId: string, updater: (current: DeviceDraft) => DeviceDraft) => {
     setDrafts((current) => {
@@ -540,40 +649,67 @@ export const AdminDevicesPage = () => {
     });
   };
 
-  const onSaveDevice = async (deviceId: string) => {
-    const token = getAuthToken();
-    if (!token) {
-      navigate("/admin/login", { replace: true });
-      return;
-    }
+  const onSaveDevice = useCallback(
+    async (deviceId: string, draftOverride?: DeviceDraft) => {
+      const token = getAuthToken();
+      if (!token) {
+        navigate("/admin/login", { replace: true });
+        return;
+      }
 
-    const draft = drafts[deviceId];
-    if (!draft) {
-      return;
-    }
+      const draft = draftOverride ?? drafts[deviceId];
+      if (!draft) {
+        return;
+      }
 
-    try {
-      setBusyDeviceState({ deviceId, action: "save" });
-      setError(null);
-      const updated = await updateDisplayDevice(token, deviceId, toUpdatePayload(draft));
-      setDevices((current) =>
-        current.map((device) => (device.id === updated.id ? updated : device)),
-      );
-      setDrafts((current) => ({
-        ...current,
-        [updated.id]: toDeviceDraft({
-          device: updated,
-          availableSetIds,
-          availableLayoutNames,
-          firstAvailableSetId,
-        }),
-      }));
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Failed to update device");
-    } finally {
-      setBusyDeviceState((current) => (current?.deviceId === deviceId ? null : current));
-    }
-  };
+      try {
+        setBusyDeviceState({ deviceId, action: "save" });
+        setDeviceSaveState(deviceId, "saving");
+        const updated = await updateDisplayDevice(token, deviceId, toUpdatePayload(draft));
+        setDevices((current) =>
+          current.map((device) => (device.id === updated.id ? updated : device)),
+        );
+        setDrafts((current) => {
+          const currentDraft = current[updated.id];
+          const normalizedSavedDraft = toDeviceDraft({
+            device: updated,
+            availableSetIds,
+            availableLayoutNames,
+            firstAvailableSetId,
+          });
+          if (
+            currentDraft &&
+            JSON.stringify(toUpdatePayload(currentDraft)) !==
+              JSON.stringify(toUpdatePayload(normalizedSavedDraft))
+          ) {
+            return current;
+          }
+
+          return {
+            ...current,
+            [updated.id]: normalizedSavedDraft,
+          };
+        });
+        setDeviceSaveState(deviceId, "saved");
+      } catch (saveError) {
+        setDeviceSaveState(
+          deviceId,
+          "error",
+          saveError instanceof Error ? saveError.message : "Failed to update device",
+        );
+      } finally {
+        setBusyDeviceState((current) => (current?.deviceId === deviceId ? null : current));
+      }
+    },
+    [
+      availableLayoutNames,
+      availableSetIds,
+      drafts,
+      firstAvailableSetId,
+      navigate,
+      setDeviceSaveState,
+    ],
+  );
 
   const onDeleteDevice = async (device: DisplayDevice) => {
     const token = getAuthToken();
@@ -599,12 +735,193 @@ export const AdminDevicesPage = () => {
         delete nextDrafts[device.id];
         return nextDrafts;
       });
+      setDeviceSaveStates((current) => {
+        const next = { ...current };
+        delete next[device.id];
+        return next;
+      });
+      setDeviceSaveErrors((current) => {
+        const next = { ...current };
+        delete next[device.id];
+        return next;
+      });
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Failed to delete device");
     } finally {
       setBusyDeviceState((current) => (current?.deviceId === device.id ? null : current));
     }
   };
+
+  const resetDeviceDraft = (device: DisplayDevice) => {
+    setDrafts((current) => ({
+      ...current,
+      [device.id]: toDeviceDraft({
+        device,
+        availableSetIds,
+        availableLayoutNames,
+        firstAvailableSetId,
+      }),
+    }));
+    setDeviceSaveState(device.id, "idle");
+  };
+
+  useEffect(() => {
+    if (siteTimeAutosaveTimerRef.current !== null) {
+      window.clearTimeout(siteTimeAutosaveTimerRef.current);
+      siteTimeAutosaveTimerRef.current = null;
+    }
+
+    if (!token || !siteTimeDirty) {
+      return;
+    }
+
+    if (!siteTimeZoneIsValid) {
+      setSiteTimeSaveState("error");
+      setSiteTimeSaveError("Enter a valid IANA timezone such as Australia/Perth.");
+      return;
+    }
+
+    siteTimeAutosaveTimerRef.current = window.setTimeout(() => {
+      void (async () => {
+        try {
+          setSiteTimeSaveState("saving");
+          setSiteTimeSaveError(null);
+          const savedTimeZone = siteTimeZoneDraft.trim();
+          const updated = await updateSiteTimeConfig(token, {
+            siteTimezone: savedTimeZone,
+          });
+          setSiteTimeConfig(updated);
+          setSiteTimeZoneDraft((current) =>
+            current.trim() === savedTimeZone ? updated.siteTimezone : current,
+          );
+          setSiteTimeSaveState("saved");
+        } catch (saveError) {
+          setSiteTimeSaveState("error");
+          setSiteTimeSaveError(
+            saveError instanceof Error ? saveError.message : "Failed to update household time",
+          );
+        }
+      })();
+    }, AUTOSAVE_DELAY_MS);
+
+    return () => {
+      if (siteTimeAutosaveTimerRef.current !== null) {
+        window.clearTimeout(siteTimeAutosaveTimerRef.current);
+        siteTimeAutosaveTimerRef.current = null;
+      }
+    };
+  }, [siteTimeDirty, siteTimeZoneDraft, siteTimeZoneIsValid, token]);
+
+  useEffect(() => {
+    if (calendarFeedsAutosaveTimerRef.current !== null) {
+      window.clearTimeout(calendarFeedsAutosaveTimerRef.current);
+      calendarFeedsAutosaveTimerRef.current = null;
+    }
+
+    if (!token || !calendarFeedsDirty) {
+      return;
+    }
+
+    if (!calendarFeedsValidation.success) {
+      setCalendarFeedsSaveState("error");
+      setCalendarFeedsSaveError(
+        calendarFeedsValidation.error.issues[0]?.message ?? "Calendar feeds are not valid yet.",
+      );
+      return;
+    }
+
+    calendarFeedsAutosaveTimerRef.current = window.setTimeout(() => {
+      void saveCalendarFeeds();
+    }, AUTOSAVE_DELAY_MS);
+
+    return () => {
+      if (calendarFeedsAutosaveTimerRef.current !== null) {
+        window.clearTimeout(calendarFeedsAutosaveTimerRef.current);
+        calendarFeedsAutosaveTimerRef.current = null;
+      }
+    };
+  }, [calendarFeedsDirty, calendarFeedsValidation, saveCalendarFeeds, token]);
+
+  useEffect(() => {
+    const activeDeviceIds = new Set(devices.map((device) => device.id));
+    for (const [deviceId, timerId] of Object.entries(deviceAutosaveTimerRef.current)) {
+      if (activeDeviceIds.has(deviceId)) {
+        continue;
+      }
+      window.clearTimeout(timerId);
+      delete deviceAutosaveTimerRef.current[deviceId];
+    }
+
+    if (!token) {
+      return;
+    }
+
+    for (const device of devices) {
+      const draft =
+        drafts[device.id] ??
+        toDeviceDraft({
+          device,
+          availableSetIds,
+          availableLayoutNames,
+          firstAvailableSetId,
+        });
+      const payload = toUpdatePayload({
+        ...draft,
+        name: draft.name.trim().length > 0 ? draft.name : device.name,
+      });
+      const baselinePayload = toUpdatePayload(
+        toDeviceDraft({
+          device,
+          availableSetIds,
+          availableLayoutNames,
+          firstAvailableSetId,
+        }),
+      );
+      const isValidDraft = hasValidRoutingTarget(draft);
+      const isDirty = JSON.stringify(payload) !== JSON.stringify(baselinePayload);
+      const isBusy = busyDeviceState?.deviceId === device.id;
+
+      if (deviceAutosaveTimerRef.current[device.id]) {
+        window.clearTimeout(deviceAutosaveTimerRef.current[device.id]);
+        delete deviceAutosaveTimerRef.current[device.id];
+      }
+
+      if (!isDirty) {
+        continue;
+      }
+
+      if (!isValidDraft) {
+        setDeviceSaveState(device.id, "error", "Choose a valid routing target first.");
+        continue;
+      }
+
+      if (isBusy) {
+        continue;
+      }
+
+      deviceAutosaveTimerRef.current[device.id] = window.setTimeout(() => {
+        delete deviceAutosaveTimerRef.current[device.id];
+        void onSaveDevice(device.id, draft);
+      }, AUTOSAVE_DELAY_MS);
+    }
+
+    return () => {
+      for (const timerId of Object.values(deviceAutosaveTimerRef.current)) {
+        window.clearTimeout(timerId);
+      }
+      deviceAutosaveTimerRef.current = {};
+    };
+  }, [
+    availableLayoutNames,
+    availableSetIds,
+    busyDeviceState,
+    devices,
+    drafts,
+    firstAvailableSetId,
+    onSaveDevice,
+    setDeviceSaveState,
+    token,
+  ]);
 
   return (
     <PageShell
@@ -618,26 +935,24 @@ export const AdminDevicesPage = () => {
         </p>
       ) : null}
 
-      <section className="mb-6 rounded-xl border border-slate-700 bg-slate-900/70 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-100">Household time</h2>
-            <p className="mt-1 text-sm text-slate-400">
-              This timezone controls chores, clocks, time gates, and verse-of-the-day.
-            </p>
-          </div>
-          <div className="rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300/90">
-              Current time
-            </p>
-            <p className="mt-2 text-base font-semibold text-slate-100">
-              {formatDateTimeAtTimeZone(householdNowMs, siteTimeConfig.siteTimezone)}
-            </p>
-            <p className="mt-1 text-xs text-slate-400">
-              {siteTimeConfig.siteTimezone} · {householdTimeStatusLabel}
-            </p>
-          </div>
-        </div>
+      <AdminSection className="mb-6">
+        <AdminSectionHeader
+          title="Household time"
+          description="This timezone controls chores, clocks, time gates, and verse-of-the-day."
+          meta={
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300/90">
+                Current time
+              </p>
+              <p className="mt-2 text-base font-semibold text-slate-100">
+                {formatDateTimeAtTimeZone(householdNowMs, siteTimeConfig.siteTimezone)}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                {siteTimeConfig.siteTimezone} · {householdTimeStatusLabel}
+              </p>
+            </div>
+          }
+        />
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
           <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
@@ -667,26 +982,30 @@ export const AdminDevicesPage = () => {
                 >
                   Use browser timezone
                 </button>
-                <button
-                  type="button"
-                  disabled={
-                    siteTimeBusy ||
-                    !siteTimeZoneIsValid ||
-                    siteTimeZoneDraft.trim() === siteTimeConfig.siteTimezone
-                  }
-                  onClick={() => void onSaveSiteTime()}
-                  className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {siteTimeBusy ? "Saving..." : "Save timezone"}
-                </button>
               </div>
 
               <p className="text-xs text-slate-400">
                 Use an IANA timezone like `Australia/Perth` or `America/New_York`.
               </p>
-              {!siteTimeZoneIsValid ? (
-                <p className="text-xs text-amber-200">Enter a valid IANA timezone before saving.</p>
-              ) : null}
+              <p
+                className={`text-xs ${
+                  siteTimeSaveState === "error"
+                    ? "text-amber-200"
+                    : siteTimeSaveState === "saved"
+                      ? "text-emerald-200"
+                      : "text-slate-400"
+                }`}
+              >
+                {siteTimeZoneIsValid
+                  ? autosaveStatusText({
+                      state: siteTimeSaveState,
+                      dirty: siteTimeDirty,
+                      error: siteTimeSaveError,
+                      idleLabel: "Timezone changes save automatically.",
+                      savedLabel: "Timezone saved.",
+                    })
+                  : "Enter a valid IANA timezone such as Australia/Perth."}
+              </p>
             </div>
           </article>
 
@@ -708,19 +1027,13 @@ export const AdminDevicesPage = () => {
             </dl>
           </article>
         </div>
-      </section>
+      </AdminSection>
 
-      <section className="mb-6 rounded-xl border border-slate-700 bg-slate-900/70 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-100">Calendar feeds</h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Store ICS feed URLs once here, then choose them from each calendar module by ID. Feed
-              URLs stay admin-only; layouts and displays only reference saved feed IDs plus optional
-              label and colour overrides.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+      <AdminSection className="mb-6">
+        <AdminSectionHeader
+          title="Calendar feeds"
+          description="Store ICS feed URLs once here, then choose them from each calendar module by ID. Feed URLs stay admin-only; layouts and displays only reference saved feed IDs plus optional label and colour overrides."
+          actions={
             <button
               type="button"
               onClick={addCalendarFeedDraft}
@@ -728,16 +1041,25 @@ export const AdminDevicesPage = () => {
             >
               Add feed
             </button>
-            <button
-              type="button"
-              disabled={calendarFeedsBusy || !calendarFeedsDirty}
-              onClick={() => void onSaveCalendarFeeds()}
-              className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {calendarFeedsBusy ? "Saving..." : "Save feeds"}
-            </button>
-          </div>
-        </div>
+          }
+        />
+        <p
+          className={`mt-3 text-xs ${
+            calendarFeedsSaveState === "error"
+              ? "text-amber-200"
+              : calendarFeedsSaveState === "saved"
+                ? "text-emerald-200"
+                : "text-slate-400"
+          }`}
+        >
+          {autosaveStatusText({
+            state: calendarFeedsSaveState,
+            dirty: calendarFeedsDirty,
+            error: calendarFeedsSaveError,
+            idleLabel: "Feed edits save automatically.",
+            savedLabel: "Feeds saved.",
+          })}
+        </p>
 
         {calendarFeedsConfig.feeds.length === 0 ? (
           <p className="mt-4 rounded border border-slate-700/80 bg-slate-950/60 px-3 py-3 text-sm text-slate-400">
@@ -844,27 +1166,22 @@ export const AdminDevicesPage = () => {
             ))}
           </div>
         )}
-      </section>
+      </AdminSection>
 
-      <section className="mb-6 rounded-xl border border-slate-700 bg-slate-900/70 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-100">Connected displays</h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Displays appear here after they open the dashboard once. Give each one a custom name
-              so it is easy to tell your screens apart. If multiple screens share the same bridge or
-              proxy IP, the detected device details below are a better identifier than `Last seen
-              IP`.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void loadData()}
-            className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
-          >
-            Refresh
-          </button>
-        </div>
+      <AdminSection className="mb-6">
+        <AdminSectionHeader
+          title="Connected displays"
+          description="Displays appear here after they open the dashboard once. Give each one a clear name so it is easy to tell your screens apart. If multiple screens share the same bridge or proxy IP, the detected device details below are a better identifier than Last seen IP."
+          actions={
+            <button
+              type="button"
+              onClick={() => void loadData()}
+              className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
+            >
+              Refresh
+            </button>
+          }
+        />
         {devices.length === 0 ? (
           <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-6 text-slate-300">
             No displays have checked in yet.
@@ -897,16 +1214,15 @@ export const AdminDevicesPage = () => {
               const isBusy = busyDeviceState?.deviceId === device.id;
               const isSaving = isBusy && busyDeviceState?.action === "save";
               const isDeleting = isBusy && busyDeviceState?.action === "delete";
+              const deviceSaveState = deviceSaveStates[device.id] ?? "idle";
+              const deviceSaveError = deviceSaveErrors[device.id] ?? null;
               const isSharedIp =
                 device.lastSeenIp !== null && (sharedIpCounts.get(device.lastSeenIp) ?? 0) > 1;
               const detectedEnvironment = formatDeviceEnvironment(device.deviceInfo);
               const detectedViewport = formatViewport(device.deviceInfo);
 
               return (
-                <article
-                  key={device.id}
-                  className="rounded-xl border border-slate-700 bg-slate-900/70 p-4"
-                >
+                <AdminSection key={device.id} as="article">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h2 className="text-lg font-semibold text-slate-100">{device.name}</h2>
@@ -933,6 +1249,16 @@ export const AdminDevicesPage = () => {
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                      {isDirty ? (
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => resetDeviceDraft(device)}
+                          className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Reset
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         disabled={isBusy}
@@ -941,16 +1267,27 @@ export const AdminDevicesPage = () => {
                       >
                         {isDeleting ? "Removing..." : "Remove device"}
                       </button>
-                      <button
-                        type="button"
-                        disabled={!isDirty || !isValidDraft || isBusy}
-                        onClick={() => void onSaveDevice(device.id)}
-                        className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {isSaving ? "Saving..." : "Save changes"}
-                      </button>
                     </div>
                   </div>
+                  <p
+                    className={`mt-3 text-xs ${
+                      deviceSaveState === "error"
+                        ? "text-amber-200"
+                        : deviceSaveState === "saved"
+                          ? "text-emerald-200"
+                          : "text-slate-400"
+                    }`}
+                  >
+                    {autosaveStatusText({
+                      state: isSaving ? "saving" : deviceSaveState,
+                      dirty: isDirty,
+                      error: deviceSaveError,
+                      idleLabel: isValidDraft
+                        ? "Display edits save automatically."
+                        : "Choose a valid routing target first.",
+                      savedLabel: "Display saved.",
+                    })}
+                  </p>
 
                   <div className="mt-4 grid gap-4 lg:grid-cols-2">
                     <label className="flex flex-col gap-2 text-sm text-slate-300">
@@ -1078,20 +1415,125 @@ export const AdminDevicesPage = () => {
                       </label>
                     )}
                   </div>
-                </article>
+                </AdminSection>
               );
             })}
           </div>
         )}
-      </section>
+      </AdminSection>
 
-      <section className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-100">Runtime details</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Only needed when checking what build is actually running.
-          </p>
+      <AdminSection className="mb-6">
+        <AdminSectionHeader
+          title="Operational health"
+          description="Quick diagnostics for display check-ins, calendar cache warmth, and automatic backups."
+        />
+
+        <div className="mt-4 grid gap-4 xl:grid-cols-4">
+          <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+            <h3 className="text-sm font-semibold text-slate-100">Displays</h3>
+            <dl className="mt-3 space-y-3 text-sm text-slate-300">
+              <div>
+                <dt className="text-slate-500">Total devices</dt>
+                <dd>{deviceHealthSummary.total}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Recent check-ins</dt>
+                <dd>{deviceHealthSummary.recentCount} in the last 15 min</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Stale devices</dt>
+                <dd>{deviceHealthSummary.staleCount} over 1 hr old</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Latest device seen</dt>
+                <dd>{formatTimestamp(deviceHealthSummary.latestSeenAt)}</dd>
+              </div>
+            </dl>
+          </article>
+
+          <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+            <h3 className="text-sm font-semibold text-slate-100">Calendar cache</h3>
+            <dl className="mt-3 space-y-3 text-sm text-slate-300">
+              <div>
+                <dt className="text-slate-500">Enabled feeds</dt>
+                <dd>
+                  {serverStatus?.diagnostics.calendar.enabledFeedCount ?? 0} of{" "}
+                  {serverStatus?.diagnostics.calendar.configuredFeedCount ?? 0}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Warm source cache</dt>
+                <dd>{serverStatus?.diagnostics.calendar.memoryCacheEntries ?? 0} sources</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">In-flight refreshes</dt>
+                <dd>{serverStatus?.diagnostics.calendar.inFlightRefreshes ?? 0}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Last prefetch</dt>
+                <dd>
+                  {formatTimestamp(
+                    serverStatus?.diagnostics.calendar.lastPrefetchCompletedAt ?? null,
+                  )}
+                </dd>
+              </div>
+            </dl>
+          </article>
+
+          <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+            <h3 className="text-sm font-semibold text-slate-100">Backups</h3>
+            <dl className="mt-3 space-y-3 text-sm text-slate-300">
+              <div>
+                <dt className="text-slate-500">Latest backup</dt>
+                <dd>{formatTimestamp(serverStatus?.diagnostics.backup.latestBackupAt ?? null)}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Retained backups</dt>
+                <dd>{serverStatus?.diagnostics.backup.backupCount ?? 0}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Backup interval</dt>
+                <dd>
+                  {formatDurationMinutes(serverStatus?.diagnostics.backup.intervalMinutes ?? 0)} ·
+                  keep {serverStatus?.diagnostics.backup.retentionDays ?? 0} days
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Backup health</dt>
+                <dd className={serverStatus?.diagnostics.backup.lastError ? "text-amber-200" : ""}>
+                  {serverStatus?.diagnostics.backup.lastError ?? "Healthy"}
+                </dd>
+              </div>
+            </dl>
+          </article>
+
+          <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+            <h3 className="text-sm font-semibold text-slate-100">Storage</h3>
+            <dl className="mt-3 space-y-3 text-sm text-slate-300">
+              <div>
+                <dt className="text-slate-500">Database size</dt>
+                <dd>
+                  {formatBytes(serverStatus?.diagnostics.storage.databaseFileSizeBytes ?? null)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Database updated</dt>
+                <dd>
+                  {formatTimestamp(
+                    serverStatus?.diagnostics.storage.databaseLastModifiedAt ?? null,
+                  )}
+                </dd>
+              </div>
+            </dl>
+          </article>
         </div>
+      </AdminSection>
+
+      <AdminSection>
+        <AdminSectionHeader
+          title="Runtime details"
+          description="Only needed when checking what build is actually running."
+        />
 
         {serverStatusError ? (
           <p className="mt-4 rounded border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
@@ -1121,7 +1563,7 @@ export const AdminDevicesPage = () => {
             </div>
           </dl>
         </article>
-      </section>
+      </AdminSection>
     </PageShell>
   );
 };

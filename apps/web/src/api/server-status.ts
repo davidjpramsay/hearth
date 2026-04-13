@@ -21,6 +21,28 @@ export const serverStatusResponseSchema = z.object({
       defaultSiteTimeZone: z.string().nullable(),
     })
     .optional(),
+  diagnostics: z.object({
+    backup: z.object({
+      running: z.boolean(),
+      latestBackupAt: z.string().nullable(),
+      backupCount: z.number().nonnegative(),
+      intervalMinutes: z.number().nonnegative(),
+      retentionDays: z.number().nonnegative(),
+      lastError: z.string().nullable(),
+    }),
+    calendar: z.object({
+      configuredFeedCount: z.number().nonnegative(),
+      enabledFeedCount: z.number().nonnegative(),
+      memoryCacheEntries: z.number().nonnegative(),
+      inFlightRefreshes: z.number().nonnegative(),
+      lastPrefetchAttemptAt: z.string().nullable(),
+      lastPrefetchCompletedAt: z.string().nullable(),
+    }),
+    storage: z.object({
+      databaseFileSizeBytes: z.number().nonnegative().nullable(),
+      databaseLastModifiedAt: z.string().nullable(),
+    }),
+  }),
   build: z.object({
     serverEntrySha1: z.string().nullable(),
     serverEntryBuiltAt: z.string().nullable(),

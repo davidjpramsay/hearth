@@ -209,6 +209,8 @@ export const moduleDefinition = defineModule({
           loading={warningState.loading}
           error={warningState.error}
           disconnected={warningState.isDisconnected}
+          disconnectedTitle={warningState.disconnectedTitle}
+          disconnectedLabel={warningState.disconnectedLabel}
           lastUpdatedMs={warningState.lastUpdatedMs}
           statusLabel={payload.warnings.length > 0 ? `${payload.warnings.length} active` : "Clear"}
           empty={!warningState.loading && !warningState.error && payload.warnings.length === 0}

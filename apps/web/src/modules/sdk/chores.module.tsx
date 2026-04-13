@@ -23,6 +23,7 @@ import {
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
+import { ModuleSkeleton } from "../ui/ModuleSkeleton";
 
 const CHORES_SNAPSHOT_MAX_AGE_MS = 36 * 60 * 60 * 1000;
 
@@ -388,7 +389,11 @@ export const moduleDefinition = defineModule({
 
       return (
         <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 p-2 text-slate-100">
-          <ModuleConnectionBadge visible={connectivityState.showDisconnected} />
+          <ModuleConnectionBadge
+            visible={connectivityState.showDisconnected}
+            title={connectivityState.disconnectedTitle ?? undefined}
+            label={connectivityState.disconnectedLabel}
+          />
           <header className="mb-2 flex items-center justify-between rounded border border-slate-700 bg-slate-900/80 px-3 py-2">
             <p className="module-copy-title text-slate-100">Today&apos;s Chores</p>
             <p className="module-copy-meta text-slate-300">
@@ -396,7 +401,7 @@ export const moduleDefinition = defineModule({
             </p>
           </header>
 
-          {loading ? <p className="module-copy-meta text-slate-300">Loading chores...</p> : null}
+          {loading ? <ModuleSkeleton variant="list" /> : null}
           {!loading && connectivityState.blockingError ? (
             <p className="module-copy-meta rounded border border-rose-500/60 bg-rose-500/10 px-2 py-1 text-rose-200">
               {connectivityState.blockingError}

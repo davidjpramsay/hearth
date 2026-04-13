@@ -191,6 +191,8 @@ const materializeSourceEvents = (
 export class CalendarFeedService {
   private readonly sourceCache = new Map<string, SourceCacheEntry>();
   private readonly inFlightSourceLoads = new Map<string, Promise<SourceLoadResult>>();
+  private lastPrefetchAttemptAtMs: number | null = null;
+  private lastPrefetchCompletedAtMs: number | null = null;
 
   constructor(
     private readonly moduleStateRepository: ModuleStateRepository | null = null,
@@ -198,6 +200,7 @@ export class CalendarFeedService {
   ) {}
 
   async prefetchConfiguredFeeds(calendarFeedsConfig?: CalendarFeedsConfig): Promise<void> {
+    this.lastPrefetchAttemptAtMs = Date.now();
     const configuredFeeds =
       calendarFeedsConfig ??
       this.settingsRepository?.getCalendarFeeds() ??
@@ -215,6 +218,7 @@ export class CalendarFeedService {
         refreshMs: 0,
       }).catch(() => null),
     );
+    this.lastPrefetchCompletedAtMs = Date.now();
   }
 
   async getUpcomingEvents(rawConfig: unknown): Promise<CalendarModuleEventsResponse> {
@@ -580,5 +584,32 @@ export class CalendarFeedService {
       allDay: input.allDay,
       location: input.location,
     });
+  }
+
+  getDiagnostics(): {
+    configuredFeedCount: number;
+    enabledFeedCount: number;
+    memoryCacheEntries: number;
+    inFlightRefreshes: number;
+    lastPrefetchAttemptAt: string | null;
+    lastPrefetchCompletedAt: string | null;
+  } {
+    const configuredFeeds =
+      this.settingsRepository?.getCalendarFeeds() ?? calendarFeedsConfigSchema.parse({});
+
+    return {
+      configuredFeedCount: configuredFeeds.feeds.length,
+      enabledFeedCount: configuredFeeds.feeds.filter((feed) => feed.enabled).length,
+      memoryCacheEntries: this.sourceCache.size,
+      inFlightRefreshes: this.inFlightSourceLoads.size,
+      lastPrefetchAttemptAt:
+        this.lastPrefetchAttemptAtMs === null
+          ? null
+          : new Date(this.lastPrefetchAttemptAtMs).toISOString(),
+      lastPrefetchCompletedAt:
+        this.lastPrefetchCompletedAtMs === null
+          ? null
+          : new Date(this.lastPrefetchCompletedAtMs).toISOString(),
+    };
   }
 }

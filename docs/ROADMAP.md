@@ -140,6 +140,13 @@ Scope:
 - Draft recovery for interrupted graph edits.
 - Tighter first-run empty states and guidance.
 
+Status:
+
+- Undo/redo is implemented.
+- Selected-node status and connection guidance are implemented.
+- Local draft recovery and first-run starter actions are implemented.
+- Remaining work is mostly interaction polish and broader regression coverage.
+
 ### 2. Planner display polish
 
 Goal: make the School display module feel production-finished on wall displays.
@@ -151,6 +158,13 @@ Scope:
 - Improve long-title and note overflow.
 - Tune portrait density and compact mode behavior.
 
+Status:
+
+- Row height scaling is implemented.
+- Notes now render with normal body copy styling instead of all-caps metadata styling.
+- Current-time and next-up emphasis is implemented in the runtime view.
+- Remaining work is portrait-density tuning and any future compact-mode option.
+
 ### 3. Admin autosave consistency
 
 Goal: make admin edits feel consistent across settings-heavy screens.
@@ -160,6 +174,12 @@ Scope:
 - Prefer autosave for low-risk changes.
 - Reserve explicit save buttons for structural or destructive edits.
 - Standardize saving/saved/error status affordances.
+
+Status:
+
+- Settings now autosaves household timezone, calendar feeds, and per-display assignment/theme edits.
+- Structural and destructive actions such as create, remove, and delete remain explicit.
+- Remaining work is to spread the same status language to any other low-risk admin forms that still feel inconsistent.
 
 ### 4. Offline and degraded-state polish
 
@@ -171,6 +191,12 @@ Scope:
 - Show when a tile is rendering cached data.
 - Improve first-boot empty states.
 
+Status:
+
+- Shared connectivity handling now distinguishes between offline-with-cache, cached-but-disconnected, and first-sync blocking failures.
+- Dashboard and modules now surface `Offline` / `Cached` badges instead of only generic disconnected icons.
+- Remaining work is mostly broader empty-state design and any deeper per-module stale indicators.
+
 ### 5. Theme system refinement
 
 Goal: make palette-slot themes feel more intentional and less purely generated.
@@ -180,6 +206,13 @@ Scope:
 - Tune the 12-slot palette per theme.
 - Tighten contrast rules for pale slots.
 - Add a few stronger curated theme presets.
+
+Status:
+
+- Theme palettes are now curated per theme instead of being driven only by hue offsets from a primary colour.
+- Palette slots are contrast-adjusted so every slot keeps a readable foreground.
+- Two stronger presets were added: `Forest` and `Ember`.
+- Remaining work is mostly aesthetic tuning rather than core system changes.
 
 ### 6. Admin UI consistency pass
 
@@ -191,6 +224,12 @@ Scope:
 - Standardize button/chip/input sizing.
 - Trim low-value explanatory text.
 
+Status:
+
+- Settings, Children, Chores, and School now share the same section-card and section-header framing.
+- Chores has been moved onto the same button, field, panel, and helper-text sizing used by the newer admin screens.
+- Remaining work is mostly final copy tightening and any small one-off control sizing that still feels out of family.
+
 ### 7. Module loading and transition polish
 
 Goal: improve perceived quality on low-power display hardware.
@@ -199,6 +238,12 @@ Scope:
 
 - Better module skeleton states.
 - Smoother state transitions between loading/ready/stale states.
+
+Status:
+
+- Shared skeleton states now cover the main display modules instead of dropping to plain `Loading ...` copy.
+- The loading treatment is now consistent across chores, weather, calendar, photos, bible verse, and School planner.
+- Remaining work is mostly transition tuning between loading, cached, and ready states rather than first-pass placeholders.
 
 ### 8. Operational observability
 
@@ -211,6 +256,13 @@ Scope:
 - Cache/feed status summaries.
 - Stale device detection.
 
+Status:
+
+- Settings now shows an operational health summary for display check-ins, stale devices, calendar cache warmth, and automatic backup status.
+- Backup diagnostics now report latest backup time, retained backup count, schedule, and the most recent backup error if one occurred.
+- Calendar diagnostics now report enabled feed count, warm in-memory source cache count, in-flight refreshes, and last prefetch completion time.
+- Remaining work is deeper per-module refresh visibility if you decide you want a fuller monitoring view later.
+
 ### 9. Safer migrations and backup visibility
 
 Goal: make persistence and recovery more transparent to operators.
@@ -221,6 +273,12 @@ Scope:
 - DB/migration status.
 - Clear export/import story for household state.
 
+Status:
+
+- Backup visibility is now in Settings through the operational health panel, including latest backup time, retained backup count, schedule, and last backup error.
+- Storage visibility now includes database size and last-modified time, so operators can confirm the install is writing state without shell access.
+- Remaining work is explicit migration/version reporting and a real export/import flow for household state.
+
 ### 10. Public docs media polish
 
 Goal: improve first-run comprehension for new users and contributors.
@@ -230,3 +288,9 @@ Scope:
 - Short demo video.
 - Selected screenshots for key admin pages.
 - A simple “how Hearth works” flow diagram.
+
+Status:
+
+- The docs site homepage now has a dedicated demo-video slot and clearer install-path entry points.
+- Media asset folders are prepared so screenshots and the final demo video can be dropped into the docs publishing path later.
+- Remaining work is the actual media creation: the final video, selected screenshots, and the flow diagram artwork.

@@ -2770,7 +2770,14 @@ export const reportScreenTargetSelectionSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 
-export const displayThemeIdSchema = z.enum(["default", "nord", "solarized", "monokai"]);
+export const displayThemeIdSchema = z.enum([
+  "default",
+  "nord",
+  "solarized",
+  "monokai",
+  "forest",
+  "ember",
+]);
 
 export const displayDeviceIdSchema = z.string().trim().min(1).max(128);
 export const displayDeviceNameSchema = z.string().trim().min(1).max(80);

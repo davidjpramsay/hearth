@@ -11,6 +11,16 @@ import { logoutAdminSession } from "../auth/session";
 import { getAuthToken } from "../auth/storage";
 import { useNavigate } from "react-router-dom";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
+import {
+  AdminSection,
+  AdminSectionHeader,
+  ADMIN_BUTTON_DANGER_CLASS,
+  ADMIN_BUTTON_PRIMARY_CLASS,
+  ADMIN_BUTTON_SECONDARY_CLASS,
+  ADMIN_INPUT_CLASS,
+  ADMIN_META_TEXT_CLASS,
+  ADMIN_PANEL_CLASS,
+} from "../components/admin/AdminSection";
 import { PageShell } from "../components/PageShell";
 import { useModuleQuery } from "../modules/data/useModuleQuery";
 import {
@@ -368,65 +378,65 @@ export const AdminChoresPage = () => {
       rightActions={<AdminNavActions current="chores" onLogout={onLogout} />}
     >
       {activeError ? (
-        <p className="mb-4 rounded border border-rose-500/70 bg-rose-500/10 px-3 py-2 text-rose-200">
+        <p className="mb-4 rounded-xl border border-rose-500/70 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
           {activeError}
         </p>
       ) : null}
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <article className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-100">Shared children</h2>
-              <p className="mt-1 text-sm text-slate-300">
-                Child names and allowances are now managed in Admin &gt; Children.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigate("/children")}
-              className="rounded-lg border border-cyan-400/60 px-3 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300"
-            >
-              Open Children
-            </button>
-          </div>
+        <AdminSection as="article">
+          <AdminSectionHeader
+            title="Shared children"
+            description="Child names and allowances are managed in Admin > Children."
+            actions={
+              <button
+                type="button"
+                onClick={() => navigate("/children")}
+                className={ADMIN_BUTTON_SECONDARY_CLASS}
+              >
+                Open Children
+              </button>
+            }
+          />
 
           <div className="mt-4 space-y-2">
             {members.map((member) => (
               <div
                 key={member.id}
-                className="flex items-center justify-between rounded border border-slate-700 bg-slate-950/70 px-3 py-2"
+                className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-3"
               >
                 <div>
                   <p className="font-semibold text-slate-100">{member.name}</p>
-                  <p className="text-xs text-slate-300">
+                  <p className={ADMIN_META_TEXT_CLASS}>
                     Weekly allowance: ${member.weeklyAllowance.toFixed(2)}
                   </p>
                   {member.avatarUrl ? (
-                    <p className="text-xs text-slate-300">{member.avatarUrl}</p>
+                    <p className={ADMIN_META_TEXT_CLASS}>{member.avatarUrl}</p>
                   ) : null}
                 </div>
-                <span className="text-xs text-slate-400">Used in chores and school</span>
+                <span className={ADMIN_META_TEXT_CLASS}>Used in chores and school</span>
               </div>
             ))}
             {members.length === 0 ? (
-              <p className="rounded border border-slate-700 bg-slate-950/50 px-3 py-3 text-sm text-slate-300">
+              <p className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-3 text-sm text-slate-300">
                 Add a child in Admin &gt; Children before creating chores.
               </p>
             ) : null}
           </div>
-        </article>
+        </AdminSection>
 
-        <article className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">
-            {choreForm.id === null ? "Add chore" : "Edit chore"}
-          </h2>
+        <AdminSection as="article">
+          <AdminSectionHeader
+            title={choreForm.id === null ? "Add chore" : "Edit chore"}
+            description="Create recurring or one-off chores for any shared child."
+            compact
+          />
           <form onSubmit={onSubmitChore} className="space-y-3">
             <label className="block space-y-1">
               <span className="text-sm text-slate-300">Chore name</span>
               <input
                 required
-                className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
+                className={ADMIN_INPUT_CLASS}
                 value={choreForm.name}
                 onChange={(event) =>
                   setChoreForm((current) => ({ ...current, name: event.target.value }))
@@ -437,7 +447,7 @@ export const AdminChoresPage = () => {
               <span className="text-sm text-slate-300">Assigned to</span>
               <select
                 required
-                className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
+                className={ADMIN_INPUT_CLASS}
                 value={choreForm.memberId}
                 onChange={(event) =>
                   setChoreForm((current) => ({ ...current, memberId: event.target.value }))
@@ -455,7 +465,7 @@ export const AdminChoresPage = () => {
             <label className="block space-y-1">
               <span className="text-sm text-slate-300">Schedule type</span>
               <select
-                className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
+                className={ADMIN_INPUT_CLASS}
                 value={choreForm.scheduleType}
                 onChange={(event) =>
                   setChoreForm((current) => ({
@@ -475,7 +485,7 @@ export const AdminChoresPage = () => {
               <label className="block space-y-1">
                 <span className="text-sm text-slate-300">Day of week</span>
                 <select
-                  className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
+                  className={ADMIN_INPUT_CLASS}
                   value={choreForm.weeklyDay}
                   onChange={(event) =>
                     setChoreForm((current) => ({
@@ -533,7 +543,7 @@ export const AdminChoresPage = () => {
                 <span className="text-sm text-slate-300">Date</span>
                 <input
                   type="date"
-                  className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
+                  className={ADMIN_INPUT_CLASS}
                   value={choreForm.oneOffDate}
                   onChange={(event) =>
                     setChoreForm((current) => ({ ...current, oneOffDate: event.target.value }))
@@ -547,13 +557,13 @@ export const AdminChoresPage = () => {
                 <span className="text-sm text-slate-300">Starts on</span>
                 <input
                   type="date"
-                  className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
+                  className={ADMIN_INPUT_CLASS}
                   value={choreForm.startsOn}
                   onChange={(event) =>
                     setChoreForm((current) => ({ ...current, startsOn: event.target.value }))
                   }
                 />
-                <p className="text-xs text-slate-400">
+                <p className={ADMIN_META_TEXT_CLASS}>
                   Recurring chores only appear from this household date onward.
                 </p>
               </label>
@@ -565,7 +575,7 @@ export const AdminChoresPage = () => {
                 type="number"
                 min={0}
                 step="0.01"
-                className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
+                className={ADMIN_INPUT_CLASS}
                 value={choreForm.valueAmount}
                 onChange={(event) =>
                   setChoreForm((current) => ({ ...current, valueAmount: event.target.value }))
@@ -585,38 +595,38 @@ export const AdminChoresPage = () => {
             </label>
 
             <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={busy}
-                className="rounded bg-cyan-500 px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-60"
-              >
+              <button type="submit" disabled={busy} className={ADMIN_BUTTON_PRIMARY_CLASS}>
                 {choreForm.id === null ? "Create chore" : "Save chore"}
               </button>
               {choreForm.id !== null ? (
                 <button
                   type="button"
                   onClick={() => setChoreForm(emptyChoreForm(siteToday))}
-                  className="rounded border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-slate-300"
+                  className={ADMIN_BUTTON_SECONDARY_CLASS}
                 >
                   Cancel edit
                 </button>
               ) : null}
             </div>
           </form>
-        </article>
+        </AdminSection>
       </section>
 
-      <section className="mt-4 rounded-xl border border-slate-700 bg-slate-900/70 p-4">
-        <h2 className="mb-3 text-lg font-semibold text-slate-100">Chore list</h2>
+      <AdminSection className="mt-4">
+        <AdminSectionHeader
+          title="Chore list"
+          description="Edit or remove saved chores without leaving the page."
+          compact
+        />
         <div className="space-y-2">
           {chores.map((chore) => (
             <div
               key={chore.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-700 bg-slate-950/70 px-3 py-2"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-3"
             >
               <div>
                 <p className="font-semibold text-slate-100">{chore.name}</p>
-                <p className="text-xs text-slate-300">
+                <p className={ADMIN_META_TEXT_CLASS}>
                   {members.find((member) => member.id === chore.memberId)?.name ?? "Unknown child"}{" "}
                   | {scheduleLabel(chore)}
                   {chore.valueAmount !== null ? ` | $${chore.valueAmount.toFixed(2)}` : ""}
@@ -627,7 +637,7 @@ export const AdminChoresPage = () => {
                 <button
                   type="button"
                   onClick={() => loadChoreIntoForm(chore)}
-                  className="rounded border border-slate-500 px-2 py-1 text-xs text-slate-200 hover:border-slate-300"
+                  className={ADMIN_BUTTON_SECONDARY_CLASS}
                 >
                   Edit
                 </button>
@@ -654,7 +664,7 @@ export const AdminChoresPage = () => {
                       setBusy(false);
                     }
                   }}
-                  className="rounded border border-rose-500/70 px-2 py-1 text-xs text-rose-200 hover:bg-rose-500/20"
+                  className={ADMIN_BUTTON_DANGER_CLASS}
                 >
                   Delete
                 </button>
@@ -665,18 +675,22 @@ export const AdminChoresPage = () => {
             <p className="text-sm text-slate-300">No chores created yet.</p>
           ) : null}
         </div>
-      </section>
+      </AdminSection>
 
       <section className="mt-4 grid gap-4 lg:grid-cols-[2fr_1fr]">
-        <article className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+        <AdminSection as="article">
           <div className="mb-3 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-slate-100">Completion tracker</h2>
-              <p className="text-sm text-slate-300">
-                {formatDateLabel(currentWeekRange.startDate)} to{" "}
-                {formatDateLabel(currentWeekRange.endDate)}
-              </p>
-            </div>
+            <AdminSectionHeader
+              title="Completion tracker"
+              description="Toggle what was completed on each day of the current payout week."
+              meta={
+                <span>
+                  {formatDateLabel(currentWeekRange.startDate)} to{" "}
+                  {formatDateLabel(currentWeekRange.endDate)}
+                </span>
+              }
+              compact
+            />
 
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
               {weekDayButtons.map((day) => (
@@ -729,11 +743,11 @@ export const AdminChoresPage = () => {
               {choresOnSelectedDay.map((item) => (
                 <label
                   key={`${item.date}-${item.choreId}`}
-                  className="flex items-center justify-between rounded border border-slate-700 bg-slate-950/70 px-3 py-2"
+                  className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-3"
                 >
                   <div>
                     <p className="font-semibold text-slate-100">{item.choreName}</p>
-                    <p className="text-xs text-slate-300">
+                    <p className={ADMIN_META_TEXT_CLASS}>
                       {item.memberName}
                       {item.valueAmount !== null ? ` | $${item.valueAmount.toFixed(2)}` : ""}
                     </p>
@@ -754,15 +768,19 @@ export const AdminChoresPage = () => {
               ) : null}
             </div>
           ) : null}
-        </article>
+        </AdminSection>
 
-        <article className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">Weekly payout (per child)</h2>
-          <div className="mb-3 rounded border border-slate-700 bg-slate-950/70 px-3 py-2">
+        <AdminSection as="article">
+          <AdminSectionHeader
+            title="Weekly payout"
+            description="Allowance rules, payday, and the current per-child payout summary."
+            compact
+          />
+          <div className={`mb-3 mt-4 ${ADMIN_PANEL_CLASS}`}>
             <label className="block space-y-1">
               <span className="text-sm text-slate-300">Allowance rule</span>
               <select
-                className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-100"
+                className={ADMIN_INPUT_CLASS}
                 value={payoutConfig.mode}
                 onChange={(event) => {
                   void savePayoutConfig({
@@ -789,7 +807,7 @@ export const AdminChoresPage = () => {
             <label className="mt-2 block space-y-1">
               <span className="text-sm text-slate-300">Payday</span>
               <select
-                className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-100"
+                className={ADMIN_INPUT_CLASS}
                 value={payoutConfig.paydayDayOfWeek}
                 onChange={(event) => {
                   void savePayoutConfig({
@@ -812,12 +830,12 @@ export const AdminChoresPage = () => {
               <button
                 type="button"
                 onClick={() => navigate("/devices")}
-                className="rounded border border-slate-500 px-2 py-1 text-xs text-slate-200 hover:border-slate-300"
+                className={ADMIN_BUTTON_SECONDARY_CLASS}
               >
                 Settings
               </button>
             </div>
-            <p className="mt-2 text-xs text-slate-300">
+            <p className={`mt-2 ${ADMIN_META_TEXT_CLASS}`}>
               Week: {formatDateLabel(currentWeekRange.startDate)} to{" "}
               {formatDateLabel(currentWeekRange.endDate)}. Resets after payday.
             </p>
@@ -830,18 +848,18 @@ export const AdminChoresPage = () => {
             {(board?.stats.weeklyByMember ?? []).map((entry) => (
               <div
                 key={entry.memberId}
-                className="rounded border border-slate-700 bg-slate-950/70 px-3 py-2"
+                className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-3"
               >
                 <p className="font-semibold text-slate-100">{entry.memberName}</p>
-                <p className="text-xs text-slate-300">
+                <p className={ADMIN_META_TEXT_CLASS}>
                   Recurring completion: {entry.recurringCompletedCount}/
                   {entry.recurringScheduledCount} ({(entry.completionRatio * 100).toFixed(0)}%)
                 </p>
-                <p className="text-xs text-slate-300">
+                <p className={ADMIN_META_TEXT_CLASS}>
                   Allowance payout: ${entry.basePayout.toFixed(2)} / $
                   {entry.baseAllowance.toFixed(2)}
                 </p>
-                <p className="text-xs text-slate-300">
+                <p className={ADMIN_META_TEXT_CLASS}>
                   Bonus payout: ${entry.bonusPayout.toFixed(2)} | Total: $
                   {entry.payoutTotal.toFixed(2)}
                 </p>
@@ -851,7 +869,7 @@ export const AdminChoresPage = () => {
               <p className="text-sm text-slate-300">No child payouts yet this week.</p>
             ) : null}
           </div>
-        </article>
+        </AdminSection>
       </section>
     </PageShell>
   );

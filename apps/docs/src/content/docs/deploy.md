@@ -1,22 +1,37 @@
 ---
-title: "Deploy to Synology"
-description: "Production deployment currently revolves around publishing the image, pulling it on Synology, and recreating the compose service."
+title: "Install on common systems"
+description: "Use the shortest path that fits your target machine. Most production installs should use the published container image."
 ---
 
-Production deployment currently revolves around publishing the image, pulling it on Synology, and recreating the compose service.
+Use the shortest path that fits your target machine. Most production installs should use the published container image.
 
-The Synology project uses the checked-in compose template and persistent data volume for server state.
+Docker host: copy `.env.example` to `.env`, review the timezone and password values, then start `docker compose.yml`. This is the easiest general-purpose production install.
 
-A normal update path is publish image, pull on the NAS, recreate the container, and run a health check against the root app and server-status endpoint.
+Synology: copy `.env.synology.example` to your real env file, use `docker-compose.synology.yml`, and keep the `/volume1/docker/hearth/data` volume persistent. That is the supported NAS path.
 
-Timezone defaults should be set in the deployment environment as well as in admin settings so fresh containers do not silently fall back to UTC.
+Native Linux or Raspberry Pi: install Node and pnpm, copy `.env.example` to `.env`, run `pnpm install`, `pnpm build`, and `pnpm start`, then keep it alive with `systemd` or another service manager.
 
-### Supported deployment check path
+After the server starts, open `/admin/login`, sign in, set the household timezone, then load `/` on each display device once so it appears in Settings.
+
+Set both the deployment timezone env vars and the household timezone in admin so a fresh container does not fall back to UTC.
+
+## Key Points
+
+- Default runtime URL is `http://<host>:3000`.
+- Use `HOST=0.0.0.0` if devices on your LAN need to reach a native install.
+- Do not expose Hearth directly to the public internet.
+- Use `pnpm verify` before publishing or building a release image.
+
+### Docker or Synology update flow
 
 ```bash
 pnpm verify
 
-# then on Synology
+# Docker host
+docker compose pull
+docker compose up -d
+
+# Synology
 docker compose -f docker-compose.synology.yml pull
 docker compose -f docker-compose.synology.yml up -d
 docker compose -f docker-compose.synology.yml ps

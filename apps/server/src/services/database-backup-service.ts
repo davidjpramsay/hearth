@@ -35,6 +35,8 @@ export class DatabaseBackupService {
   };
   private timer: ReturnType<typeof setInterval> | null = null;
   private running = false;
+  private lastSuccessAt: string | null = null;
+  private lastError: string | null = null;
 
   constructor(
     private readonly db: Database.Database,
@@ -79,6 +81,7 @@ export class DatabaseBackupService {
       await this.createBackup();
       this.pruneOldBackups();
     } catch (error) {
+      this.lastError = error instanceof Error ? error.message : String(error);
       this.logger.error(
         `[backup] Failed backup cycle: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -94,6 +97,8 @@ export class DatabaseBackupService {
       `${BACKUP_FILE_PREFIX}${timestamp}${BACKUP_FILE_SUFFIX}`,
     );
     await this.db.backup(targetPath);
+    this.lastSuccessAt = new Date().toISOString();
+    this.lastError = null;
     this.logger.info(`[backup] Created ${targetPath}`);
   }
 
@@ -117,5 +122,34 @@ export class DatabaseBackupService {
         rmSync(fullPath);
       }
     }
+  }
+
+  getDiagnostics(): {
+    running: boolean;
+    latestBackupAt: string | null;
+    backupCount: number;
+    intervalMinutes: number;
+    retentionDays: number;
+    lastError: string | null;
+  } {
+    const entries = readdirSync(this.backupDir, { withFileTypes: true });
+    const backupFiles = entries
+      .filter(
+        (entry) =>
+          entry.isFile() &&
+          entry.name.startsWith(BACKUP_FILE_PREFIX) &&
+          entry.name.endsWith(BACKUP_FILE_SUFFIX),
+      )
+      .map((entry) => statSync(join(this.backupDir, entry.name)).mtime.toISOString())
+      .sort((left, right) => Date.parse(right) - Date.parse(left));
+
+    return {
+      running: this.running,
+      latestBackupAt: backupFiles[0] ?? this.lastSuccessAt,
+      backupCount: backupFiles.length,
+      intervalMinutes: Math.round(this.intervalMs / (60 * 1000)),
+      retentionDays: Math.round(this.retentionMs / (24 * 60 * 60 * 1000)),
+      lastError: this.lastError,
+    };
   }
 }

@@ -22,6 +22,7 @@ import {
 import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
+import { ModuleSkeleton } from "../ui/ModuleSkeleton";
 import {
   getThemePaletteColorVar,
   getThemePaletteForegroundVar,
@@ -34,6 +35,14 @@ const MIN_SLOT_HEIGHT_PX = 20;
 
 const localIsoDate = (timeZone: string, date: Date = getDisplayNow()): string =>
   toCalendarDateInTimeZone(date, timeZone);
+
+const localTimeString = (timeZone: string, date: Date): string =>
+  new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+  }).format(date);
 
 const buildSnapshotKey = (instanceId: string): string => `homeschool-planner:${instanceId}`;
 
@@ -113,6 +122,7 @@ export const moduleDefinition = defineModule({
       const loadRef = useRef<() => Promise<void>>(async () => undefined);
       const plannerViewportRef = useRef<HTMLDivElement | null>(null);
       const [plannerViewportHeight, setPlannerViewportHeight] = useState<number>(0);
+      const [displayNow, setDisplayNow] = useState(() => getDisplayNow());
       const browserOnline = useBrowserOnlineStatus();
       const connectivityState = resolveModuleConnectivityState({
         error,
@@ -233,6 +243,36 @@ export const moduleDefinition = defineModule({
         };
       }, [isEditing, response.siteDate]);
 
+      useEffect(() => {
+        if (isEditing) {
+          return;
+        }
+
+        let minuteTimer: number | null = null;
+
+        const scheduleMinuteTick = () => {
+          const now = getDisplayNow();
+          setDisplayNow(now);
+          const delayMs = Math.max(
+            250,
+            60_000 - (now.getSeconds() * 1000 + now.getMilliseconds()) + 50,
+          );
+          minuteTimer = window.setTimeout(scheduleMinuteTick, delayMs);
+        };
+
+        scheduleMinuteTick();
+        const removeDisplayTimeListener = addDisplayTimeContextListener(() => {
+          setDisplayNow(getDisplayNow());
+        });
+
+        return () => {
+          removeDisplayTimeListener();
+          if (minuteTimer !== null) {
+            window.clearTimeout(minuteTimer);
+          }
+        };
+      }, [isEditing]);
+
       const slots = buildPlannerTimeSlots(response.dayWindow.startTime, response.dayWindow.endTime);
 
       useEffect(() => {
@@ -280,10 +320,24 @@ export const moduleDefinition = defineModule({
         timeZone: getDisplaySiteTimeZone(),
       });
       const siteDateLabel = formatter.format(new Date(`${response.siteDate}T12:00:00.000Z`));
+      const currentTimeMinutes = plannerTimeToMinutes(
+        localTimeString(getDisplaySiteTimeZone(), displayNow),
+      );
+      const dayStartMinutes = plannerTimeToMinutes(response.dayWindow.startTime);
+      const dayEndMinutes = plannerTimeToMinutes(response.dayWindow.endTime);
+      const currentTimeWithinWindow =
+        currentTimeMinutes >= dayStartMinutes && currentTimeMinutes < dayEndMinutes;
+      const currentTimeOffsetPx = currentTimeWithinWindow
+        ? ((currentTimeMinutes - dayStartMinutes) / 15) * slotHeightPx
+        : null;
 
       return (
         <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 p-2 text-slate-100">
-          <ModuleConnectionBadge visible={connectivityState.showDisconnected} />
+          <ModuleConnectionBadge
+            visible={connectivityState.showDisconnected}
+            title={connectivityState.disconnectedTitle ?? undefined}
+            label={connectivityState.disconnectedLabel}
+          />
           <header className="mb-2 rounded border border-slate-700 bg-slate-900/80 px-3 py-2">
             <p className="module-copy-title text-slate-100">
               {response.template?.name ?? "School Planner"}
@@ -291,9 +345,7 @@ export const moduleDefinition = defineModule({
             <p className="module-copy-meta mt-1 text-slate-300">{siteDateLabel}</p>
           </header>
 
-          {loading ? (
-            <p className="module-copy-meta text-slate-300">Loading school plan...</p>
-          ) : null}
+          {loading ? <ModuleSkeleton variant="board" /> : null}
 
           {!loading && connectivityState.blockingError ? (
             <p className="module-copy-meta rounded border border-rose-500/60 bg-rose-500/10 px-2 py-1 text-rose-200">
@@ -341,7 +393,18 @@ export const moduleDefinition = defineModule({
 
                   {response.users.map((user) => {
                     const userBlocks = response.blocks.filter((block) => block.userId === user.id);
-                    const dayStartMinutes = plannerTimeToMinutes(response.dayWindow.startTime);
+                    const activeBlockId =
+                      userBlocks.find((block) => {
+                        const startMinutes = plannerTimeToMinutes(block.startTime);
+                        const endMinutes = plannerTimeToMinutes(block.endTime);
+                        return (
+                          currentTimeMinutes >= startMinutes && currentTimeMinutes < endMinutes
+                        );
+                      })?.id ?? null;
+                    const nextBlockId =
+                      userBlocks.find(
+                        (block) => plannerTimeToMinutes(block.startTime) > currentTimeMinutes,
+                      )?.id ?? null;
 
                     return (
                       <div
@@ -358,6 +421,14 @@ export const moduleDefinition = defineModule({
                             style={{ height: `${slotHeightPx}px` }}
                           />
                         ))}
+                        {currentTimeOffsetPx !== null ? (
+                          <div
+                            className="pointer-events-none absolute inset-x-0 z-[1] border-t-2 border-rose-300/90"
+                            style={{ top: `${currentTimeOffsetPx}px` }}
+                          >
+                            <div className="absolute -left-1.5 -top-[5px] h-2.5 w-2.5 rounded-full bg-rose-300 shadow-[0_0_0_3px_rgba(253,164,175,0.18)]" />
+                          </div>
+                        ) : null}
 
                         {userBlocks.map((block) => {
                           const startMinutes =
@@ -368,11 +439,19 @@ export const moduleDefinition = defineModule({
                             ((endMinutes - startMinutes) / 15) * slotHeightPx,
                             slotHeightPx,
                           );
+                          const isActive = block.id === activeBlockId;
+                          const isNext = !isActive && block.id === nextBlockId;
 
                           return (
                             <div
                               key={block.id}
-                              className="absolute left-1 right-1 overflow-hidden rounded border border-slate-950/50 px-2 py-1 shadow"
+                              className={`absolute left-1 right-1 overflow-hidden rounded border px-2 py-1 shadow transition ${
+                                isActive
+                                  ? "z-[2] ring-2 ring-white/55 shadow-[0_12px_28px_rgba(15,23,42,0.36)]"
+                                  : isNext
+                                    ? "z-[2] ring-1 ring-white/30"
+                                    : "border-slate-950/50"
+                              }`}
                               style={{
                                 top: `${top + 1}px`,
                                 height: `${height - 2}px`,
@@ -384,8 +463,17 @@ export const moduleDefinition = defineModule({
                               <p className="truncate text-sm font-semibold leading-tight">
                                 {block.name}
                               </p>
+                              {isActive ? (
+                                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] opacity-80">
+                                  Now
+                                </p>
+                              ) : isNext ? (
+                                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] opacity-75">
+                                  Next
+                                </p>
+                              ) : null}
                               {height >= slotHeightPx * 2.5 && block.notes ? (
-                                <p className="mt-1 line-clamp-3 text-[11px] leading-snug opacity-80">
+                                <p className="mt-1 line-clamp-3 text-[11px] leading-snug opacity-85 normal-case tracking-normal">
                                   {block.notes}
                                 </p>
                               ) : null}

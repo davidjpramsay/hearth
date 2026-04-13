@@ -95,6 +95,8 @@ export const SetLogicCanvas = ({
   selectedNodeSummary,
   canUndo,
   canRedo,
+  hasEditableNodes,
+  recoverableDraftSavedAt,
   reactFlowProps,
   runtimeStatusMeta,
   reactFlowInstance,
@@ -102,6 +104,11 @@ export const SetLogicCanvas = ({
   onToggleCanvasInteractive,
   onUndo,
   onRedo,
+  onAddStarterPhotoNode,
+  onAddStarterTimeGateNode,
+  onAddStarterLayoutNode,
+  onRestoreDraft,
+  onDiscardDraft,
   onFitView,
   onZoomIn,
   onZoomOut,
@@ -112,6 +119,8 @@ export const SetLogicCanvas = ({
   selectedNodeSummary: string;
   canUndo: boolean;
   canRedo: boolean;
+  hasEditableNodes: boolean;
+  recoverableDraftSavedAt: string | null;
   reactFlowProps: Record<string, unknown>;
   runtimeStatusMeta: RuntimeStatusMeta | null;
   reactFlowInstance: {
@@ -123,6 +132,11 @@ export const SetLogicCanvas = ({
   onToggleCanvasInteractive: () => void;
   onUndo: () => void;
   onRedo: () => void;
+  onAddStarterPhotoNode: () => void;
+  onAddStarterTimeGateNode: () => void;
+  onAddStarterLayoutNode: () => void;
+  onRestoreDraft?: () => void;
+  onDiscardDraft?: () => void;
   onFitView: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -195,6 +209,74 @@ export const SetLogicCanvas = ({
           </p>
         </div>
       </Panel>
+      {!hasEditableNodes ? (
+        <Panel position="top-center">
+          <div className="max-w-[520px] rounded-2xl border border-slate-700/80 bg-slate-950/92 px-5 py-4 text-center shadow-[0_10px_24px_rgba(2,6,23,0.55)]">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
+              Set Logic
+            </p>
+            <p className="mt-2 text-lg font-semibold text-slate-100">
+              Start your graph with one routing node or a direct layout.
+            </p>
+            <p className="mt-2 text-sm text-slate-300">
+              Photo Orientation is the usual starting point. Time Gate is useful when a layout set
+              changes by household time.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20"
+                onClick={onAddStarterPhotoNode}
+              >
+                Add Photo Orientation
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20"
+                onClick={onAddStarterTimeGateNode}
+              >
+                Add Time Gate
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-cyan-500/50 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-500/20"
+                onClick={onAddStarterLayoutNode}
+              >
+                Add Layout Node
+              </button>
+            </div>
+          </div>
+        </Panel>
+      ) : null}
+      {recoverableDraftSavedAt && onRestoreDraft && onDiscardDraft ? (
+        <Panel position="top-center">
+          <div className="mt-[156px] max-w-[520px] rounded-2xl border border-amber-400/50 bg-slate-950/92 px-5 py-4 text-center shadow-[0_10px_24px_rgba(2,6,23,0.55)]">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-300/90">
+              Local Draft Found
+            </p>
+            <p className="mt-2 text-sm text-slate-200">
+              A newer local graph draft is available from{" "}
+              {new Date(recoverableDraftSavedAt).toLocaleString()}.
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-amber-400/60 bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/20"
+                onClick={onRestoreDraft}
+              >
+                Restore draft
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-slate-100"
+                onClick={onDiscardDraft}
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </Panel>
+      ) : null}
       {runtimeStatusMeta ? (
         <Panel position="top-right">
           <div

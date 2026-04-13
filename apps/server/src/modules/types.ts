@@ -9,6 +9,22 @@ export interface ModuleAdapterHealth {
 export interface ModuleAdapterContext {
   eventBus: ModuleEventBus;
   processStartedAtMs: number;
+  getBackupDiagnostics?: () => {
+    running: boolean;
+    latestBackupAt: string | null;
+    backupCount: number;
+    intervalMinutes: number;
+    retentionDays: number;
+    lastError: string | null;
+  };
+  getCalendarDiagnostics?: () => {
+    configuredFeedCount: number;
+    enabledFeedCount: number;
+    memoryCacheEntries: number;
+    inFlightRefreshes: number;
+    lastPrefetchAttemptAt: string | null;
+    lastPrefetchCompletedAt: string | null;
+  };
 }
 
 export interface ModuleServerAdapter {

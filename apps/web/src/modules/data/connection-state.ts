@@ -66,12 +66,42 @@ export const resolveModuleConnectivityState = (input: {
 }): {
   blockingError: string | null;
   showDisconnected: boolean;
+  disconnectedTitle: string | null;
+  disconnectedLabel: string | null;
 } => {
   const connectionIssue = input.error ? isConnectivityError(input.error) : false;
 
+  if (!input.isOnline) {
+    return {
+      blockingError: input.hasSnapshot ? null : "Offline. Waiting for first sync.",
+      showDisconnected: input.hasSnapshot,
+      disconnectedTitle: input.hasSnapshot ? "Offline. Showing cached data." : null,
+      disconnectedLabel: input.hasSnapshot ? "Offline" : null,
+    };
+  }
+
+  if (connectionIssue && input.hasSnapshot) {
+    return {
+      blockingError: null,
+      showDisconnected: true,
+      disconnectedTitle: "Live updates are unavailable. Showing cached data.",
+      disconnectedLabel: "Cached",
+    };
+  }
+
+  if (connectionIssue) {
+    return {
+      blockingError: "Can't reach the server yet. Waiting for first sync.",
+      showDisconnected: false,
+      disconnectedTitle: null,
+      disconnectedLabel: null,
+    };
+  }
+
   return {
-    blockingError:
-      input.error && (!connectionIssue || !input.hasSnapshot) ? input.error : null,
-    showDisconnected: !input.isOnline || (connectionIssue && input.hasSnapshot),
+    blockingError: input.error,
+    showDisconnected: false,
+    disconnectedTitle: null,
+    disconnectedLabel: null,
   };
 };

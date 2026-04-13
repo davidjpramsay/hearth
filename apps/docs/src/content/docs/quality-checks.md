@@ -13,6 +13,8 @@ Avoid relying on `pnpm -r test` as a repo health signal because workspace build 
 
 Set-logic graph rules now have pure helper coverage plus browser smoke tests for connection and persistence regressions.
 
+The graph editor reducer also has dedicated undo/redo coverage.
+
 ### Supported verification commands
 
 ```bash

@@ -3,12 +3,13 @@ import { DEFAULT_THEME_COLOR_SLOT, THEME_COLOR_SLOTS, type ThemeColorSlot } from
 export const THEME_STORAGE_KEY = "hearth:theme-id";
 const THEME_CHANGE_EVENT = "hearth:theme-change";
 
-export type ThemeId = "default" | "nord" | "solarized" | "monokai";
+export type ThemeId = "default" | "nord" | "solarized" | "monokai" | "forest" | "ember";
 
 interface ThemeOption {
   id: ThemeId;
   label: string;
   primary: string;
+  palette?: Record<ThemeColorSlot, string>;
 }
 
 interface RgbColor {
@@ -35,10 +36,120 @@ const LIGHT_FOREGROUND = "#F8FAFC";
 const DARK_FOREGROUND = "#020617";
 
 export const THEME_OPTIONS: ThemeOption[] = [
-  { id: "default", label: "Default (Current)", primary: "#67E8F9" },
-  { id: "nord", label: "Nord", primary: "#88C0D0" },
-  { id: "solarized", label: "Solarized Dark", primary: "#2AA198" },
-  { id: "monokai", label: "Monokai", primary: "#66D9EF" },
+  {
+    id: "default",
+    label: "Default (Current)",
+    primary: "#67E8F9",
+    palette: {
+      "color-1": "#F97066",
+      "color-2": "#F58B1F",
+      "color-3": "#E7B71E",
+      "color-4": "#86C453",
+      "color-5": "#32C18B",
+      "color-6": "#1FBDBD",
+      "color-7": "#3BA7F4",
+      "color-8": "#587CF3",
+      "color-9": "#8A63EB",
+      "color-10": "#CB5BC9",
+      "color-11": "#8E9AAF",
+      "color-12": "#D7C14D",
+    },
+  },
+  {
+    id: "nord",
+    label: "Nord",
+    primary: "#88C0D0",
+    palette: {
+      "color-1": "#BF616A",
+      "color-2": "#D08770",
+      "color-3": "#EBCB8B",
+      "color-4": "#A3BE8C",
+      "color-5": "#8FBCBB",
+      "color-6": "#88C0D0",
+      "color-7": "#81A1C1",
+      "color-8": "#5E81AC",
+      "color-9": "#7B88C7",
+      "color-10": "#B48EAD",
+      "color-11": "#9AA5B7",
+      "color-12": "#D9B56D",
+    },
+  },
+  {
+    id: "solarized",
+    label: "Solarized Dark",
+    primary: "#2AA198",
+    palette: {
+      "color-1": "#DC322F",
+      "color-2": "#CB4B16",
+      "color-3": "#B58900",
+      "color-4": "#859900",
+      "color-5": "#2AA198",
+      "color-6": "#2F9FB3",
+      "color-7": "#268BD2",
+      "color-8": "#4B7DCF",
+      "color-9": "#6C71C4",
+      "color-10": "#C05E9B",
+      "color-11": "#93A1A1",
+      "color-12": "#C89B3C",
+    },
+  },
+  {
+    id: "monokai",
+    label: "Monokai",
+    primary: "#66D9EF",
+    palette: {
+      "color-1": "#F92672",
+      "color-2": "#FD971F",
+      "color-3": "#E6DB74",
+      "color-4": "#A6E22E",
+      "color-5": "#58D68D",
+      "color-6": "#66D9EF",
+      "color-7": "#4FA3F7",
+      "color-8": "#7C7BFF",
+      "color-9": "#AE81FF",
+      "color-10": "#D979C8",
+      "color-11": "#A59F85",
+      "color-12": "#D2C15B",
+    },
+  },
+  {
+    id: "forest",
+    label: "Forest",
+    primary: "#34D399",
+    palette: {
+      "color-1": "#E76F51",
+      "color-2": "#F4A261",
+      "color-3": "#E9C46A",
+      "color-4": "#90BE6D",
+      "color-5": "#34D399",
+      "color-6": "#2BB5A8",
+      "color-7": "#3A86A8",
+      "color-8": "#4F6FD8",
+      "color-9": "#7A5FD0",
+      "color-10": "#B565A7",
+      "color-11": "#8E9B88",
+      "color-12": "#C6A969",
+    },
+  },
+  {
+    id: "ember",
+    label: "Ember",
+    primary: "#F97316",
+    palette: {
+      "color-1": "#EF4444",
+      "color-2": "#F97316",
+      "color-3": "#F59E0B",
+      "color-4": "#A3C957",
+      "color-5": "#3DBA8C",
+      "color-6": "#16B3A3",
+      "color-7": "#3B82F6",
+      "color-8": "#6366F1",
+      "color-9": "#8B5CF6",
+      "color-10": "#D946EF",
+      "color-11": "#A8A29E",
+      "color-12": "#EAB308",
+    },
+  },
 ];
 
 const THEME_CLASS_PREFIX = "theme-";
@@ -165,6 +276,34 @@ const toContrastRatio = (left: number, right: number): number => {
   return (lighter + 0.05) / (darker + 0.05);
 };
 
+const withContrastAdjustedBackground = (background: RgbColor): RgbColor => {
+  const lightLuminance = toRelativeLuminance(hexToRgb(LIGHT_FOREGROUND));
+  const darkLuminance = toRelativeLuminance(hexToRgb(DARK_FOREGROUND));
+  let candidate = background;
+  let candidateHsl = rgbToHsl(candidate);
+
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const backgroundLuminance = toRelativeLuminance(candidate);
+    const lightContrast = toContrastRatio(lightLuminance, backgroundLuminance);
+    const darkContrast = toContrastRatio(darkLuminance, backgroundLuminance);
+    if (Math.max(lightContrast, darkContrast) >= 4.5) {
+      return candidate;
+    }
+
+    candidateHsl = {
+      ...candidateHsl,
+      saturation: clamp(candidateHsl.saturation + 0.02, 0.32, 0.9),
+      lightness:
+        darkContrast >= lightContrast
+          ? clamp(candidateHsl.lightness + 0.035, 0.18, 0.92)
+          : clamp(candidateHsl.lightness - 0.035, 0.18, 0.92),
+    };
+    candidate = hslToRgb(candidateHsl);
+  }
+
+  return candidate;
+};
+
 const pickForeground = (background: RgbColor): string => {
   const backgroundLuminance = toRelativeLuminance(background);
   const lightContrast = toContrastRatio(
@@ -181,13 +320,13 @@ const pickForeground = (background: RgbColor): string => {
 
 const toRgbString = (value: RgbColor): string => `${value.red} ${value.green} ${value.blue}`;
 
-const buildThemePaletteEntries = (primary: string): GeneratedPaletteEntry[] => {
+const buildGeneratedThemePalette = (primary: string): RgbColor[] => {
   const base = rgbToHsl(hexToRgb(primary));
   const baseSaturation = clamp(Math.max(base.saturation, 0.62), 0.58, 0.88);
   const baseLightness = clamp(Math.max(base.lightness, 0.58), 0.48, 0.72);
   const hueOffsets = [-120, -90, -60, -30, 0, 30, 60, 90, 120];
 
-  const colors = [
+  return [
     ...hueOffsets.map((offset, index) =>
       hslToRgb({
         hue: base.hue + offset,
@@ -211,9 +350,19 @@ const buildThemePaletteEntries = (primary: string): GeneratedPaletteEntry[] => {
       lightness: clamp(baseLightness + 0.16, 0.68, 0.84),
     }),
   ];
+};
+
+export const buildThemePaletteEntriesForTheme = (themeId: ThemeId): GeneratedPaletteEntry[] => {
+  const theme = getThemeDefinition(themeId);
+  const colors = theme.palette
+    ? THEME_COLOR_SLOTS.map(
+        (slot) => hexToRgb(theme.palette?.[slot] ?? theme.primary) ?? hexToRgb(theme.primary),
+      )
+    : buildGeneratedThemePalette(theme.primary).map((entry) => entry);
 
   return THEME_COLOR_SLOTS.map((slot, index) => {
-    const rgb = colors[index] ?? colors[0] ?? hexToRgb(primary);
+    const baseRgb = colors[index] ?? colors[0] ?? hexToRgb(theme.primary);
+    const rgb = withContrastAdjustedBackground(baseRgb);
     return {
       slot,
       hex: rgbToHex(rgb),
@@ -222,12 +371,11 @@ const buildThemePaletteEntries = (primary: string): GeneratedPaletteEntry[] => {
     };
   });
 };
-
 const getThemeDefinition = (themeId: ThemeId): ThemeOption =>
   THEME_OPTIONS.find((theme) => theme.id === themeId) ?? THEME_OPTIONS[0]!;
 
 const applyThemePaletteVariables = (root: HTMLElement, themeId: ThemeId): void => {
-  const palette = buildThemePaletteEntries(getThemeDefinition(themeId).primary);
+  const palette = buildThemePaletteEntriesForTheme(themeId);
   for (const entry of palette) {
     root.style.setProperty(`--theme-palette-${entry.slot}`, entry.hex);
     root.style.setProperty(`--theme-palette-${entry.slot}-rgb`, entry.rgb);

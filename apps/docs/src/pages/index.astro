@@ -41,6 +41,29 @@ import { docsHomeHero as hero, docsHomeStartLinks as startLinks } from "../gener
         ))}
       </ul>
     </section>
+    <section class="docs-home-card docs-home-card--wide">
+      <h2>Demo Video</h2>
+      <p>
+        A guided demo video will live here once it has been recorded. The docs site is already set
+        up for media publishing, so the final video only needs to be added to the docs media
+        assets.
+      </p>
+      <p class="docs-home-muted">
+        In the meantime, start with the install guide, then open the admin pages for Layouts,
+        Settings, Children, Chores, and School.
+      </p>
+    </section>
+    <section class="docs-home-card docs-home-card--wide">
+      <h2>Install Paths</h2>
+      <ul>
+        <li>
+          <a href="/install/">Development on your own machine</a>
+        </li>
+        <li>
+          <a href="/deploy/">Docker, Synology, and native Linux install steps</a>
+        </li>
+      </ul>
+    </section>
   </div>
 </StarlightPage>
 
@@ -70,6 +93,20 @@ import { docsHomeHero as hero, docsHomeStartLinks as startLinks } from "../gener
     color: var(--sl-color-gray-2);
   }
 
+  .docs-home-card p {
+    margin: 0;
+    color: var(--sl-color-gray-2);
+    line-height: 1.65;
+  }
+
+  .docs-home-card p + p {
+    margin-top: 0.8rem;
+  }
+
+  .docs-home-muted {
+    color: var(--sl-color-gray-3);
+  }
+
   .docs-home-card li + li {
     margin-top: 0.7rem;
   }
@@ -87,6 +124,10 @@ import { docsHomeHero as hero, docsHomeStartLinks as startLinks } from "../gener
     .docs-home-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       margin-top: 2rem;
+    }
+
+    .docs-home-card--wide {
+      grid-column: 1 / -1;
     }
   }
 </style>

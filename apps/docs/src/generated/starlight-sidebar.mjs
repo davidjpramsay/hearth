@@ -7,7 +7,7 @@ export const docsSidebar = [
         slug: "overview",
       },
       {
-        label: "Install and run locally",
+        label: "Choose an install path",
         slug: "install",
       },
     ],
@@ -29,7 +29,7 @@ export const docsSidebar = [
         slug: "admin",
       },
       {
-        label: "Deploy to Synology",
+        label: "Install on common systems",
         slug: "deploy",
       },
     ],

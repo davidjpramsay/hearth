@@ -10,6 +10,7 @@ import { logoutAdminSession } from "../auth/session";
 import { getAuthToken } from "../auth/storage";
 import { PageShell } from "../components/PageShell";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
+import { AdminSection, AdminSectionHeader } from "../components/admin/AdminSection";
 import type { ChoreMember } from "@hearth/shared";
 import { useModuleQuery } from "../modules/data/useModuleQuery";
 
@@ -121,13 +122,12 @@ export const AdminChildrenPage = () => {
         ) : null}
 
         <section className="grid gap-6 xl:grid-cols-[minmax(20rem,0.95fr)_minmax(0,1.05fr)]">
-          <article className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
-            <h2 className="text-lg font-semibold text-slate-100">
-              {childForm.id === null ? "Add child" : "Edit child"}
-            </h2>
-            <p className="mt-1 text-sm text-slate-300">
-              Names added here are reused in Chores and School.
-            </p>
+          <AdminSection as="article">
+            <AdminSectionHeader
+              title={childForm.id === null ? "Add child" : "Edit child"}
+              description="Names added here are reused in Chores and School."
+              compact
+            />
 
             <form onSubmit={onSubmitChild} className="mt-4 space-y-3">
               <label className="block space-y-1">
@@ -189,20 +189,15 @@ export const AdminChildrenPage = () => {
                 ) : null}
               </div>
             </form>
-          </article>
+          </AdminSection>
 
-          <article className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-100">Shared children</h2>
-                <p className="mt-1 text-sm text-slate-300">
-                  Chores and School both pull from this list.
-                </p>
-              </div>
-              <span className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-300">
-                {children.length} total
-              </span>
-            </div>
+          <AdminSection as="article">
+            <AdminSectionHeader
+              title="Shared children"
+              description="Chores and School both pull from this list."
+              meta={<span>{children.length} total</span>}
+              compact
+            />
 
             {loading ? <p className="mt-4 text-sm text-slate-400">Loading children...</p> : null}
 
@@ -254,7 +249,7 @@ export const AdminChildrenPage = () => {
                 </p>
               ) : null}
             </div>
-          </article>
+          </AdminSection>
         </section>
       </div>
     </PageShell>

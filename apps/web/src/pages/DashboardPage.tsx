@@ -427,9 +427,7 @@ export const DashboardPage = () => {
         });
 
         setShowDisconnectedBadge(connectivityState.showDisconnected);
-        setDisconnectedTitle(
-          connectivityState.showDisconnected ? `${message}. Showing last synced layout.` : null,
-        );
+        setDisconnectedTitle(connectivityState.disconnectedTitle);
         setError(connectivityState.blockingError);
 
         if (connectivityState.showDisconnected && retryResolveTimerRef.current === null) {
@@ -481,7 +479,7 @@ export const DashboardPage = () => {
 
     if (!browserOnline && activeLayoutRef.current !== null) {
       setShowDisconnectedBadge(true);
-      setDisconnectedTitle("Browser is offline. Showing last synced layout.");
+      setDisconnectedTitle("Offline. Showing last synced layout.");
       return;
     }
 
@@ -537,9 +535,7 @@ export const DashboardPage = () => {
     eventSource.onerror = () => {
       if (activeLayoutRef.current !== null) {
         setShowDisconnectedBadge(true);
-        setDisconnectedTitle(
-          "Live updates are temporarily unavailable. Showing last synced layout.",
-        );
+        setDisconnectedTitle("Live updates are unavailable. Showing last synced layout.");
       }
       if (retryResolveTimerRef.current === null) {
         retryResolveTimerRef.current = window.setTimeout(() => {
@@ -751,6 +747,7 @@ export const DashboardPage = () => {
         <ModuleConnectionBadge
           visible={showDisconnectedBadge}
           title={disconnectedTitle ?? undefined}
+          label={browserOnline ? "Cached" : "Offline"}
         />
 
         {!activeLayout ? (

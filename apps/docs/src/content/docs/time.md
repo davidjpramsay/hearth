@@ -11,11 +11,14 @@ For `site-local` modules, read time and timezone from `apps/web/src/runtime/disp
 
 If a module caches snapshots locally and its content is day-scoped, validate the snapshot against the current household date before reusing it.
 
+When cached data is reused after a connectivity failure, prefer a soft stale badge over a hard blocking error.
+
 ## Key Points
 
 - Good references: clock, chores, calendar, bible-verse, homeschool-planner.
 - Do not trust raw `new Date()` for household-day grouping on displays.
 - Use timezone-aware helpers from `@hearth/shared` for day comparisons.
+- The School planner runtime uses synced household time for day selection and its current-time indicator.
 
 ### Site-local module pattern
 

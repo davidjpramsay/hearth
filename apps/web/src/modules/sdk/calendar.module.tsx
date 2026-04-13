@@ -28,6 +28,7 @@ import {
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
+import { ModuleSkeleton } from "../ui/ModuleSkeleton";
 import {
   getThemePaletteColorVar,
   getThemePaletteForegroundVar,
@@ -564,17 +565,17 @@ export const moduleDefinition = defineModule({
 
       return (
         <div className="module-panel-shell relative flex h-full min-h-0 flex-col overflow-hidden p-2 text-slate-100">
-          <ModuleConnectionBadge visible={connectivityState.showDisconnected} />
+          <ModuleConnectionBadge
+            visible={connectivityState.showDisconnected}
+            title={connectivityState.disconnectedTitle ?? undefined}
+            label={connectivityState.disconnectedLabel}
+          />
           <header className="mb-2 flex items-center justify-between rounded border border-slate-700/80 bg-slate-900/80 px-3 py-2">
             <p className="module-copy-title text-slate-100">{headerTitle}</p>
             <p className="module-copy-label text-slate-400">{headerViewLabel}</p>
           </header>
 
-          {loading ? (
-            <div className="module-copy-body flex min-h-0 flex-1 items-center justify-center text-slate-300">
-              Loading calendar...
-            </div>
-          ) : null}
+          {loading ? <ModuleSkeleton variant="list" /> : null}
 
           {!loading && connectivityState.blockingError ? (
             <div className="module-copy-meta flex min-h-0 flex-1 items-center justify-center rounded border border-rose-500/60 bg-rose-500/10 px-3 text-center text-rose-200">

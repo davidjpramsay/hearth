@@ -20,6 +20,7 @@ import {
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
+import { ModuleSkeleton } from "../ui/ModuleSkeleton";
 
 const BIBLE_VERSE_SNAPSHOT_MAX_AGE_MS = 36 * 60 * 60 * 1000;
 
@@ -373,14 +374,14 @@ export const moduleDefinition = defineModule({
 
       return (
         <div className="module-panel-shell relative flex h-full min-h-0 flex-col overflow-hidden p-3 text-slate-100">
-          <ModuleConnectionBadge visible={connectivityState.showDisconnected} />
+          <ModuleConnectionBadge
+            visible={connectivityState.showDisconnected}
+            title={connectivityState.disconnectedTitle ?? undefined}
+            label={connectivityState.disconnectedLabel}
+          />
           <p className="module-copy-label text-cyan-200">Verse of the day</p>
 
-          {loading ? (
-            <div className="module-copy-meta flex min-h-0 flex-1 items-center justify-center text-slate-300">
-              Loading verse...
-            </div>
-          ) : null}
+          {loading ? <ModuleSkeleton variant="quote" /> : null}
 
           {!loading && connectivityState.blockingError ? (
             <div className="module-copy-meta mt-2 flex min-h-0 flex-1 items-center justify-center rounded border border-rose-500/60 bg-rose-500/10 px-3 text-center text-rose-200">

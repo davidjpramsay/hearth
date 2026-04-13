@@ -75,6 +75,7 @@ import {
 } from "./set-logic-editor/shared";
 
 interface SetLogicEditorProps {
+  draftStorageKey?: string;
   authoring: LayoutSetAuthoring;
   layoutOptions: LayoutOption[];
   photoCollectionOptions: PhotoCollectionOption[];
@@ -82,7 +83,38 @@ interface SetLogicEditorProps {
   onChange: (nextAuthoring: LayoutSetAuthoring) => void | Promise<void>;
 }
 
+interface StoredGraphDraft {
+  block: PhotoRouterBlock;
+  selectedNodeId: string | null;
+  savedAt: string;
+}
+
+const loadStoredGraphDraft = (key: string): StoredGraphDraft | null => {
+  try {
+    const rawValue = window.localStorage.getItem(key);
+    if (!rawValue) {
+      return null;
+    }
+    const parsed = JSON.parse(rawValue) as StoredGraphDraft;
+    if (!parsed || typeof parsed !== "object" || !parsed.block) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const clearStoredGraphDraft = (key: string) => {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Ignore storage failures.
+  }
+};
+
 export const SetLogicEditor = ({
+  draftStorageKey,
   authoring,
   layoutOptions,
   photoCollectionOptions,
@@ -106,6 +138,7 @@ export const SetLogicEditor = ({
     null,
   );
   const hasPerformedInitialFitRef = useRef(false);
+  const [recoverableDraft, setRecoverableDraft] = useState<StoredGraphDraft | null>(null);
   const draftBlock = state.block;
   const selectedNodeId = state.selectedNodeId;
   const editorError = state.editorError;
@@ -134,6 +167,46 @@ export const SetLogicEditor = ({
     selectedNodeIdRef.current = selectedNodeId;
     latestBlockRef.current = draftBlock;
   }, [draftBlock, selectedNodeId]);
+
+  useEffect(() => {
+    if (!draftStorageKey || typeof window === "undefined") {
+      return;
+    }
+
+    const storedDraft = loadStoredGraphDraft(draftStorageKey);
+    if (!storedDraft) {
+      setRecoverableDraft(null);
+      return;
+    }
+
+    const propsSignature = JSON.stringify(block);
+    const draftSignature = JSON.stringify(storedDraft.block);
+    if (propsSignature === draftSignature) {
+      clearStoredGraphDraft(draftStorageKey);
+      setRecoverableDraft(null);
+      return;
+    }
+
+    setRecoverableDraft(storedDraft);
+  }, [block, draftStorageKey]);
+
+  useEffect(() => {
+    if (!draftStorageKey || typeof window === "undefined") {
+      return;
+    }
+
+    const payload: StoredGraphDraft = {
+      block: draftBlock,
+      selectedNodeId,
+      savedAt: new Date().toISOString(),
+    };
+
+    try {
+      window.localStorage.setItem(draftStorageKey, JSON.stringify(payload));
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [draftBlock, draftStorageKey, selectedNodeId]);
 
   const updateBlock = useCallback(
     (updater: (current: PhotoRouterBlock) => PhotoRouterBlock) => {
@@ -242,6 +315,68 @@ export const SetLogicEditor = ({
       }
     },
     [onChange],
+  );
+
+  const applyRecoveredDraft = useCallback(
+    (storedDraft: StoredGraphDraft) => {
+      const currentAuthoring = latestAuthoringRef.current;
+      const currentBlock = latestBlockRef.current;
+
+      try {
+        const nextAuthoring = setPrimaryPhotoRouterBlock({
+          authoring: currentAuthoring,
+          block: storedDraft.block,
+        });
+        const validationIssue = getLayoutSetAuthoringValidationIssues(nextAuthoring)[0] ?? null;
+        if (validationIssue) {
+          dispatch({
+            type: "set-editor-error",
+            message: validationIssue.message,
+          });
+          return;
+        }
+
+        latestAuthoringRef.current = nextAuthoring;
+        latestBlockRef.current = storedDraft.block;
+        dispatch({
+          type: "sync-from-props",
+          block: storedDraft.block,
+        });
+        dispatch({
+          type: "select-node",
+          nodeId: storedDraft.selectedNodeId,
+        });
+        dispatch({
+          type: "set-editor-error",
+          message: null,
+        });
+        setRecoverableDraft(null);
+        if (draftStorageKey) {
+          clearStoredGraphDraft(draftStorageKey);
+        }
+
+        void Promise.resolve(onChange(nextAuthoring)).catch((error) => {
+          latestAuthoringRef.current = currentAuthoring;
+          latestBlockRef.current = currentBlock;
+          dispatch({
+            type: "sync-from-props",
+            block: currentBlock,
+          });
+          dispatch({
+            type: "set-editor-error",
+            message:
+              error instanceof Error ? error.message : "Unable to restore the saved graph draft.",
+          });
+        });
+      } catch (error) {
+        dispatch({
+          type: "set-editor-error",
+          message:
+            error instanceof Error ? error.message : "Unable to restore the saved graph draft.",
+        });
+      }
+    },
+    [draftStorageKey, onChange],
   );
 
   const addLayoutNodeAtPosition = useCallback(
@@ -736,6 +871,7 @@ export const SetLogicEditor = ({
 
   const canUndo = state.historyPast.length > 0;
   const canRedo = state.historyFuture.length > 0;
+  const hasEditableNodes = draftBlock.nodes.length > 0;
 
   const handleUndo = useCallback(() => {
     const previousBlock = state.historyPast.at(-1);
@@ -907,6 +1043,8 @@ export const SetLogicEditor = ({
           selectedNodeSummary={selectedNodeSummary}
           canUndo={canUndo}
           canRedo={canRedo}
+          hasEditableNodes={hasEditableNodes}
+          recoverableDraftSavedAt={recoverableDraft?.savedAt ?? null}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           runtimeStatusMeta={runtimeStatusMeta}
@@ -931,6 +1069,22 @@ export const SetLogicEditor = ({
           }}
           onUndo={handleUndo}
           onRedo={handleRedo}
+          onAddStarterPhotoNode={() => addActionNodeAtPosition("photo")}
+          onAddStarterTimeGateNode={() => addTimeGateNodeAtPosition()}
+          onAddStarterLayoutNode={() => addLayoutNodeAtPosition()}
+          onRestoreDraft={
+            recoverableDraft ? () => applyRecoveredDraft(recoverableDraft) : undefined
+          }
+          onDiscardDraft={
+            recoverableDraft
+              ? () => {
+                  setRecoverableDraft(null);
+                  if (draftStorageKey) {
+                    clearStoredGraphDraft(draftStorageKey);
+                  }
+                }
+              : undefined
+          }
           reactFlowProps={{
             onInit: setReactFlowInstance,
             onNodesChange: handleNodesChange,

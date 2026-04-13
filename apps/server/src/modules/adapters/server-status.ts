@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { getRuntimeTimeZone } from "@hearth/shared";
 import { z } from "zod";
 import { config } from "../../config.js";
-import type { ModuleServerAdapter } from "../types.js";
+import type { ModuleAdapterContext, ModuleServerAdapter } from "../types.js";
 
 const processStartedAtMs = Date.now();
 let statusTicker: NodeJS.Timeout | null = null;
@@ -40,6 +40,18 @@ const readBuiltAt = (filePath: string | null): string | null => {
 
   try {
     return statSync(filePath).mtime.toISOString();
+  } catch {
+    return null;
+  }
+};
+
+const readFileSizeBytes = (filePath: string | null): number | null => {
+  if (!filePath) {
+    return null;
+  }
+
+  try {
+    return statSync(filePath).size;
   } catch {
     return null;
   }
@@ -101,6 +113,28 @@ export const serverStatusResponseSchema = z.object({
     runtimeTimeZone: z.string(),
     defaultSiteTimeZone: z.string().nullable(),
   }),
+  diagnostics: z.object({
+    backup: z.object({
+      running: z.boolean(),
+      latestBackupAt: z.string().nullable(),
+      backupCount: z.number().nonnegative(),
+      intervalMinutes: z.number().nonnegative(),
+      retentionDays: z.number().nonnegative(),
+      lastError: z.string().nullable(),
+    }),
+    calendar: z.object({
+      configuredFeedCount: z.number().nonnegative(),
+      enabledFeedCount: z.number().nonnegative(),
+      memoryCacheEntries: z.number().nonnegative(),
+      inFlightRefreshes: z.number().nonnegative(),
+      lastPrefetchAttemptAt: z.string().nullable(),
+      lastPrefetchCompletedAt: z.string().nullable(),
+    }),
+    storage: z.object({
+      databaseFileSizeBytes: z.number().nonnegative().nullable(),
+      databaseLastModifiedAt: z.string().nullable(),
+    }),
+  }),
   build: z.object({
     serverEntrySha1: z.string().nullable(),
     serverEntryBuiltAt: z.string().nullable(),
@@ -111,7 +145,30 @@ export const serverStatusResponseSchema = z.object({
   }),
 });
 
-const toStatusPayload = () =>
+const defaultBackupDiagnostics = {
+  running: false,
+  latestBackupAt: null,
+  backupCount: 0,
+  intervalMinutes: 0,
+  retentionDays: 0,
+  lastError: null,
+};
+
+const defaultCalendarDiagnostics = {
+  configuredFeedCount: 0,
+  enabledFeedCount: 0,
+  memoryCacheEntries: 0,
+  inFlightRefreshes: 0,
+  lastPrefetchAttemptAt: null,
+  lastPrefetchCompletedAt: null,
+};
+
+const readStorageDiagnostics = () => ({
+  databaseFileSizeBytes: readFileSizeBytes(config.dbPath),
+  databaseLastModifiedAt: readBuiltAt(config.dbPath),
+});
+
+const toStatusPayload = (context: ModuleAdapterContext) =>
   serverStatusResponseSchema.parse({
     ok: true,
     service: "hearth-server",
@@ -131,24 +188,29 @@ const toStatusPayload = () =>
       runtimeTimeZone: getRuntimeTimeZone(),
       defaultSiteTimeZone: config.defaultSiteTimeZone,
     },
+    diagnostics: {
+      backup: context.getBackupDiagnostics?.() ?? defaultBackupDiagnostics,
+      calendar: context.getCalendarDiagnostics?.() ?? defaultCalendarDiagnostics,
+      storage: readStorageDiagnostics(),
+    },
     build: readBuildMetadata(),
   });
 
 export const serverStatusAdapter: ModuleServerAdapter = {
   id: "server-status",
   streamTopics: ["server-status.updates"],
-  registerRoutes: (app) => {
+  registerRoutes: (app, context) => {
     app.get("/", async (_request, reply) => {
-      return reply.send(toStatusPayload());
+      return reply.send(toStatusPayload(context));
     });
   },
-  start: ({ eventBus }) => {
+  start: (context) => {
     if (statusTicker) {
       return;
     }
 
     statusTicker = setInterval(() => {
-      eventBus.publish("server-status.updates", toStatusPayload());
+      context.eventBus.publish("server-status.updates", toStatusPayload(context));
     }, 15_000);
   },
   stop: () => {

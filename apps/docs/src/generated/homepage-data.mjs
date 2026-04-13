@@ -18,7 +18,7 @@ export const docsHomeStartLinks = [
   },
   {
     href: "/install/",
-    label: "Install and run locally",
+    label: "Choose an install path",
   },
   {
     href: "/application-structure/",
@@ -30,7 +30,7 @@ export const docsHomeStartLinks = [
   },
   {
     href: "/deploy/",
-    label: "Deploy to Synology",
+    label: "Install on common systems",
   },
   {
     href: "/build-sdk-modules/",

@@ -324,6 +324,8 @@ export const moduleDefinition = defineModule({
           loading={bookState.loading}
           error={bookState.error}
           disconnected={bookState.isDisconnected}
+          disconnectedTitle={bookState.disconnectedTitle}
+          disconnectedLabel={bookState.disconnectedLabel}
           empty={!hasBook && !bookState.loading && !bookState.error}
           emptyMessage={bookState.data?.warning ?? "No Kobo reading activity found."}
         >

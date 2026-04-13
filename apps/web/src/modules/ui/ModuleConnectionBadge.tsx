@@ -2,12 +2,14 @@ interface ModuleConnectionBadgeProps {
   visible?: boolean;
   variant?: "floating" | "inline";
   title?: string;
+  label?: string | null;
 }
 
 export const ModuleConnectionBadge = ({
   visible = false,
   variant = "floating",
   title = "Connection unavailable",
+  label = null,
 }: ModuleConnectionBadgeProps) => {
   if (!visible) {
     return null;
@@ -15,7 +17,7 @@ export const ModuleConnectionBadge = ({
 
   return (
     <div
-      className={`module-connection-badge module-connection-badge--${variant}`}
+      className={`module-connection-badge module-connection-badge--${variant}${label ? " module-connection-badge--with-label" : ""}`}
       role="status"
       aria-label="Connection unavailable"
       title={title}
@@ -30,6 +32,7 @@ export const ModuleConnectionBadge = ({
         />
         <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
+      {label ? <span className="module-connection-badge__label">{label}</span> : null}
     </div>
   );
 };

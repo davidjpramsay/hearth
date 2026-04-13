@@ -15,10 +15,10 @@ This is the public documentation surface for Hearth. It explains what the system
 ## Sections
 
 - [What Hearth does](#overview)
-- [Install and run locally](#install)
+- [Choose an install path](#install)
 - [How the application is organised](#application-structure)
 - [Use the admin app](#admin)
-- [Deploy to Synology](#deploy)
+- [Install on common systems](#deploy)
 - [Build modules](#build-sdk-modules)
 - [Write time-safe modules](#time)
 - [Test and verify changes](#quality-checks)
@@ -39,25 +39,33 @@ The web app contains both the display runtime and the admin experience, so most 
 - Layouts can be selected directly or through set logic and time/photo-based routing.
 - Modules are SDK-first and auto-discovered from the web app.
 
-## Install and run locally
+## Choose an install path
 
 _Quick Start_
 
-Use the monorepo root commands. The root scripts already build shared packages first.
+Pick the install path that matches how you want to use Hearth: local development, Docker, Synology, or a native Linux / Raspberry Pi install.
 
-Install dependencies once with pnpm.
+For development on your own machine, use the local pnpm workflow. That gives you the Vite web app, the Fastify server, and the shared package watchers together.
 
-For day-to-day development, use the root dev command so shared, server, and web watchers stay in sync.
+For a normal home install on a Linux box, mini PC, or Raspberry Pi, the easiest production path is Docker Compose with the published image. That avoids local source builds on the target machine.
 
-Use the root verify command before pushing so formatting, builds, package tests, and Playwright all run in the supported order.
+For Synology, use the checked-in Synology compose file and env example. That is the supported NAS path and keeps updates simple.
+
+If you prefer a native Linux install instead of Docker, use Node, pnpm, and a system service. That is workable, but Docker is the easier default for most people.
+
+- Choose local pnpm only if you are developing or debugging Hearth itself.
+- Choose Docker Compose for the simplest production install on most systems.
+- Choose the Synology compose path if you are using Container Manager.
+- Choose native Linux only if you deliberately want to manage Node and the service yourself.
 
 ### Local development
 
 ```bash
+cp .env.example .env
 pnpm install
 pnpm dev
 
-# before pushing
+# before pushing changes
 pnpm verify
 ```
 
@@ -101,26 +109,47 @@ Use School to manage reusable day plans, assign them to repeat weekdays, and edi
 - Admin login lives at `/admin/login`.
 - The dashboard display runtime lives at `/`.
 - Saved calendar feeds are global and can be referenced by calendar modules by ID.
+- Settings autosaves low-risk edits such as household timezone, calendar feed edits, and per-display theme/routing changes.
 - School day plans are global, each weekday can only belong to one plan, and the School module renders the plan that matches today's household weekday.
+- The main admin pages now share the same section framing and tighter helper copy, so Settings, Children, Chores, and School read as one system instead of separate generations of UI.
+- Settings now includes an operational health panel with display check-in summaries, stale-device detection, calendar cache warmth, and backup status.
+- That same panel now surfaces database size and last-modified time, so storage state is visible without shell access.
+- The layout set-logic editor supports undo/redo, draft recovery, and starter actions for first-time graph setup.
+- Displays and snapshot-backed modules now show softer `Offline` or `Cached` badges when they are serving last-good data.
+- The main display modules now use shared skeleton loading states instead of plain `Loading ...` copy while data warms up.
+- Theme colours now come from curated 12-slot palettes, including the newer Forest and Ember presets.
 
-## Deploy to Synology
+## Install on common systems
 
 _Deployment_
 
-Production deployment currently revolves around publishing the image, pulling it on Synology, and recreating the compose service.
+Use the shortest path that fits your target machine. Most production installs should use the published container image.
 
-The Synology project uses the checked-in compose template and persistent data volume for server state.
+Docker host: copy `.env.example` to `.env`, review the timezone and password values, then start `docker compose.yml`. This is the easiest general-purpose production install.
 
-A normal update path is publish image, pull on the NAS, recreate the container, and run a health check against the root app and server-status endpoint.
+Synology: copy `.env.synology.example` to your real env file, use `docker-compose.synology.yml`, and keep the `/volume1/docker/hearth/data` volume persistent. That is the supported NAS path.
 
-Timezone defaults should be set in the deployment environment as well as in admin settings so fresh containers do not silently fall back to UTC.
+Native Linux or Raspberry Pi: install Node and pnpm, copy `.env.example` to `.env`, run `pnpm install`, `pnpm build`, and `pnpm start`, then keep it alive with `systemd` or another service manager.
 
-### Supported deployment check path
+After the server starts, open `/admin/login`, sign in, set the household timezone, then load `/` on each display device once so it appears in Settings.
+
+Set both the deployment timezone env vars and the household timezone in admin so a fresh container does not fall back to UTC.
+
+- Default runtime URL is `http://<host>:3000`.
+- Use `HOST=0.0.0.0` if devices on your LAN need to reach a native install.
+- Do not expose Hearth directly to the public internet.
+- Use `pnpm verify` before publishing or building a release image.
+
+### Docker or Synology update flow
 
 ```bash
 pnpm verify
 
-# then on Synology
+# Docker host
+docker compose pull
+docker compose up -d
+
+# Synology
 docker compose -f docker-compose.synology.yml pull
 docker compose -f docker-compose.synology.yml up -d
 docker compose -f docker-compose.synology.yml ps
@@ -144,6 +173,7 @@ Use the shared module data hooks instead of hand-rolled fetch effects so polling
 - Use `useModuleQuery` for polling, cache, and invalidation-aware refreshes.
 - Use `useModuleStream` for direct SSE topic subscriptions when a module truly needs streaming state.
 - Keep provider secrets and private feed URLs server-side.
+- Block-style modules should store theme palette slots, not raw hex colours.
 
 ### Scaffold a new module
 
@@ -163,9 +193,12 @@ For `site-local` modules, read time and timezone from `apps/web/src/runtime/disp
 
 If a module caches snapshots locally and its content is day-scoped, validate the snapshot against the current household date before reusing it.
 
+When cached data is reused after a connectivity failure, prefer a soft stale badge over a hard blocking error.
+
 - Good references: clock, chores, calendar, bible-verse, homeschool-planner.
 - Do not trust raw `new Date()` for household-day grouping on displays.
 - Use timezone-aware helpers from `@hearth/shared` for day comparisons.
+- The School planner runtime uses synced household time for day selection and its current-time indicator.
 
 ### Site-local module pattern
 
@@ -193,6 +226,8 @@ The root `verify` script is the canonical local and CI verification path.
 Avoid relying on `pnpm -r test` as a repo health signal because workspace build ordering can create false negatives.
 
 Set-logic graph rules now have pure helper coverage plus browser smoke tests for connection and persistence regressions.
+
+The graph editor reducer also has dedicated undo/redo coverage.
 
 ### Supported verification commands
 

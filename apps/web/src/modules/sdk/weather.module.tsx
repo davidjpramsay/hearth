@@ -15,6 +15,7 @@ import {
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
 import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
+import { ModuleSkeleton } from "../ui/ModuleSkeleton";
 import { type TileDensity, useTileDensity } from "../ui/useTileDensity";
 
 const WEATHER_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -592,12 +593,12 @@ export const moduleDefinition = defineModule({
           className="module-panel-shell relative isolate flex h-full min-h-0 flex-col p-3 text-[color:var(--color-text-primary)]"
           style={moduleAccentStyle}
         >
-          <ModuleConnectionBadge visible={connectivityState.showDisconnected} />
-          {loading ? (
-            <div className="module-copy-body relative z-10 flex min-h-0 flex-1 items-center justify-center text-[color:var(--color-text-secondary)]">
-              Loading weather...
-            </div>
-          ) : null}
+          <ModuleConnectionBadge
+            visible={connectivityState.showDisconnected}
+            title={connectivityState.disconnectedTitle ?? undefined}
+            label={connectivityState.disconnectedLabel}
+          />
+          {loading ? <ModuleSkeleton variant="list" /> : null}
 
           {!loading && connectivityState.blockingError ? (
             <div className="module-copy-meta relative z-10 flex min-h-0 flex-1 items-center justify-center rounded border border-rose-300/40 bg-rose-300/10 px-4 text-center text-rose-50">

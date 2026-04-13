@@ -26,6 +26,7 @@ import { getAuthToken } from "../auth/storage";
 import { logoutAdminSession } from "../auth/session";
 import { PageShell } from "../components/PageShell";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
+import { AdminSection, AdminSectionHeader } from "../components/admin/AdminSection";
 import {
   PlannerTimetableEditor,
   type PlannerEditorBlock,
@@ -34,7 +35,6 @@ import { ThemePalettePicker } from "../components/admin/ThemePalettePicker";
 import { useModuleQuery } from "../modules/data/useModuleQuery";
 
 const FALLBACK_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-const sectionCardClass = "rounded-xl border border-slate-700 bg-slate-900/70 p-4";
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const repeatDayOrder = [1, 2, 3, 4, 5, 6, 0] as const;
 
@@ -425,18 +425,12 @@ export const AdminPlannerPage = () => {
           </div>
         ) : null}
 
-        <section className={sectionCardClass}>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-100">School day window</h2>
-              <p className="mt-1 text-sm text-slate-300">
-                This timetable window applies to every saved school plan.
-              </p>
-            </div>
-            <p className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100">
-              Today: {siteToday}
-            </p>
-          </div>
+        <AdminSection>
+          <AdminSectionHeader
+            title="School day window"
+            description="This timetable window applies to every saved school plan."
+            meta={<span className="text-cyan-100">Today: {siteToday}</span>}
+          />
 
           <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={onSaveDayWindow}>
             <label className="flex min-w-[10rem] flex-col gap-1 text-sm text-slate-200">
@@ -481,25 +475,23 @@ export const AdminPlannerPage = () => {
               Save day window
             </button>
           </form>
-        </section>
+        </AdminSection>
 
         <div className="grid gap-6">
-          <section className={sectionCardClass}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-100">Shared children</h2>
-                <p className="mt-1 text-sm text-slate-300">
-                  School columns are pulled from the shared children list in Admin &gt; Children.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate("/children")}
-                className="rounded-lg border border-cyan-400/60 px-3 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300"
-              >
-                Open Children
-              </button>
-            </div>
+          <AdminSection>
+            <AdminSectionHeader
+              title="Shared children"
+              description="School columns are pulled from the shared children list in Admin > Children."
+              actions={
+                <button
+                  type="button"
+                  onClick={() => navigate("/children")}
+                  className="rounded-lg border border-cyan-400/60 px-3 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300"
+                >
+                  Open Children
+                </button>
+              }
+            />
 
             <div className="mt-4 space-y-2">
               {users.map((user) => (
@@ -520,16 +512,14 @@ export const AdminPlannerPage = () => {
                 </p>
               ) : null}
             </div>
-          </section>
+          </AdminSection>
         </div>
 
-        <section className={sectionCardClass}>
-          <div>
-            <h2 className="text-lg font-semibold text-slate-100">School plans</h2>
-            <p className="mt-1 text-sm text-slate-300">
-              Create plans, then choose which weekdays each one repeats on.
-            </p>
-          </div>
+        <AdminSection>
+          <AdminSectionHeader
+            title="School plans"
+            description="Create plans, then choose which weekdays each one repeats on."
+          />
 
           <form className="mt-4 flex flex-wrap gap-3" onSubmit={onCreateTemplate}>
             <input
@@ -651,9 +641,9 @@ export const AdminPlannerPage = () => {
               </p>
             ) : null}
           </div>
-        </section>
+        </AdminSection>
 
-        <section className={sectionCardClass}>
+        <AdminSection>
           {selectedTemplate ? (
             <form className="mb-4 flex flex-wrap gap-3" onSubmit={onRenameTemplate}>
               <input
@@ -671,15 +661,10 @@ export const AdminPlannerPage = () => {
             </form>
           ) : null}
 
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-100">Timetable editor</h2>
-              <p className="mt-1 text-sm text-slate-300">
-                Drag on a column to create a block. Drag a block to move it, or drag its edges to
-                resize it.
-              </p>
-            </div>
-            <div className="flex gap-2">
+          <AdminSectionHeader
+            title="Timetable editor"
+            description="Drag on a column to create a block. Drag a block to move it, or drag its edges to resize it."
+            actions={
               <button
                 type="button"
                 onClick={onRevertBlocks}
@@ -688,7 +673,9 @@ export const AdminPlannerPage = () => {
               >
                 Revert
               </button>
-              <div className="flex items-center rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-300">
+            }
+            meta={
+              <span>
                 {validationError
                   ? "Fix timetable issues before saving"
                   : isAutosavingBlocks
@@ -696,9 +683,9 @@ export const AdminPlannerPage = () => {
                     : blocksDirty
                       ? "Waiting to save…"
                       : "Saved"}
-              </div>
-            </div>
-          </div>
+              </span>
+            }
+          />
 
           {validationError ? (
             <div className="mt-4 rounded-lg border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
@@ -835,7 +822,7 @@ export const AdminPlannerPage = () => {
               </div>
             </div>
           )}
-        </section>
+        </AdminSection>
 
         {loading ? <p className="text-sm text-slate-300">Loading school plans...</p> : null}
       </div>

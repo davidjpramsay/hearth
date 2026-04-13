@@ -226,6 +226,86 @@
   --tone-slate-950-rgb: 27 28 24;
 }
 
+:root.theme-forest {
+  --font-display: "Avenir Next", "Segoe UI", "Space Grotesk", sans-serif;
+  --font-body: "Avenir Next", "Segoe UI", "IBM Plex Sans", sans-serif;
+
+  --color-bg-app: #10231d;
+  --color-bg-surface: rgba(16, 35, 29, 0.82);
+  --color-bg-surface-strong: rgba(25, 53, 45, 0.74);
+  --color-bg-danger: rgba(231, 111, 81, 0.16);
+  --color-border-subtle: rgba(72, 116, 101, 0.5);
+  --color-border-danger: rgba(231, 111, 81, 0.58);
+
+  --color-text-primary: #eef7f1;
+  --color-text-secondary: #d9ebe1;
+  --color-text-muted: #93b3a5;
+  --color-text-accent: #34d399;
+  --color-text-accent-rgb: 52 211 153;
+  --color-text-danger: #f5c0b2;
+  --color-text-danger-rgb: 245 192 178;
+
+  --color-status-ok: #90be6d;
+  --color-status-ok-rgb: 144 190 109;
+  --color-status-loading: #e9c46a;
+  --color-status-loading-rgb: 233 196 106;
+  --color-status-error: #e76f51;
+  --color-status-error-rgb: 231 111 81;
+
+  --app-bg-gradient: radial-gradient(circle at 18% 0%, #26463a 0%, #10231d 54%, #0a1713 100%);
+
+  --tone-slate-100-rgb: 238 247 241;
+  --tone-slate-200-rgb: 217 235 225;
+  --tone-slate-300-rgb: 183 212 198;
+  --tone-slate-400-rgb: 147 179 165;
+  --tone-slate-500-rgb: 108 141 128;
+  --tone-slate-600-rgb: 72 101 90;
+  --tone-slate-700-rgb: 43 72 61;
+  --tone-slate-800-rgb: 25 53 45;
+  --tone-slate-900-rgb: 16 35 29;
+  --tone-slate-950-rgb: 10 23 19;
+}
+
+:root.theme-ember {
+  --font-display: "Avenir Next", "Segoe UI", "Space Grotesk", sans-serif;
+  --font-body: "Avenir Next", "Segoe UI", "IBM Plex Sans", sans-serif;
+
+  --color-bg-app: #2c1711;
+  --color-bg-surface: rgba(44, 23, 17, 0.84);
+  --color-bg-surface-strong: rgba(60, 31, 22, 0.76);
+  --color-bg-danger: rgba(239, 68, 68, 0.18);
+  --color-border-subtle: rgba(138, 83, 63, 0.52);
+  --color-border-danger: rgba(239, 68, 68, 0.6);
+
+  --color-text-primary: #fff2eb;
+  --color-text-secondary: #f6dcd0;
+  --color-text-muted: #d0a590;
+  --color-text-accent: #f97316;
+  --color-text-accent-rgb: 249 115 22;
+  --color-text-danger: #fecaca;
+  --color-text-danger-rgb: 254 202 202;
+
+  --color-status-ok: #a3c957;
+  --color-status-ok-rgb: 163 201 87;
+  --color-status-loading: #f59e0b;
+  --color-status-loading-rgb: 245 158 11;
+  --color-status-error: #ef4444;
+  --color-status-error-rgb: 239 68 68;
+
+  --app-bg-gradient: radial-gradient(circle at 15% 0%, #71361f 0%, #2c1711 52%, #1a0f0b 100%);
+
+  --tone-slate-100-rgb: 255 242 235;
+  --tone-slate-200-rgb: 246 220 208;
+  --tone-slate-300-rgb: 229 188 165;
+  --tone-slate-400-rgb: 208 165 144;
+  --tone-slate-500-rgb: 171 121 101;
+  --tone-slate-600-rgb: 120 78 62;
+  --tone-slate-700-rgb: 80 49 36;
+  --tone-slate-800-rgb: 60 31 22;
+  --tone-slate-900-rgb: 44 23 17;
+  --tone-slate-950-rgb: 26 15 11;
+}
+
 html {
   width: 100%;
   height: 100%;
@@ -480,6 +560,131 @@ body {
     color: var(--color-text-secondary);
   }
 
+  .module-skeleton {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    gap: 0.6rem;
+  }
+
+  .module-skeleton--list,
+  .module-skeleton--quote {
+    flex-direction: column;
+  }
+
+  .module-skeleton--media {
+    align-items: stretch;
+  }
+
+  .module-skeleton__card,
+  .module-skeleton__media,
+  .module-skeleton__board-rail,
+  .module-skeleton__board-header,
+  .module-skeleton__board-block,
+  .module-skeleton__line {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.7rem;
+    border: 1px solid rgb(var(--tone-slate-700-rgb) / 0.72);
+    background: rgb(var(--tone-slate-900-rgb) / 0.72);
+  }
+
+  .module-skeleton__card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.8rem;
+  }
+
+  .module-skeleton__media {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .module-skeleton__line {
+    height: 0.75rem;
+    border: none;
+    border-radius: 999px;
+    background: rgb(var(--tone-slate-700-rgb) / 0.75);
+  }
+
+  .module-skeleton__line--eyebrow {
+    width: 24%;
+  }
+
+  .module-skeleton__line--title {
+    width: 58%;
+    height: 0.95rem;
+  }
+
+  .module-skeleton__line--full {
+    width: 100%;
+  }
+
+  .module-skeleton__line--medium {
+    width: 72%;
+  }
+
+  .module-skeleton__line--short {
+    width: 42%;
+  }
+
+  .module-skeleton__board-rail {
+    width: 4.5rem;
+    flex: 0 0 4.5rem;
+  }
+
+  .module-skeleton__board-grid {
+    display: grid;
+    min-height: 0;
+    flex: 1 1 auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .module-skeleton__board-header {
+    min-height: 1.6rem;
+  }
+
+  .module-skeleton__board-block--tall {
+    min-height: 7rem;
+  }
+
+  .module-skeleton__board-block--mid {
+    min-height: 5.4rem;
+  }
+
+  .module-skeleton__board-block--short {
+    min-height: 4rem;
+  }
+
+  .module-skeleton__card::after,
+  .module-skeleton__media::after,
+  .module-skeleton__board-rail::after,
+  .module-skeleton__board-header::after,
+  .module-skeleton__board-block::after,
+  .module-skeleton__line::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(var(--tone-slate-200-rgb) / 0.06) 46%,
+      rgb(var(--tone-slate-100-rgb) / 0.12) 50%,
+      rgb(var(--tone-slate-200-rgb) / 0.06) 54%,
+      transparent 100%
+    );
+    animation: module-skeleton-shimmer 1.8s ease-in-out infinite;
+  }
+
+  @keyframes module-skeleton-shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
   .module-panel-shell {
     position: relative;
     overflow: hidden;
@@ -584,6 +789,13 @@ body {
     pointer-events: none;
   }
 
+  .module-connection-badge--with-label {
+    width: auto;
+    min-width: 1.75rem;
+    padding: 0 0.55rem;
+    gap: 0.35rem;
+  }
+
   .module-connection-badge--inline {
     position: static;
     width: 1.5rem;
@@ -592,10 +804,25 @@ body {
     background: rgb(var(--color-status-loading-rgb) / 0.12);
   }
 
+  .module-connection-badge--inline.module-connection-badge--with-label {
+    min-width: 0;
+    width: auto;
+    height: 1.5rem;
+    padding: 0 0.45rem;
+  }
+
   .module-connection-badge svg {
     width: 0.95rem;
     height: 0.95rem;
     stroke: currentColor;
+  }
+
+  .module-connection-badge__label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
   }
 }
 

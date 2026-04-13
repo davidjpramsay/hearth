@@ -14,6 +14,23 @@ It is built to run on low-power hardware (Raspberry Pi / mini PCs) and provides:
 - Automatic rolling SQLite backups
 - Chores weekly tracking with configurable payday boundaries
 
+## Start Here
+
+Pick the path that matches what you are trying to do:
+
+- Build or change Hearth itself: use the local `pnpm` development workflow
+- Run Hearth on a normal server, mini PC, or Raspberry Pi: use Docker Compose
+- Run Hearth on a Synology NAS: use the Synology compose files
+- Run Hearth without Docker: use the native Node install on Linux
+
+Public docs site:
+
+- [https://davidjpramsay.github.io/hearth/](https://davidjpramsay.github.io/hearth/)
+
+Demo video:
+
+- Coming soon. The docs site is ready for it, but the final recording has not been added yet.
+
 ## Monorepo Structure
 
 - `apps/server`: Fastify API + SQLite + module backends
@@ -113,55 +130,185 @@ Recent reliability and performance hardening:
 - March 1, 2026: hardened layout editor autosave to ignore stale save responses (prevents newer edits being overwritten by slower network responses).
 - March 1, 2026: improved runtime robustness with safer SSE event fan-out and stricter photo path containment checks.
 
-## Quick Start
+## Install For Development
 
-1. Install:
+Use this if you are changing Hearth itself.
+
+1. Copy the env file.
+
+```bash
+cp .env.example .env
+```
+
+2. Install dependencies.
 
 ```bash
 pnpm install
 ```
 
-2. Run in dev mode:
+3. Start development mode.
 
 ```bash
-cp .env.example .env
 pnpm dev
 ```
 
-- API (dev backend): `http://localhost:3000`
-- Web dev server (dev-only): `http://localhost:5173`
+URLs:
 
-3. Production build:
+- API server: `http://localhost:3000`
+- Web dev app: `http://localhost:5173`
+
+Before pushing changes:
+
+```bash
+pnpm verify
+```
+
+## Install With Docker Compose
+
+Use this for most normal home installs on Linux, mini PCs, and Raspberry Pi class hardware.
+
+1. Copy the env file.
 
 ```bash
 cp .env.example .env
+```
+
+2. Edit `.env` and set at least:
+
+- `ADMIN_PASSWORD`
+- `TZ`
+- `DEFAULT_SITE_TIMEZONE`
+
+3. Start the published container.
+
+```bash
+docker compose up -d
+```
+
+4. Open Hearth.
+
+- Runtime: `http://<your-host>:3000`
+- Admin login: `http://<your-host>:3000/admin/login`
+
+5. After first login:
+
+- set the household timezone in `Settings`
+- open `/` once on each display device so it registers
+- go back to `Settings` and name/assign each display
+
+Update later with:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+## Install On Synology
+
+Use this if you are running Hearth through Synology Container Manager.
+
+1. Copy the Synology env file.
+
+```bash
+cp .env.synology.example .env.synology
+```
+
+2. Edit `.env.synology` and set:
+
+- `ADMIN_PASSWORD`
+- `TZ`
+- `DEFAULT_SITE_TIMEZONE`
+
+3. Start the Synology stack.
+
+```bash
+docker compose -f docker-compose.synology.yml --env-file .env.synology up -d
+```
+
+4. Open Hearth at:
+
+- `http://<your-synology-host>:3000`
+
+5. Keep the data volume persistent:
+
+- `/volume1/docker/hearth/data:/app/data`
+
+Update later with:
+
+```bash
+docker compose -f docker-compose.synology.yml --env-file .env.synology pull
+docker compose -f docker-compose.synology.yml --env-file .env.synology up -d
+docker compose -f docker-compose.synology.yml --env-file .env.synology ps
+```
+
+For the full Synology path, use:
+
+- [Synology Deployment](docs/SYNOLOGY_DEPLOYMENT.md)
+- [Synology Update Routine](docs/SYNOLOGY_UPDATE.md)
+
+## Install Natively On Linux Or Raspberry Pi
+
+Use this only if you deliberately do not want Docker.
+
+1. Install Node, pnpm, and git.
+2. Copy the env file.
+
+```bash
+cp .env.example .env
+```
+
+3. Set at least:
+
+- `ADMIN_PASSWORD`
+- `TZ`
+- `DEFAULT_SITE_TIMEZONE`
+
+4. Install and build Hearth.
+
+```bash
+pnpm install
 pnpm build
+```
+
+5. Start Hearth.
+
+```bash
 pnpm start
 ```
 
-- Installed/runtime URL: `http://<your-server-LAN-IP>:3000`
-- In install/runtime mode, `5173` is not used.
-- On a brand-new install, set `ADMIN_PASSWORD` before first start so the server can initialize the stored admin password hash securely.
+6. If displays on your LAN need to reach this machine, set:
+
+- `HOST=0.0.0.0`
+
+7. Keep it running with `systemd` or another process manager.
+
+## First Run Checklist
+
+After any production install:
+
+1. Open `/admin/login`
+2. Sign in with `ADMIN_PASSWORD`
+3. Open `Settings`
+4. Set the household timezone
+5. Open `/` once on each display device
+6. Return to `Settings` and assign each display to a layout or set
+7. Build your layouts in `Layouts`
 
 ## Deployment Options
 
-Hearth can be deployed in multiple ways:
+Supported paths:
 
-- Native Node on Linux / mini PC / Raspberry Pi class hardware
-- Generic Docker or `docker compose`
-- Published container images from GitHub Container Registry
-- Synology Container Manager
-- Other Docker-based platforms such as Portainer, Unraid, or CasaOS using the image-based compose setup
+- Local development with `pnpm`
+- Docker Compose using `docker-compose.yml`
+- Synology using `docker-compose.synology.yml`
+- Native Linux / Raspberry Pi with Node + pnpm
 
-Use:
+Useful deployment docs:
 
-- `.env.example` + `docker-compose.yml` for normal Docker deployments that pull the published image
-- `.env.example` + `docker-compose.build.yml` for advanced source-build container deployments
-- `.env.synology.example` + `docker-compose.synology.yml` for Synology
-- [Deployment Guide](docs/DEPLOYMENT.md) for the full overview
-- [Synology Deployment](docs/SYNOLOGY_DEPLOYMENT.md) if Synology is your target
-- [Synology Update Routine](docs/SYNOLOGY_UPDATE.md) for repeat deploys after the first install
-- [Image Publishing](docs/IMAGE_PUBLISHING.md) for the GitHub Actions release workflow
+- [Deployment Guide](docs/DEPLOYMENT.md)
+- [Synology Deployment](docs/SYNOLOGY_DEPLOYMENT.md)
+- [Synology Update Routine](docs/SYNOLOGY_UPDATE.md)
+- [Image Publishing](docs/IMAGE_PUBLISHING.md)
 
 ## Kobo Reader Setup
 

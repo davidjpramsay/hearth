@@ -33,17 +33,24 @@
       "id": "install",
       "group": "Getting Started",
       "eyebrow": "Quick Start",
-      "title": "Install and run locally",
-      "summary": "Use the monorepo root commands. The root scripts already build shared packages first.",
+      "title": "Choose an install path",
+      "summary": "Pick the install path that matches how you want to use Hearth: local development, Docker, Synology, or a native Linux / Raspberry Pi install.",
       "body": [
-        "Install dependencies once with pnpm.",
-        "For day-to-day development, use the root dev command so shared, server, and web watchers stay in sync.",
-        "Use the root verify command before pushing so formatting, builds, package tests, and Playwright all run in the supported order."
+        "For development on your own machine, use the local pnpm workflow. That gives you the Vite web app, the Fastify server, and the shared package watchers together.",
+        "For a normal home install on a Linux box, mini PC, or Raspberry Pi, the easiest production path is Docker Compose with the published image. That avoids local source builds on the target machine.",
+        "For Synology, use the checked-in Synology compose file and env example. That is the supported NAS path and keeps updates simple.",
+        "If you prefer a native Linux install instead of Docker, use Node, pnpm, and a system service. That is workable, but Docker is the easier default for most people."
+      ],
+      "bullets": [
+        "Choose local pnpm only if you are developing or debugging Hearth itself.",
+        "Choose Docker Compose for the simplest production install on most systems.",
+        "Choose the Synology compose path if you are using Container Manager.",
+        "Choose native Linux only if you deliberately want to manage Node and the service yourself."
       ],
       "code": {
         "language": "bash",
         "title": "Local development",
-        "content": "pnpm install\npnpm dev\n\n# before pushing\npnpm verify"
+        "content": "cp .env.example .env\npnpm install\npnpm dev\n\n# before pushing changes\npnpm verify"
       }
     },
     {
@@ -83,24 +90,40 @@
         "Admin login lives at `/admin/login`.",
         "The dashboard display runtime lives at `/`.",
         "Saved calendar feeds are global and can be referenced by calendar modules by ID.",
-        "School day plans are global, each weekday can only belong to one plan, and the School module renders the plan that matches today's household weekday."
+        "Settings autosaves low-risk edits such as household timezone, calendar feed edits, and per-display theme/routing changes.",
+        "School day plans are global, each weekday can only belong to one plan, and the School module renders the plan that matches today's household weekday.",
+        "The main admin pages now share the same section framing and tighter helper copy, so Settings, Children, Chores, and School read as one system instead of separate generations of UI.",
+        "Settings now includes an operational health panel with display check-in summaries, stale-device detection, calendar cache warmth, and backup status.",
+        "That same panel now surfaces database size and last-modified time, so storage state is visible without shell access.",
+        "The layout set-logic editor supports undo/redo, draft recovery, and starter actions for first-time graph setup.",
+        "Displays and snapshot-backed modules now show softer `Offline` or `Cached` badges when they are serving last-good data.",
+        "The main display modules now use shared skeleton loading states instead of plain `Loading ...` copy while data warms up.",
+        "Theme colours now come from curated 12-slot palettes, including the newer Forest and Ember presets."
       ]
     },
     {
       "id": "deploy",
       "group": "Operations",
       "eyebrow": "Deployment",
-      "title": "Deploy to Synology",
-      "summary": "Production deployment currently revolves around publishing the image, pulling it on Synology, and recreating the compose service.",
+      "title": "Install on common systems",
+      "summary": "Use the shortest path that fits your target machine. Most production installs should use the published container image.",
       "body": [
-        "The Synology project uses the checked-in compose template and persistent data volume for server state.",
-        "A normal update path is publish image, pull on the NAS, recreate the container, and run a health check against the root app and server-status endpoint.",
-        "Timezone defaults should be set in the deployment environment as well as in admin settings so fresh containers do not silently fall back to UTC."
+        "Docker host: copy `.env.example` to `.env`, review the timezone and password values, then start `docker compose.yml`. This is the easiest general-purpose production install.",
+        "Synology: copy `.env.synology.example` to your real env file, use `docker-compose.synology.yml`, and keep the `/volume1/docker/hearth/data` volume persistent. That is the supported NAS path.",
+        "Native Linux or Raspberry Pi: install Node and pnpm, copy `.env.example` to `.env`, run `pnpm install`, `pnpm build`, and `pnpm start`, then keep it alive with `systemd` or another service manager.",
+        "After the server starts, open `/admin/login`, sign in, set the household timezone, then load `/` on each display device once so it appears in Settings.",
+        "Set both the deployment timezone env vars and the household timezone in admin so a fresh container does not fall back to UTC."
+      ],
+      "bullets": [
+        "Default runtime URL is `http://<host>:3000`.",
+        "Use `HOST=0.0.0.0` if devices on your LAN need to reach a native install.",
+        "Do not expose Hearth directly to the public internet.",
+        "Use `pnpm verify` before publishing or building a release image."
       ],
       "code": {
         "language": "bash",
-        "title": "Supported deployment check path",
-        "content": "pnpm verify\n\n# then on Synology\ndocker compose -f docker-compose.synology.yml pull\ndocker compose -f docker-compose.synology.yml up -d\ndocker compose -f docker-compose.synology.yml ps"
+        "title": "Docker or Synology update flow",
+        "content": "pnpm verify\n\n# Docker host\ndocker compose pull\ndocker compose up -d\n\n# Synology\ndocker compose -f docker-compose.synology.yml pull\ndocker compose -f docker-compose.synology.yml up -d\ndocker compose -f docker-compose.synology.yml ps"
       }
     },
     {
@@ -119,7 +142,8 @@
         "Auto-discovery is handled by the web registry.",
         "Use `useModuleQuery` for polling, cache, and invalidation-aware refreshes.",
         "Use `useModuleStream` for direct SSE topic subscriptions when a module truly needs streaming state.",
-        "Keep provider secrets and private feed URLs server-side."
+        "Keep provider secrets and private feed URLs server-side.",
+        "Block-style modules should store theme palette slots, not raw hex colours."
       ],
       "code": {
         "language": "bash",
@@ -136,12 +160,14 @@
       "body": [
         "Set `manifest.timeMode` intentionally: `device-local`, `site-local`, or `source-local`.",
         "For `site-local` modules, read time and timezone from `apps/web/src/runtime/display-time.ts`, react to display-time updates, and schedule a dedicated rollover refresh at the next site-local day boundary.",
-        "If a module caches snapshots locally and its content is day-scoped, validate the snapshot against the current household date before reusing it."
+        "If a module caches snapshots locally and its content is day-scoped, validate the snapshot against the current household date before reusing it.",
+        "When cached data is reused after a connectivity failure, prefer a soft stale badge over a hard blocking error."
       ],
       "bullets": [
         "Good references: clock, chores, calendar, bible-verse, homeschool-planner.",
         "Do not trust raw `new Date()` for household-day grouping on displays.",
-        "Use timezone-aware helpers from `@hearth/shared` for day comparisons."
+        "Use timezone-aware helpers from `@hearth/shared` for day comparisons.",
+        "The School planner runtime uses synced household time for day selection and its current-time indicator."
       ],
       "code": {
         "language": "ts",
@@ -159,7 +185,8 @@
         "The root `test` script prepares shared package artifacts first and then runs package tests sequentially.",
         "The root `verify` script is the canonical local and CI verification path.",
         "Avoid relying on `pnpm -r test` as a repo health signal because workspace build ordering can create false negatives.",
-        "Set-logic graph rules now have pure helper coverage plus browser smoke tests for connection and persistence regressions."
+        "Set-logic graph rules now have pure helper coverage plus browser smoke tests for connection and persistence regressions.",
+        "The graph editor reducer also has dedicated undo/redo coverage."
       ],
       "code": {
         "language": "bash",

@@ -25,6 +25,8 @@ export interface UseModuleQueryResult<TData> {
   error: string | null;
   lastUpdatedMs: number | null;
   isDisconnected: boolean;
+  disconnectedTitle: string | null;
+  disconnectedLabel: string | null;
   revalidate: () => Promise<void>;
 }
 
@@ -235,6 +237,8 @@ export const useModuleQuery = <TData,>(
     error: connectivityState.blockingError,
     lastUpdatedMs,
     isDisconnected: connectivityState.showDisconnected,
+    disconnectedTitle: connectivityState.disconnectedTitle,
+    disconnectedLabel: connectivityState.disconnectedLabel,
     revalidate,
   };
 };

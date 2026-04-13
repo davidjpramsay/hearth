@@ -15,6 +15,7 @@ import { PhotosSlideshowService } from "./services/photos-slideshow-service.js";
 import { LocalWarningService } from "./services/local-warning-service.js";
 import { ScreenProfileService } from "./services/screen-profile-service.js";
 import { ModuleAdapterService } from "./modules/service.js";
+import { ModuleEventBus } from "./modules/event-bus.js";
 import { createApp } from "./app.js";
 
 const { hashSync } = bcrypt;
@@ -47,7 +48,7 @@ if (!settingsRepository.getAdminPasswordHash()) {
   }
 }
 const layoutEventBus = new LayoutEventBus();
-const moduleAdapterService = ModuleAdapterService.createDefault();
+const moduleEventBus = new ModuleEventBus();
 const localWarningService = new LocalWarningService({
   devForceActive: config.localWarningDevForceActive,
 });
@@ -85,8 +86,16 @@ const services = {
     localWarningService,
   ),
   layoutEventBus,
-  moduleAdapterService,
+  moduleAdapterService: null as unknown as ModuleAdapterService,
 };
+
+const moduleAdapterService = new ModuleAdapterService({
+  eventBus: moduleEventBus,
+  processStartedAtMs: Date.now(),
+  getBackupDiagnostics: () => backupService.getDiagnostics(),
+  getCalendarDiagnostics: () => services.calendarFeedService.getDiagnostics(),
+});
+services.moduleAdapterService = moduleAdapterService;
 
 const app = await createApp(services);
 if (!config.localWarningDevForceActive) {
