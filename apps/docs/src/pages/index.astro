@@ -1,6 +1,18 @@
 ---
 import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
 import { docsHomeHero as hero, docsHomeStartLinks as startLinks } from "../generated/homepage-data.mjs";
+
+const basePath = import.meta.env.BASE_URL.endsWith("/")
+  ? import.meta.env.BASE_URL.slice(0, -1)
+  : import.meta.env.BASE_URL;
+const withBase = (href) => {
+  if (/^https?:\/\//i.test(href)) {
+    return href;
+  }
+
+  const normalizedHref = href.startsWith("/") ? href : `/${href}`;
+  return `${basePath}${normalizedHref}`;
+};
 ---
 
 <StarlightPage
@@ -13,7 +25,11 @@ import { docsHomeHero as hero, docsHomeStartLinks as startLinks } from "../gener
       title: hero.headline,
       tagline: hero.summary,
       actions: [
-        { text: "Start here", link: startLinks[0]?.href ?? "/overview/", variant: "primary" },
+        {
+          text: "Start here",
+          link: withBase(startLinks[0]?.href ?? "/overview/"),
+          variant: "primary",
+        },
         { text: "GitHub repo", link: "https://github.com/davidjpramsay/hearth" },
         {
           text: "Markdown mirror",
@@ -36,7 +52,7 @@ import { docsHomeHero as hero, docsHomeStartLinks as startLinks } from "../gener
       <ul>
         {startLinks.map((link) => (
           <li>
-            <a href={link.href}>{link.label}</a>
+            <a href={withBase(link.href)}>{link.label}</a>
           </li>
         ))}
       </ul>
@@ -57,10 +73,10 @@ import { docsHomeHero as hero, docsHomeStartLinks as startLinks } from "../gener
       <h2>Install Paths</h2>
       <ul>
         <li>
-          <a href="/install/">Development on your own machine</a>
+          <a href={withBase("/install/")}>Development on your own machine</a>
         </li>
         <li>
-          <a href="/deploy/">Docker, Synology, and native Linux install steps</a>
+          <a href={withBase("/deploy/")}>Docker, Synology, and native Linux install steps</a>
         </li>
       </ul>
     </section>
@@ -70,11 +86,13 @@ import { docsHomeHero as hero, docsHomeStartLinks as startLinks } from "../gener
 <style>
   .docs-home-grid {
     display: grid;
+    align-items: start;
     gap: 1.5rem;
     margin-top: 1rem;
   }
 
   .docs-home-card {
+    align-self: start;
     border: 1px solid var(--sl-color-hairline-shade);
     border-radius: 1rem;
     background: linear-gradient(180deg, rgb(17 33 59 / 0.58), rgb(10 18 32 / 0.92));
