@@ -41,42 +41,41 @@ const withBase = (href) => {
   }}
 >
   <div class="docs-home-grid">
-    <section class="docs-home-card">
-      <h2>Highlights</h2>
-      <ul>
-        {hero.highlights.map((highlight) => <li>{highlight}</li>)}
-      </ul>
-    </section>
-    <section class="docs-home-card">
-      <h2>Start Here</h2>
-      <ul>
-        {startLinks.map((link) => (
-          <li>
-            <a href={withBase(link.href)}>{link.label}</a>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <div class="docs-home-top-row">
+      <section class="docs-home-card docs-home-card--top">
+        <h2>Highlights</h2>
+        <ul>
+          {hero.highlights.map((highlight) => <li>{highlight}</li>)}
+        </ul>
+      </section>
+      <section class="docs-home-card docs-home-card--top">
+        <h2>Start Here</h2>
+        <ul>
+          {startLinks.map((link) => (
+            <li>
+              <a href={withBase(link.href)}>{link.label}</a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
     <section class="docs-home-card docs-home-card--wide">
-      <h2>Demo Video</h2>
+      <h2>Demo video</h2>
       <p>
-        A guided demo video will live here once it has been recorded. The docs site is already set
-        up for media publishing, so the final video only needs to be added to the docs media
-        assets.
+        A short demo will go here.
       </p>
       <p class="docs-home-muted">
-        In the meantime, start with the install guide, then open the admin pages for Layouts,
-        Settings, Children, Chores, and School.
+        For now, start with install and the main admin pages.
       </p>
     </section>
     <section class="docs-home-card docs-home-card--wide">
-      <h2>Install Paths</h2>
+      <h2>Install paths</h2>
       <ul>
         <li>
-          <a href={withBase("/install/")}>Development on your own machine</a>
+          <a href={withBase("/install/")}>Run locally</a>
         </li>
         <li>
-          <a href={withBase("/deploy/")}>Docker, Synology, and native Linux install steps</a>
+          <a href={withBase("/deploy/")}>Docker, Synology, or Linux</a>
         </li>
       </ul>
     </section>
@@ -86,17 +85,27 @@ const withBase = (href) => {
 <style>
   .docs-home-grid {
     display: grid;
-    align-items: start;
     gap: 1.5rem;
     margin-top: 1rem;
   }
 
+  .docs-home-top-row {
+    display: grid;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
   .docs-home-card {
     align-self: start;
+    margin: 0;
     border: 1px solid var(--sl-color-hairline-shade);
     border-radius: 1rem;
     background: linear-gradient(180deg, rgb(17 33 59 / 0.58), rgb(10 18 32 / 0.92));
     padding: 1.25rem;
+  }
+
+  .docs-home-card--top {
+    height: 100%;
   }
 
   .docs-home-card h2 {
@@ -140,12 +149,16 @@ const withBase = (href) => {
 
   @media (min-width: 50rem) {
     .docs-home-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
       margin-top: 2rem;
     }
 
+    .docs-home-top-row {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+    }
+
     .docs-home-card--wide {
-      grid-column: 1 / -1;
+      grid-column: auto;
     }
   }
 </style>

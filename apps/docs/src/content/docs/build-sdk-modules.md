@@ -1,23 +1,23 @@
 ---
 title: "Build modules"
-description: "Hearth is SDK-first. New modules should be added as web SDK modules unless there is a strong reason to keep them outside that path."
+description: "Most new modules should be added as web SDK modules."
 ---
 
-Hearth is SDK-first. New modules should be added as web SDK modules unless there is a strong reason to keep them outside that path.
+Most new modules should be added as web SDK modules.
 
-Use the generator for the fast path, or add a module file manually under apps/web/src/modules/sdk.
+Use the generator for the fastest start, or add a module file under apps/web/src/modules/sdk.
 
-Modules declare a manifest, settings schema, optional data schema, runtime component, and optional admin settings panel.
+Each module defines a manifest, settings schema, runtime component, and optional admin panel.
 
-If a module needs secrets or provider calls, move those concerns to the server and consume a server route from the module.
+If a module needs secrets or provider calls, move that work to the server.
 
-Use the shared module data hooks instead of hand-rolled fetch effects so polling, cache reuse, focus refresh, visibility refresh, and SSE invalidation follow one path.
+Use the shared data hooks instead of writing custom fetch effects.
 
 ## Key Points
 
-- Auto-discovery is handled by the web registry.
-- Use `useModuleQuery` for polling, cache, and invalidation-aware refreshes.
-- Use `useModuleStream` for direct SSE topic subscriptions when a module truly needs streaming state.
+- The web registry auto-discovers modules.
+- Use `useModuleQuery` for polling, cache, and refreshes.
+- Use `useModuleStream` only when a module truly needs streaming state.
 - Keep provider secrets and private feed URLs server-side.
 - Block-style modules should store theme palette slots, not raw hex colours.
 

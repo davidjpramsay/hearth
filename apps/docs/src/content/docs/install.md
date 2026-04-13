@@ -1,24 +1,24 @@
 ---
 title: "Choose an install path"
-description: "Pick the install path that matches how you want to use Hearth: local development, Docker, Synology, or a native Linux / Raspberry Pi install."
+description: "Pick the install path that matches your setup."
 ---
 
-Pick the install path that matches how you want to use Hearth: local development, Docker, Synology, or a native Linux / Raspberry Pi install.
+Pick the install path that matches your setup.
 
-For development on your own machine, use the local pnpm workflow. That gives you the Vite web app, the Fastify server, and the shared package watchers together.
+Use local pnpm if you are developing Hearth.
 
-For a normal home install on a Linux box, mini PC, or Raspberry Pi, the easiest production path is Docker Compose with the published image. That avoids local source builds on the target machine.
+Use Docker Compose for most production installs on Linux, mini PCs, and Raspberry Pi devices.
 
-For Synology, use the checked-in Synology compose file and env example. That is the supported NAS path and keeps updates simple.
+Use the Synology compose files if you are running on a Synology NAS.
 
-If you prefer a native Linux install instead of Docker, use Node, pnpm, and a system service. That is workable, but Docker is the easier default for most people.
+Use a native Linux install only if you do not want Docker.
 
 ## Key Points
 
-- Choose local pnpm only if you are developing or debugging Hearth itself.
-- Choose Docker Compose for the simplest production install on most systems.
-- Choose the Synology compose path if you are using Container Manager.
-- Choose native Linux only if you deliberately want to manage Node and the service yourself.
+- Local pnpm: for development
+- Docker Compose: best default for production
+- Synology: best for Container Manager
+- Native Linux: for non-Docker installs
 
 ### Local development
 

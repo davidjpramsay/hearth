@@ -1,18 +1,18 @@
 ---
 title: "What Hearth does"
-description: "Hearth is a household display system for dashboards, layouts, photo-driven rotation, chores, calendars, planner boards, weather, and site-local time-aware modules."
+description: "Hearth runs a family dashboard on a wall display or kiosk screen."
 ---
 
-Hearth is a household display system for dashboards, layouts, photo-driven rotation, chores, calendars, planner boards, weather, and site-local time-aware modules.
+Hearth runs a family dashboard on a wall display or kiosk screen.
 
-A display opens the dashboard, checks in with the server, receives the active layout or set, and then renders SDK modules inside the grid.
+Each display opens the dashboard, checks in with the server, and loads the active layout or set.
 
-The server is the source of truth for household timezone, display routing, module APIs, saved settings, and cached provider data.
+The server stores the household timezone, display routing, settings, and cached data.
 
-The web app contains both the display runtime and the admin experience, so most work happens in one frontend package with server-backed routes where secrets or integrations are involved.
+The web app includes both the display view and the admin tools.
 
 ## Key Points
 
-- Display clients use synced server time instead of trusting the Pi clock directly.
-- Layouts can be selected directly or through set logic and time/photo-based routing.
-- Modules are SDK-first and auto-discovered from the web app.
+- Displays use synced server time.
+- Layouts can switch by set logic, time, or photo rules.
+- Modules are SDK-first and auto-discovered.

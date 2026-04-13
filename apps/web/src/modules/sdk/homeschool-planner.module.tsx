@@ -36,13 +36,21 @@ const MIN_SLOT_HEIGHT_PX = 20;
 const localIsoDate = (timeZone: string, date: Date = getDisplayNow()): string =>
   toCalendarDateInTimeZone(date, timeZone);
 
-const localTimeString = (timeZone: string, date: Date): string =>
-  new Intl.DateTimeFormat("en-GB", {
+const localTimeParts = (timeZone: string, date: Date): { hour: number; minute: number } => {
+  const parts = new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+    hourCycle: "h23",
     timeZone,
-  }).format(date);
+  }).formatToParts(date);
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "00";
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "00";
+  return {
+    hour: Number.parseInt(hour, 10) % 24,
+    minute: Number.parseInt(minute, 10) || 0,
+  };
+};
 
 const buildSnapshotKey = (instanceId: string): string => `homeschool-planner:${instanceId}`;
 
@@ -320,9 +328,8 @@ export const moduleDefinition = defineModule({
         timeZone: getDisplaySiteTimeZone(),
       });
       const siteDateLabel = formatter.format(new Date(`${response.siteDate}T12:00:00.000Z`));
-      const currentTimeMinutes = plannerTimeToMinutes(
-        localTimeString(getDisplaySiteTimeZone(), displayNow),
-      );
+      const currentTime = localTimeParts(getDisplaySiteTimeZone(), displayNow);
+      const currentTimeMinutes = currentTime.hour * 60 + currentTime.minute;
       const dayStartMinutes = plannerTimeToMinutes(response.dayWindow.startTime);
       const dayEndMinutes = plannerTimeToMinutes(response.dayWindow.endTime);
       const currentTimeWithinWindow =

@@ -1,24 +1,24 @@
 ---
-title: "Write time-safe modules"
-description: "Any module that depends on household-local time, midnight rollover, or `today` must use the synced display-time utilities instead of raw browser time."
+title: "Build time-safe modules"
+description: "If a module depends on household time or `today`, use synced display time instead of browser time."
 ---
 
-Any module that depends on household-local time, midnight rollover, or `today` must use the synced display-time utilities instead of raw browser time.
+If a module depends on household time or `today`, use synced display time instead of browser time.
 
 Set `manifest.timeMode` intentionally: `device-local`, `site-local`, or `source-local`.
 
-For `site-local` modules, read time and timezone from `apps/web/src/runtime/display-time.ts`, react to display-time updates, and schedule a dedicated rollover refresh at the next site-local day boundary.
+For `site-local` modules, read time and timezone from `apps/web/src/runtime/display-time.ts` and refresh at the next site-local day boundary.
 
-If a module caches snapshots locally and its content is day-scoped, validate the snapshot against the current household date before reusing it.
+If a module reuses cached data, check that the cache still matches the current household date.
 
-When cached data is reused after a connectivity failure, prefer a soft stale badge over a hard blocking error.
+If cached data is shown after a failure, prefer a soft stale badge over a hard error.
 
 ## Key Points
 
-- Good references: clock, chores, calendar, bible-verse, homeschool-planner.
-- Do not trust raw `new Date()` for household-day grouping on displays.
+- Good references: clock, chores, calendar, bible verse, and School planner.
+- Do not trust raw `new Date()` for household-day logic on displays.
 - Use timezone-aware helpers from `@hearth/shared` for day comparisons.
-- The School planner runtime uses synced household time for day selection and its current-time indicator.
+- The School planner uses synced household time for day selection and its current-time line.
 
 ### Site-local module pattern
 

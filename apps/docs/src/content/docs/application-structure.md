@@ -1,19 +1,19 @@
 ---
-title: "How the application is organised"
-description: "The repo is split into shared contracts, the module SDK, the server, and the web app that powers both admin and displays."
+title: "How Hearth is built"
+description: "The repo has shared packages, a server, a web app, and the module SDK."
 ---
 
-The repo is split into shared contracts, the module SDK, the server, and the web app that powers both admin and displays.
+The repo has shared packages, a server, a web app, and the module SDK.
 
-packages/shared contains schemas, display contracts, time utilities, and shared module types.
+packages/shared contains schemas, contracts, and shared time helpers.
 
-packages/module-sdk contains defineModule and the SDK contract used by built-in and future modules.
+packages/module-sdk contains the SDK used by built-in and future modules.
 
-apps/server owns authenticated admin routes, module data endpoints, persistence, provider integrations, and display resolution.
+apps/server owns persistence, admin routes, provider calls, and display resolution.
 
-apps/web owns the dashboard runtime, admin pages, module implementations, and synced display-time behavior.
+apps/web owns the display runtime, admin pages, and built-in modules.
 
-The set-logic editor is split into a reducer, pure graph helpers, React Flow node components, inspector UI, and canvas shell so graph rules are testable without being buried inside one render file.
+The set-logic editor is split into smaller parts so it is easier to test and maintain.
 
 ## Key Points
 

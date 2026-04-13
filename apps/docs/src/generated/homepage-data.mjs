@@ -1,14 +1,14 @@
 export const docsHomeHero = {
   eyebrow: "Hearth Docs",
-  headline: "Installation, operations, displays, and module development in one place.",
+  headline: "Install, run, and extend Hearth.",
   summary:
-    "This is the public documentation surface for Hearth. It explains what the system does, how to run it, how displays behave, and how to build new SDK modules without reintroducing timing and caching regressions.",
+    "Hearth is a family wall display app. These docs show how to install it, run it, and build modules.",
   highlights: [
-    "Display runtime plus admin UI in one web app",
-    "Astro-based public docs site deployed to GitHub Pages",
-    "Synced household time for site-local behavior",
-    "SDK-first module architecture",
-    "Single supported verification path with pnpm verify",
+    "Display and admin in one app",
+    "Public docs on GitHub Pages",
+    "Synced household time",
+    "SDK modules",
+    "Check changes with pnpm verify",
   ],
 };
 export const docsHomeStartLinks = [
@@ -22,15 +22,15 @@ export const docsHomeStartLinks = [
   },
   {
     href: "/application-structure/",
-    label: "How the application is organised",
+    label: "How Hearth is built",
   },
   {
     href: "/admin/",
-    label: "Use the admin app",
+    label: "Use the admin",
   },
   {
     href: "/deploy/",
-    label: "Install on common systems",
+    label: "Install on your system",
   },
   {
     href: "/build-sdk-modules/",
@@ -38,10 +38,10 @@ export const docsHomeStartLinks = [
   },
   {
     href: "/time/",
-    label: "Write time-safe modules",
+    label: "Build time-safe modules",
   },
   {
     href: "/quality-checks/",
-    label: "Test and verify changes",
+    label: "Check your changes",
   },
 ];

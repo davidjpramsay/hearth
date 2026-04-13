@@ -1,19 +1,19 @@
 ---
-title: "Test and verify changes"
-description: "Use the root scripts rather than ad hoc workspace commands so dependency builds and tests run in the supported order."
+title: "Check your changes"
+description: "Use the root scripts so builds and tests run in the right order."
 ---
 
-Use the root scripts rather than ad hoc workspace commands so dependency builds and tests run in the supported order.
+Use the root scripts so builds and tests run in the right order.
 
-The root `test` script prepares shared package artifacts first and then runs package tests sequentially.
+The root `test` script builds shared packages first, then runs package tests in sequence.
 
-The root `verify` script is the canonical local and CI verification path.
+The root `verify` script is the main local and CI check.
 
-Avoid relying on `pnpm -r test` as a repo health signal because workspace build ordering can create false negatives.
+Avoid `pnpm -r test` because workspace order can cause false failures.
 
-Set-logic graph rules now have pure helper coverage plus browser smoke tests for connection and persistence regressions.
+The set-logic editor has helper tests and browser smoke tests.
 
-The graph editor reducer also has dedicated undo/redo coverage.
+The graph editor reducer also has undo/redo tests.
 
 ### Supported verification commands
 

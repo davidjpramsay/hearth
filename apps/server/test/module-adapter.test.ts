@@ -22,6 +22,28 @@ test("server status adapter response schema accepts valid payload", () => {
       runtimeTimeZone: "Australia/Perth",
       defaultSiteTimeZone: "Australia/Perth",
     },
+    diagnostics: {
+      backup: {
+        running: false,
+        latestBackupAt: null,
+        backupCount: 2,
+        intervalMinutes: 60,
+        retentionDays: 7,
+        lastError: null,
+      },
+      calendar: {
+        configuredFeedCount: 4,
+        enabledFeedCount: 3,
+        memoryCacheEntries: 2,
+        inFlightRefreshes: 0,
+        lastPrefetchAttemptAt: new Date().toISOString(),
+        lastPrefetchCompletedAt: new Date().toISOString(),
+      },
+      storage: {
+        databaseFileSizeBytes: 1024,
+        databaseLastModifiedAt: new Date().toISOString(),
+      },
+    },
     build: {
       serverEntrySha1: "abc123",
       serverEntryBuiltAt: new Date().toISOString(),

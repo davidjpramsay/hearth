@@ -16,7 +16,7 @@ export const docsSidebar = [
     label: "Architecture",
     items: [
       {
-        label: "How the application is organised",
+        label: "How Hearth is built",
         slug: "application-structure",
       },
     ],
@@ -25,11 +25,11 @@ export const docsSidebar = [
     label: "Operations",
     items: [
       {
-        label: "Use the admin app",
+        label: "Use the admin",
         slug: "admin",
       },
       {
-        label: "Install on common systems",
+        label: "Install on your system",
         slug: "deploy",
       },
     ],
@@ -42,7 +42,7 @@ export const docsSidebar = [
         slug: "build-sdk-modules",
       },
       {
-        label: "Write time-safe modules",
+        label: "Build time-safe modules",
         slug: "time",
       },
     ],
@@ -51,7 +51,7 @@ export const docsSidebar = [
     label: "Quality",
     items: [
       {
-        label: "Test and verify changes",
+        label: "Check your changes",
         slug: "quality-checks",
       },
     ],

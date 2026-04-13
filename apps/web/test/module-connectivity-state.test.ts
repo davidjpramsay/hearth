@@ -20,7 +20,7 @@ test("shows a blocking error when no snapshot exists yet", () => {
     isOnline: true,
   });
 
-  assert.equal(result.blockingError, "Failed to fetch");
+  assert.equal(result.blockingError, "Can't reach the server yet. Waiting for first sync.");
   assert.equal(result.showDisconnected, false);
 });
 

@@ -148,7 +148,7 @@ test.describe("Hearth smoke", () => {
       .locator(".react-flow__node")
       .filter({ hasText: "Time Gate Node" })
       .last();
-    await latestTimeGateNode.click();
+    await latestTimeGateNode.getByText("Time Gate Node").click({ force: true });
     await expect(page.getByText("Edit the selected time gate node settings.")).toBeVisible();
   });
 
