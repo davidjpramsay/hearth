@@ -1,24 +1,24 @@
 export const docsHomeHero = {
   eyebrow: "Hearth Docs",
-  headline: "Install, run, and extend Hearth.",
+  headline: "A family wall display you run yourself.",
   summary:
-    "Hearth is a family wall display app. These docs show how to install it, run it, and build modules.",
+    "Hearth shows photos, calendars, chores, school plans, clocks, and more on a full-screen display. Use the admin app to build layouts and choose what each screen shows.",
   highlights: [
-    "Display and admin in one app",
-    "Public docs on GitHub Pages",
+    "Photos, calendar, chores, and school planner",
+    "One admin app for all screens",
+    "Runs on Docker, Synology, Linux, and Raspberry Pi",
     "Synced household time",
-    "SDK modules",
-    "Check changes with pnpm verify",
+    "Local SQLite data with backups",
   ],
 };
 export const docsHomeStartLinks = [
   {
     href: "/overview/",
-    label: "What Hearth does",
+    label: "What Hearth is",
   },
   {
     href: "/install/",
-    label: "Choose an install path",
+    label: "Choose your install path",
   },
   {
     href: "/application-structure/",
@@ -30,7 +30,7 @@ export const docsHomeStartLinks = [
   },
   {
     href: "/deploy/",
-    label: "Install on your system",
+    label: "Install step by step",
   },
   {
     href: "/build-sdk-modules/",

@@ -1,14 +1,14 @@
 {
   "hero": {
     "eyebrow": "Hearth Docs",
-    "headline": "Install, run, and extend Hearth.",
-    "summary": "Hearth is a family wall display app. These docs show how to install it, run it, and build modules.",
+    "headline": "A family wall display you run yourself.",
+    "summary": "Hearth shows photos, calendars, chores, school plans, clocks, and more on a full-screen display. Use the admin app to build layouts and choose what each screen shows.",
     "highlights": [
-      "Display and admin in one app",
-      "Public docs on GitHub Pages",
+      "Photos, calendar, chores, and school planner",
+      "One admin app for all screens",
+      "Runs on Docker, Synology, Linux, and Raspberry Pi",
       "Synced household time",
-      "SDK modules",
-      "Check changes with pnpm verify"
+      "Local SQLite data with backups"
     ]
   },
   "sections": [
@@ -16,36 +16,37 @@
       "id": "overview",
       "group": "Getting Started",
       "eyebrow": "Platform",
-      "title": "What Hearth does",
-      "summary": "Hearth runs a family dashboard on a wall display or kiosk screen.",
+      "title": "What Hearth is",
+      "summary": "Hearth is a self-hosted dashboard for a wall display, TV, tablet, or kiosk browser.",
       "body": [
-        "Each display opens the dashboard, checks in with the server, and loads the active layout or set.",
-        "The server stores the household timezone, display routing, settings, and cached data.",
-        "The web app includes both the display view and the admin tools."
+        "Open Hearth on a display to show a full-screen family dashboard.",
+        "Use the admin app to build layouts, add modules, and choose what each screen shows.",
+        "Built-in modules include photos, calendar, clock, weather, chores, Bible verse, and School planner.",
+        "Each display checks in with the server so layout changes appear quickly."
       ],
       "bullets": [
-        "Displays use synced server time.",
-        "Layouts can switch by set logic, time, or photo rules.",
-        "Modules are SDK-first and auto-discovered."
+        "One app for the display and the admin tools.",
+        "Different screens can show different layouts.",
+        "Displays use synced household time.",
+        "Layouts can switch by set logic, time, or photo rules."
       ]
     },
     {
       "id": "install",
       "group": "Getting Started",
       "eyebrow": "Quick Start",
-      "title": "Choose an install path",
-      "summary": "Pick the install path that matches your setup.",
+      "title": "Choose your install path",
+      "summary": "Pick the path that matches how you want to run Hearth.",
       "body": [
-        "Use local pnpm if you are developing Hearth.",
-        "Use Docker Compose for most production installs on Linux, mini PCs, and Raspberry Pi devices.",
-        "Use the Synology compose files if you are running on a Synology NAS.",
-        "Use a native Linux install only if you do not want Docker."
+        "If you just want to run Hearth at home, use Docker Compose or Synology.",
+        "If you are changing the code, use local pnpm development.",
+        "Only use the native Linux install if you do not want Docker."
       ],
       "bullets": [
         "Local pnpm: for development",
-        "Docker Compose: best default for production",
-        "Synology: best for Container Manager",
-        "Native Linux: for non-Docker installs"
+        "Docker Compose: best default for most installs",
+        "Synology: best for Synology Container Manager",
+        "Native Linux: only if you do not want Docker"
       ],
       "code": {
         "language": "bash",
@@ -58,19 +59,18 @@
       "group": "Architecture",
       "eyebrow": "Architecture",
       "title": "How Hearth is built",
-      "summary": "The repo has shared packages, a server, a web app, and the module SDK.",
+      "summary": "Hearth has a server, a web app, shared packages, and a module SDK.",
       "body": [
-        "packages/shared contains schemas, contracts, and shared time helpers.",
-        "packages/module-sdk contains the SDK used by built-in and future modules.",
-        "apps/server owns persistence, admin routes, provider calls, and display resolution.",
-        "apps/web owns the display runtime, admin pages, and built-in modules.",
-        "The set-logic editor is split into smaller parts so it is easier to test and maintain."
+        "apps/server stores data, serves the API, and resolves what each display should show.",
+        "apps/web contains the display app and the admin pages.",
+        "packages/shared contains schemas, contracts, and time helpers.",
+        "packages/module-sdk contains the SDK used by built-in and future modules."
       ],
       "bullets": [
-        "`apps/web/src/modules/sdk` holds built-in SDK modules.",
-        "`apps/web/src/runtime/display-time.ts` is the synced household time source for site-local modules.",
-        "`apps/server/src/routes` and `apps/server/src/services` contain module-facing APIs and backend logic.",
-        "`apps/web/src/components/admin/set-logic-editor` contains the extracted set-logic editor internals."
+        "`apps/web/src/modules/sdk` holds built-in modules.",
+        "`apps/web/src/runtime/display-time.ts` is the synced household time source.",
+        "`apps/server/src/routes` and `apps/server/src/services` hold backend logic.",
+        "`apps/web/src/components/admin/set-logic-editor` holds the set-logic editor internals."
       ]
     },
     {
@@ -80,48 +80,47 @@
       "title": "Use the admin",
       "summary": "Most setup happens in Layouts, Settings, Children, Chores, and School.",
       "body": [
-        "Use Layouts to build pages and set up logic.",
-        "Use Settings to manage displays, timezone, calendar feeds, and runtime details.",
+        "Open `/admin/login` to sign in.",
+        "Use Layouts to build pages and set up layout logic.",
+        "Use Settings to manage displays, timezone, calendar feeds, and system health.",
         "Use Children to manage the shared child list.",
         "Use Chores to manage tasks and payouts.",
-        "Use School to manage day plans and timetables."
+        "Use School to manage weekly plans and timetables."
       ],
       "bullets": [
-        "Admin login lives at `/admin/login`.",
-        "The dashboard display runtime lives at `/`.",
-        "Saved calendar feeds are shared by all calendar modules.",
-        "Settings autosaves low-risk edits.",
+        "The fullscreen display runs at `/`.",
+        "Saved calendar feeds can be reused across layouts.",
+        "Settings autosaves simple edits.",
         "Each weekday can belong to only one School plan.",
         "Settings shows display health, backups, and database status.",
-        "The set-logic editor supports undo, redo, and draft recovery.",
-        "Displays can show `Offline` or `Cached` instead of hard errors.",
-        "Main modules now use shared loading skeletons.",
-        "Theme colours come from curated 12-slot palettes."
+        "The set-logic editor supports undo, redo, and draft recovery."
       ]
     },
     {
       "id": "deploy",
       "group": "Operations",
-      "eyebrow": "Deployment",
-      "title": "Install on your system",
-      "summary": "Use the simplest path for your machine. Most installs should use the published container image.",
+      "eyebrow": "Install",
+      "title": "Install step by step",
+      "summary": "Follow the steps for your system. Most home installs should use Docker or Synology.",
       "body": [
-        "Docker: copy `.env.example` to `.env`, set the password and timezone, then start Docker Compose.",
-        "Synology: use `.env.synology.example` and `docker-compose.synology.yml`, and keep the data volume persistent.",
-        "Native Linux or Raspberry Pi: install Node and pnpm, then run `pnpm install`, `pnpm build`, and `pnpm start`.",
-        "After startup, open `/admin/login`, set the household timezone, and open `/` once on each display device.",
-        "Set the deployment timezone and the household timezone so a fresh install does not fall back to UTC."
+        "Docker Compose: copy `.env.example` to `.env`, then set `ADMIN_PASSWORD`, `TZ`, and `DEFAULT_SITE_TIMEZONE`.",
+        "Start Hearth with `docker compose up -d`.",
+        "Open `http://<your-host>:3000/admin/login` and sign in with `ADMIN_PASSWORD`.",
+        "Open `Settings`, set the household timezone, then open `/` once on each display so it registers.",
+        "Go back to `Settings`, name each display, and assign a layout or set.",
+        "On Synology, use `.env.synology` and `docker-compose.synology.yml` instead of the standard files.",
+        "For native Linux or Raspberry Pi, install Node, pnpm, and git first, then run `pnpm install`, `pnpm build`, and `pnpm start`."
       ],
       "bullets": [
-        "Default runtime URL is `http://<host>:3000`.",
-        "Set `HOST=0.0.0.0` if devices on your LAN need to reach a native install.",
-        "Do not expose Hearth directly to the public internet.",
-        "Use `pnpm verify` before publishing or building a release image."
+        "Default runtime URL: `http://<host>:3000`",
+        "Admin login: `http://<host>:3000/admin/login`",
+        "Set `HOST=0.0.0.0` if other devices on your LAN need to reach a native install.",
+        "Do not expose Hearth directly to the public internet."
       ],
       "code": {
         "language": "bash",
-        "title": "Docker or Synology update flow",
-        "content": "pnpm verify\n\n# Docker host\ndocker compose pull\ndocker compose up -d\n\n# Synology\ndocker compose -f docker-compose.synology.yml pull\ndocker compose -f docker-compose.synology.yml up -d\ndocker compose -f docker-compose.synology.yml ps"
+        "title": "Docker install",
+        "content": "cp .env.example .env\n# edit .env and set ADMIN_PASSWORD, TZ, DEFAULT_SITE_TIMEZONE\n\ndocker compose up -d\n\n# later updates\ndocker compose pull\ndocker compose up -d"
       }
     },
     {
@@ -131,21 +130,20 @@
       "title": "Build modules",
       "summary": "Most new modules should be added as web SDK modules.",
       "body": [
-        "Use the generator for the fastest start, or add a module file under apps/web/src/modules/sdk.",
+        "Use the generator for the fastest start.",
         "Each module defines a manifest, settings schema, runtime component, and optional admin panel.",
         "If a module needs secrets or provider calls, move that work to the server.",
-        "Use the shared data hooks instead of writing custom fetch effects."
+        "Use the shared data hooks instead of writing your own fetch effects."
       ],
       "bullets": [
         "The web registry auto-discovers modules.",
         "Use `useModuleQuery` for polling, cache, and refreshes.",
-        "Use `useModuleStream` only when a module truly needs streaming state.",
-        "Keep provider secrets and private feed URLs server-side.",
+        "Keep provider secrets and private feed URLs on the server.",
         "Block-style modules should store theme palette slots, not raw hex colours."
       ],
       "code": {
         "language": "bash",
-        "title": "Scaffold a new module",
+        "title": "Create a new module",
         "content": "pnpm create-module"
       }
     },
@@ -156,16 +154,16 @@
       "title": "Build time-safe modules",
       "summary": "If a module depends on household time or `today`, use synced display time instead of browser time.",
       "body": [
-        "Set `manifest.timeMode` intentionally: `device-local`, `site-local`, or `source-local`.",
-        "For `site-local` modules, read time and timezone from `apps/web/src/runtime/display-time.ts` and refresh at the next site-local day boundary.",
-        "If a module reuses cached data, check that the cache still matches the current household date.",
-        "If cached data is shown after a failure, prefer a soft stale badge over a hard error."
+        "Set `manifest.timeMode` on purpose: `device-local`, `site-local`, or `source-local`.",
+        "For `site-local` modules, read time and timezone from `apps/web/src/runtime/display-time.ts`.",
+        "Refresh at the next site-local day boundary.",
+        "If a module uses cached data, make sure the cache still matches the current household date."
       ],
       "bullets": [
-        "Good references: clock, chores, calendar, bible verse, and School planner.",
-        "Do not trust raw `new Date()` for household-day logic on displays.",
-        "Use timezone-aware helpers from `@hearth/shared` for day comparisons.",
-        "The School planner uses synced household time for day selection and its current-time line."
+        "Good references: clock, chores, calendar, Bible verse, and School planner.",
+        "Do not trust raw `new Date()` for household-day logic.",
+        "Use timezone-aware helpers from `@hearth/shared`.",
+        "School planner uses synced household time for day selection and its current-time line."
       ],
       "code": {
         "language": "ts",
@@ -180,15 +178,13 @@
       "title": "Check your changes",
       "summary": "Use the root scripts so builds and tests run in the right order.",
       "body": [
-        "The root `test` script builds shared packages first, then runs package tests in sequence.",
+        "The root `test` script builds shared packages first, then runs tests in order.",
         "The root `verify` script is the main local and CI check.",
-        "Avoid `pnpm -r test` because workspace order can cause false failures.",
-        "The set-logic editor has helper tests and browser smoke tests.",
-        "The graph editor reducer also has undo/redo tests."
+        "Avoid `pnpm -r test` because workspace order can cause false failures."
       ],
       "code": {
         "language": "bash",
-        "title": "Supported verification commands",
+        "title": "Commands to run",
         "content": "pnpm test\npnpm verify"
       }
     }

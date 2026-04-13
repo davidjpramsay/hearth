@@ -1,27 +1,27 @@
 # Hearth
 
-Hearth is a self-hosted family dashboard for a wall display or kiosk browser.
+Hearth is a self-hosted family wall display.
 
-It is built to run on low-power hardware (Raspberry Pi / mini PCs) and provides:
+Run it on a TV, tablet, Raspberry Pi, mini PC, or kiosk browser to show things like:
 
-- Visual layout editor (`/admin`)
-- Settings admin for household time, calendar feeds, and per-display routing
-- Fullscreen display dashboard (`/`)
-- Modular tiles (Photos, Calendar, Clock, Chores, Weather, Bible verse, Welcome, Count Down, Kobo Reader)
-- SQLite persistence
-- Live layout updates via SSE
-- Automatic encrypted calendar-source storage in the database
-- Automatic rolling SQLite backups
-- Chores weekly tracking with configurable payday boundaries
+- Photos
+- Calendar
+- Clock and weather
+- Chores
+- School planner
+- Bible verse
+- Custom layouts for each screen
+
+Use the admin app to build layouts, manage screens, and choose what each display shows.
 
 ## Start Here
 
-Pick the path that matches what you are trying to do:
+Pick the path that matches what you want to do:
 
-- Build or change Hearth itself: use the local `pnpm` development workflow
-- Run Hearth on a normal server, mini PC, or Raspberry Pi: use Docker Compose
-- Run Hearth on a Synology NAS: use the Synology compose files
-- Run Hearth without Docker: use the native Node install on Linux
+- Change Hearth itself: use local `pnpm`
+- Run Hearth at home on Linux, a mini PC, or Raspberry Pi: use Docker Compose
+- Run Hearth on a Synology NAS: use the Synology files
+- Run Hearth without Docker: use the native Linux install
 
 Public docs site:
 
@@ -31,108 +31,17 @@ Demo video:
 
 - Coming soon. The docs site is ready for it, but the final recording has not been added yet.
 
-## Monorepo Structure
+## What You Get
 
-- `apps/server`: Fastify API + SQLite + module backends
-- `apps/web`: React admin + display app
-- `packages/shared`: shared contracts (Zod schemas + TS types)
-- `packages/core`: shared layout + registry helpers used by web/server
-- `packages/module-sdk`: typed SDK for runtime modules
-
-## Documentation
-
-- Public docs site: [https://davidjpramsay.github.io/hearth/](https://davidjpramsay.github.io/hearth/) (Astro Starlight)
-- Structured docs source: `docs/content/app-docs.json`
-- Generated Markdown mirror: `docs/APP_DOCS.md`
-- Generated Astro content module: `apps/docs/src/content/app-docs.generated.ts`
-- Local docs authoring: `pnpm docs:sync` then `pnpm docs:dev`
-- [Deployment Guide](docs/DEPLOYMENT.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [App Docs Mirror](docs/APP_DOCS.md)
-- [Performance Guide](docs/PERFORMANCE.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Synology Checklist](docs/SYNOLOGY_CHECKLIST.md)
-- [Synology Deployment](docs/SYNOLOGY_DEPLOYMENT.md)
-- [Synology Update Routine](docs/SYNOLOGY_UPDATE.md)
-- [Image Publishing](docs/IMAGE_PUBLISHING.md)
-- [Modules Overview](docs/modules/MODULES_OVERVIEW.md)
-- [Module Contract](docs/modules/MODULE_CONTRACT.md)
-- [Adding a Module](docs/modules/ADDING_A_MODULE.md)
-- [Data Sources](docs/modules/DATA_SOURCES.md)
-- [Historical Migration Notes](docs/modules/MIGRATION_GUIDE.md)
-- [Layout Logic Customization](docs/modules/LAYOUT_LOGIC_CUSTOMIZATION.md)
-- [Module Security](docs/modules/SECURITY.md)
-- [Module Style Guide](docs/modules/STYLE_GUIDE.md)
-
-## Building Modules
-
-Hearth runtime is SDK-first.
-
-- Active modules are auto-discovered from `apps/web/src/modules/sdk/*`.
-- `packages/core` no longer carries runtime module implementations or discovery stubs; it stays focused on shared layout/registry helpers.
-- The web registry resolves module listing/rendering locally in the web app.
-- Server integrations are handled by adapters in `apps/server/src/modules/adapters/*`.
-
-Create a new module scaffold:
-
-```bash
-pnpm create-module
-```
-
-Then verify:
-
-```bash
-pnpm verify
-```
-
-Browser smoke coverage uses Playwright and boots a clean local Hearth server against a disposable
-`.tmp/e2e-data` directory. On a fresh machine, install the browser once with:
-
-```bash
-pnpm exec playwright install chromium
-```
-
-The public docs site is a standalone Astro Starlight app under `apps/docs` and is published through GitHub Pages. It is intentionally separate from the Hearth runtime server.
-
-Recent reliability and performance hardening:
-
-- set-logic editor internals now live under `apps/web/src/components/admin/set-logic-editor/*` instead of one monolithic file
-- graph rules have pure helper coverage plus Playwright regressions for time-gate connections and graph persistence
-- `useModuleQuery` is the unified fetch lifecycle for polling/invalidation-aware module and admin data refresh
-- the web build manually chunks React Flow and set-logic editor code so the layout editor does not bloat the main runtime bundle
-
-## Recent Changelog
-
-- April 12, 2026: split the set-logic editor into reducer/graph/component/inspector/canvas-shell modules, added focused graph helper tests plus Playwright editor regressions, and manually chunked the web build so React Flow + set-logic code stay out of the main app bundle.
-- March 19, 2026: hardened admin 401 recovery so expired/invalid stored tokens are cleared and redirected back to `/admin/login`, and reset display bootstrap state on device updates so deleted displays do not resurrect stale routing on re-checkin.
-- March 19, 2026: added shared build-update detection so admin pages now show a reload prompt when a newer bundle is deployed, while the dashboard display path still auto-reloads itself.
-- March 19, 2026: added Playwright browser smoke coverage for admin login/logout, first-run display registration, and admin layout creation against a clean local test server.
-- March 19, 2026: removed the last dead `@hearth/core` discovery/module stub path and the unused `hello-world` demo adapter; remaining compatibility code is now limited to real data/bootstrap migrations rather than runtime module legacy.
-- March 19, 2026: workspace build scripts now clear `dist/` before recompiling so deleted files do not linger in deploy artifacts.
-- March 18, 2026: unified active module typography around shared `module-copy-*` roles (`label`, `meta`, `body`, `title`, `hero`) and removed the retired legacy module sources from `packages/core/src/modules/*`.
-- March 10, 2026: all active SDK modules now share a minimal `presentation` settings block (`heading`, `primary`, `supporting`) for clean per-module sizing, and the old clock-specific time/date font-size controls were removed.
-- March 9, 2026: Layout Sets now use a visual action-node graph with draggable layout nodes and `Photo Orientation` nodes, backed by persisted `logicBlocks` that compile into the runtime `logicGraph`; the old primitive free-form canvas path is removed.
-- March 8, 2026: photo image responses now send long-lived immutable cache headers, allowing cache-capable kiosk browsers to reuse already-loaded images on repeat views instead of refetching them each time.
-- March 6, 2026: added SDK `count-down` module with date/time countdown modes, completion pulse effect, and resilient empty-event fallback rendering.
-- March 6, 2026: Bible Verse module now centers short verses and uses one-way looped slow-scroll for long verses with fixed heading/footer.
-- March 5, 2026: set-driven display now publishes effective cycle context so Photos modules follow set rule timers in `Layout Set` mode and use module slide interval in `Single Layout` mode.
-- March 5, 2026: calendar module event cards now use stronger full-color fills in list/week/month views, with updated header labeling (`Upcoming` for list/week, current month name for month view).
-- March 2, 2026: Bible Verse module switched to `api.esv.org` (ESV provider) with server-side API key support.
-- March 2, 2026: migrated the initial built-in modules to SDK-backed live modules with runtime registration moved fully into the web app.
-- March 2, 2026: added a future-proof module platform with `@hearth/module-sdk`, typed manifests/schemas, lifecycle hooks, and runtime validators.
-- March 2, 2026: introduced the unified web module registry and SDK auto-discovery.
-- March 2, 2026: added standard module data hooks (`useModuleQuery`, `useModuleStream`) and reusable SDK `ModuleFrame` UI shell.
-- March 2, 2026: introduced server module adapter layer (`apps/server/src/modules`) with REST + SSE support for server-backed modules.
-- March 2, 2026: added module scaffolding generator (`pnpm create-module`) and baseline tests for SDK validation, registry listing, and adapter response validation.
-- March 1, 2026: migrated auto layout rotation to a single shared cycle clock (`autoCycleSeconds`) so all auto targets rotate consistently, including layouts without Photos modules.
-- March 1, 2026: extracted shared grid/quantization logic into `apps/web/src/layout/grid-math.ts` and wired both dashboard + layout editor to it to reduce layout drift regressions.
-- March 1, 2026: prevented no-photo/placeholder frames from emitting orientation events (avoids false portrait/landscape switches).
-- March 1, 2026: hardened layout editor autosave to ignore stale save responses (prevents newer edits being overwritten by slower network responses).
-- March 1, 2026: improved runtime robustness with safer SSE event fan-out and stricter photo path containment checks.
+- Fullscreen display at `/`
+- Admin app at `/admin/login`
+- Per-screen layout routing
+- Photo, calendar, chores, weather, clock, Bible verse, and School planner modules
+- SQLite storage with automatic backups
 
 ## Install For Development
 
-Use this if you are changing Hearth itself.
+Use this only if you are changing Hearth itself.
 
 1. Copy the env file.
 
@@ -165,7 +74,13 @@ pnpm verify
 
 ## Install With Docker Compose
 
-Use this for most normal home installs on Linux, mini PCs, and Raspberry Pi class hardware.
+Use this for most home installs.
+
+Before you start:
+
+- Docker and Docker Compose must already be installed.
+- This machine should stay on while Hearth is running.
+- Your screens must be able to reach this machine on your local network.
 
 1. Copy the env file.
 
@@ -179,22 +94,25 @@ cp .env.example .env
 - `TZ`
 - `DEFAULT_SITE_TIMEZONE`
 
-3. Start the published container.
+3. Start Hearth.
 
 ```bash
 docker compose up -d
 ```
 
-4. Open Hearth.
+4. Open Hearth in a browser.
 
 - Runtime: `http://<your-host>:3000`
 - Admin login: `http://<your-host>:3000/admin/login`
 
-5. After first login:
+5. After you sign in:
 
-- set the household timezone in `Settings`
-- open `/` once on each display device so it registers
-- go back to `Settings` and name/assign each display
+- Open `Settings`
+- Set the household timezone
+- Open `/` once on each display device so it registers
+- Go back to `Settings` and name each display
+- Build your first layout in `Layouts`
+- Assign that layout to a screen
 
 Update later with:
 
@@ -206,6 +124,11 @@ docker compose up -d
 ## Install On Synology
 
 Use this if you are running Hearth through Synology Container Manager.
+
+Before you start:
+
+- Synology Container Manager must already be working.
+- You need a persistent folder for Hearth data.
 
 1. Copy the Synology env file.
 
@@ -219,7 +142,7 @@ cp .env.synology.example .env.synology
 - `TZ`
 - `DEFAULT_SITE_TIMEZONE`
 
-3. Start the Synology stack.
+3. Start Hearth.
 
 ```bash
 docker compose -f docker-compose.synology.yml --env-file .env.synology up -d
@@ -232,6 +155,15 @@ docker compose -f docker-compose.synology.yml --env-file .env.synology up -d
 5. Keep the data volume persistent:
 
 - `/volume1/docker/hearth/data:/app/data`
+
+6. After you sign in:
+
+- Open `Settings`
+- Set the household timezone
+- Open `/` once on each display device so it registers
+- Go back to `Settings` and name each display
+- Build your first layout in `Layouts`
+- Assign that layout to a screen
 
 Update later with:
 
@@ -250,41 +182,56 @@ For the full Synology path, use:
 
 Use this only if you deliberately do not want Docker.
 
-1. Install Node, pnpm, and git.
-2. Copy the env file.
+Before you start:
+
+- Install Node
+- Install pnpm
+- Install git
+- Make sure other devices on your LAN can reach this machine if it will host displays
+
+1. Copy the env file.
 
 ```bash
 cp .env.example .env
 ```
 
-3. Set at least:
+2. Set at least:
 
 - `ADMIN_PASSWORD`
 - `TZ`
 - `DEFAULT_SITE_TIMEZONE`
 
-4. Install and build Hearth.
+3. Install and build Hearth.
 
 ```bash
 pnpm install
 pnpm build
 ```
 
-5. Start Hearth.
+4. Start Hearth.
 
 ```bash
 pnpm start
 ```
 
-6. If displays on your LAN need to reach this machine, set:
+5. If other devices on your LAN need to reach this machine, set:
 
 - `HOST=0.0.0.0`
 
-7. Keep it running with `systemd` or another process manager.
+6. Keep it running with `systemd` or another process manager.
+
+7. After you sign in:
+
+- Open `Settings`
+- Set the household timezone
+- Open `/` once on each display device so it registers
+- Go back to `Settings` and name each display
+- Build your first layout in `Layouts`
+- Assign that layout to a screen
 
 ## First Run Checklist
 
-After any production install:
+After any install:
 
 1. Open `/admin/login`
 2. Sign in with `ADMIN_PASSWORD`
@@ -293,6 +240,13 @@ After any production install:
 5. Open `/` once on each display device
 6. Return to `Settings` and assign each display to a layout or set
 7. Build your layouts in `Layouts`
+
+## Public Docs
+
+- Public docs site: [https://davidjpramsay.github.io/hearth/](https://davidjpramsay.github.io/hearth/)
+- App docs mirror: [docs/APP_DOCS.md](docs/APP_DOCS.md)
+- Deployment guide: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+- Synology deployment: [docs/SYNOLOGY_DEPLOYMENT.md](docs/SYNOLOGY_DEPLOYMENT.md)
 
 ## Deployment Options
 
@@ -309,6 +263,25 @@ Useful deployment docs:
 - [Synology Deployment](docs/SYNOLOGY_DEPLOYMENT.md)
 - [Synology Update Routine](docs/SYNOLOGY_UPDATE.md)
 - [Image Publishing](docs/IMAGE_PUBLISHING.md)
+
+## Developer Notes
+
+- `apps/server`: API + SQLite + backend logic
+- `apps/web`: admin app + display app
+- `packages/shared`: shared schemas and contracts
+- `packages/module-sdk`: SDK for modules
+
+Create a new module scaffold:
+
+```bash
+pnpm create-module
+```
+
+Check changes before pushing:
+
+```bash
+pnpm verify
+```
 
 ## Kobo Reader Setup
 

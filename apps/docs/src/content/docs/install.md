@@ -1,24 +1,22 @@
 ---
-title: "Choose an install path"
-description: "Pick the install path that matches your setup."
+title: "Choose your install path"
+description: "Pick the path that matches how you want to run Hearth."
 ---
 
-Pick the install path that matches your setup.
+Pick the path that matches how you want to run Hearth.
 
-Use local pnpm if you are developing Hearth.
+If you just want to run Hearth at home, use Docker Compose or Synology.
 
-Use Docker Compose for most production installs on Linux, mini PCs, and Raspberry Pi devices.
+If you are changing the code, use local pnpm development.
 
-Use the Synology compose files if you are running on a Synology NAS.
-
-Use a native Linux install only if you do not want Docker.
+Only use the native Linux install if you do not want Docker.
 
 ## Key Points
 
 - Local pnpm: for development
-- Docker Compose: best default for production
-- Synology: best for Container Manager
-- Native Linux: for non-Docker installs
+- Docker Compose: best default for most installs
+- Synology: best for Synology Container Manager
+- Native Linux: only if you do not want Docker
 
 ### Local development
 

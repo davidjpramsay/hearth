@@ -1,18 +1,21 @@
 ---
-title: "What Hearth does"
-description: "Hearth runs a family dashboard on a wall display or kiosk screen."
+title: "What Hearth is"
+description: "Hearth is a self-hosted dashboard for a wall display, TV, tablet, or kiosk browser."
 ---
 
-Hearth runs a family dashboard on a wall display or kiosk screen.
+Hearth is a self-hosted dashboard for a wall display, TV, tablet, or kiosk browser.
 
-Each display opens the dashboard, checks in with the server, and loads the active layout or set.
+Open Hearth on a display to show a full-screen family dashboard.
 
-The server stores the household timezone, display routing, settings, and cached data.
+Use the admin app to build layouts, add modules, and choose what each screen shows.
 
-The web app includes both the display view and the admin tools.
+Built-in modules include photos, calendar, clock, weather, chores, Bible verse, and School planner.
+
+Each display checks in with the server so layout changes appear quickly.
 
 ## Key Points
 
-- Displays use synced server time.
+- One app for the display and the admin tools.
+- Different screens can show different layouts.
+- Displays use synced household time.
 - Layouts can switch by set logic, time, or photo rules.
-- Modules are SDK-first and auto-discovered.

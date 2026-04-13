@@ -3,11 +3,11 @@ export const docsSidebar = [
     label: "Getting Started",
     items: [
       {
-        label: "What Hearth does",
+        label: "What Hearth is",
         slug: "overview",
       },
       {
-        label: "Choose an install path",
+        label: "Choose your install path",
         slug: "install",
       },
     ],
@@ -29,7 +29,7 @@ export const docsSidebar = [
         slug: "admin",
       },
       {
-        label: "Install on your system",
+        label: "Install step by step",
         slug: "deploy",
       },
     ],

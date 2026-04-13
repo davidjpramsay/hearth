@@ -1,38 +1,40 @@
 ---
-title: "Install on your system"
-description: "Use the simplest path for your machine. Most installs should use the published container image."
+title: "Install step by step"
+description: "Follow the steps for your system. Most home installs should use Docker or Synology."
 ---
 
-Use the simplest path for your machine. Most installs should use the published container image.
+Follow the steps for your system. Most home installs should use Docker or Synology.
 
-Docker: copy `.env.example` to `.env`, set the password and timezone, then start Docker Compose.
+Docker Compose: copy `.env.example` to `.env`, then set `ADMIN_PASSWORD`, `TZ`, and `DEFAULT_SITE_TIMEZONE`.
 
-Synology: use `.env.synology.example` and `docker-compose.synology.yml`, and keep the data volume persistent.
+Start Hearth with `docker compose up -d`.
 
-Native Linux or Raspberry Pi: install Node and pnpm, then run `pnpm install`, `pnpm build`, and `pnpm start`.
+Open `http://<your-host>:3000/admin/login` and sign in with `ADMIN_PASSWORD`.
 
-After startup, open `/admin/login`, set the household timezone, and open `/` once on each display device.
+Open `Settings`, set the household timezone, then open `/` once on each display so it registers.
 
-Set the deployment timezone and the household timezone so a fresh install does not fall back to UTC.
+Go back to `Settings`, name each display, and assign a layout or set.
+
+On Synology, use `.env.synology` and `docker-compose.synology.yml` instead of the standard files.
+
+For native Linux or Raspberry Pi, install Node, pnpm, and git first, then run `pnpm install`, `pnpm build`, and `pnpm start`.
 
 ## Key Points
 
-- Default runtime URL is `http://<host>:3000`.
-- Set `HOST=0.0.0.0` if devices on your LAN need to reach a native install.
+- Default runtime URL: `http://<host>:3000`
+- Admin login: `http://<host>:3000/admin/login`
+- Set `HOST=0.0.0.0` if other devices on your LAN need to reach a native install.
 - Do not expose Hearth directly to the public internet.
-- Use `pnpm verify` before publishing or building a release image.
 
-### Docker or Synology update flow
+### Docker install
 
 ```bash
-pnpm verify
+cp .env.example .env
+# edit .env and set ADMIN_PASSWORD, TZ, DEFAULT_SITE_TIMEZONE
 
-# Docker host
-docker compose pull
 docker compose up -d
 
-# Synology
-docker compose -f docker-compose.synology.yml pull
-docker compose -f docker-compose.synology.yml up -d
-docker compose -f docker-compose.synology.yml ps
+# later updates
+docker compose pull
+docker compose up -d
 ```

@@ -2,61 +2,62 @@
 
 # Hearth App Docs
 
-Hearth is a family wall display app. These docs show how to install it, run it, and build modules.
+Hearth shows photos, calendars, chores, school plans, clocks, and more on a full-screen display. Use the admin app to build layouts and choose what each screen shows.
 
 ## Highlights
 
-- Display and admin in one app
-- Public docs on GitHub Pages
+- Photos, calendar, chores, and school planner
+- One admin app for all screens
+- Runs on Docker, Synology, Linux, and Raspberry Pi
 - Synced household time
-- SDK modules
-- Check changes with pnpm verify
+- Local SQLite data with backups
 
 ## Sections
 
-- [What Hearth does](#overview)
-- [Choose an install path](#install)
+- [What Hearth is](#overview)
+- [Choose your install path](#install)
 - [How Hearth is built](#application-structure)
 - [Use the admin](#admin)
-- [Install on your system](#deploy)
+- [Install step by step](#deploy)
 - [Build modules](#build-sdk-modules)
 - [Build time-safe modules](#time)
 - [Check your changes](#quality-checks)
 
-## What Hearth does
+## What Hearth is
 
 _Platform_
 
-Hearth runs a family dashboard on a wall display or kiosk screen.
+Hearth is a self-hosted dashboard for a wall display, TV, tablet, or kiosk browser.
 
-Each display opens the dashboard, checks in with the server, and loads the active layout or set.
+Open Hearth on a display to show a full-screen family dashboard.
 
-The server stores the household timezone, display routing, settings, and cached data.
+Use the admin app to build layouts, add modules, and choose what each screen shows.
 
-The web app includes both the display view and the admin tools.
+Built-in modules include photos, calendar, clock, weather, chores, Bible verse, and School planner.
 
-- Displays use synced server time.
+Each display checks in with the server so layout changes appear quickly.
+
+- One app for the display and the admin tools.
+- Different screens can show different layouts.
+- Displays use synced household time.
 - Layouts can switch by set logic, time, or photo rules.
-- Modules are SDK-first and auto-discovered.
 
-## Choose an install path
+## Choose your install path
 
 _Quick Start_
 
-Pick the install path that matches your setup.
+Pick the path that matches how you want to run Hearth.
 
-Use local pnpm if you are developing Hearth.
+If you just want to run Hearth at home, use Docker Compose or Synology.
 
-Use Docker Compose for most production installs on Linux, mini PCs, and Raspberry Pi devices.
+If you are changing the code, use local pnpm development.
 
-Use the Synology compose files if you are running on a Synology NAS.
-
-Use a native Linux install only if you do not want Docker.
+Only use the native Linux install if you do not want Docker.
 
 - Local pnpm: for development
-- Docker Compose: best default for production
-- Synology: best for Container Manager
-- Native Linux: for non-Docker installs
+- Docker Compose: best default for most installs
+- Synology: best for Synology Container Manager
+- Native Linux: only if you do not want Docker
 
 ### Local development
 
@@ -73,22 +74,20 @@ pnpm verify
 
 _Architecture_
 
-The repo has shared packages, a server, a web app, and the module SDK.
+Hearth has a server, a web app, shared packages, and a module SDK.
 
-packages/shared contains schemas, contracts, and shared time helpers.
+apps/server stores data, serves the API, and resolves what each display should show.
+
+apps/web contains the display app and the admin pages.
+
+packages/shared contains schemas, contracts, and time helpers.
 
 packages/module-sdk contains the SDK used by built-in and future modules.
 
-apps/server owns persistence, admin routes, provider calls, and display resolution.
-
-apps/web owns the display runtime, admin pages, and built-in modules.
-
-The set-logic editor is split into smaller parts so it is easier to test and maintain.
-
-- `apps/web/src/modules/sdk` holds built-in SDK modules.
-- `apps/web/src/runtime/display-time.ts` is the synced household time source for site-local modules.
-- `apps/server/src/routes` and `apps/server/src/services` contain module-facing APIs and backend logic.
-- `apps/web/src/components/admin/set-logic-editor` contains the extracted set-logic editor internals.
+- `apps/web/src/modules/sdk` holds built-in modules.
+- `apps/web/src/runtime/display-time.ts` is the synced household time source.
+- `apps/server/src/routes` and `apps/server/src/services` hold backend logic.
+- `apps/web/src/components/admin/set-logic-editor` holds the set-logic editor internals.
 
 ## Use the admin
 
@@ -96,61 +95,61 @@ _Usage_
 
 Most setup happens in Layouts, Settings, Children, Chores, and School.
 
-Use Layouts to build pages and set up logic.
+Open `/admin/login` to sign in.
 
-Use Settings to manage displays, timezone, calendar feeds, and runtime details.
+Use Layouts to build pages and set up layout logic.
+
+Use Settings to manage displays, timezone, calendar feeds, and system health.
 
 Use Children to manage the shared child list.
 
 Use Chores to manage tasks and payouts.
 
-Use School to manage day plans and timetables.
+Use School to manage weekly plans and timetables.
 
-- Admin login lives at `/admin/login`.
-- The dashboard display runtime lives at `/`.
-- Saved calendar feeds are shared by all calendar modules.
-- Settings autosaves low-risk edits.
+- The fullscreen display runs at `/`.
+- Saved calendar feeds can be reused across layouts.
+- Settings autosaves simple edits.
 - Each weekday can belong to only one School plan.
 - Settings shows display health, backups, and database status.
 - The set-logic editor supports undo, redo, and draft recovery.
-- Displays can show `Offline` or `Cached` instead of hard errors.
-- Main modules now use shared loading skeletons.
-- Theme colours come from curated 12-slot palettes.
 
-## Install on your system
+## Install step by step
 
-_Deployment_
+_Install_
 
-Use the simplest path for your machine. Most installs should use the published container image.
+Follow the steps for your system. Most home installs should use Docker or Synology.
 
-Docker: copy `.env.example` to `.env`, set the password and timezone, then start Docker Compose.
+Docker Compose: copy `.env.example` to `.env`, then set `ADMIN_PASSWORD`, `TZ`, and `DEFAULT_SITE_TIMEZONE`.
 
-Synology: use `.env.synology.example` and `docker-compose.synology.yml`, and keep the data volume persistent.
+Start Hearth with `docker compose up -d`.
 
-Native Linux or Raspberry Pi: install Node and pnpm, then run `pnpm install`, `pnpm build`, and `pnpm start`.
+Open `http://<your-host>:3000/admin/login` and sign in with `ADMIN_PASSWORD`.
 
-After startup, open `/admin/login`, set the household timezone, and open `/` once on each display device.
+Open `Settings`, set the household timezone, then open `/` once on each display so it registers.
 
-Set the deployment timezone and the household timezone so a fresh install does not fall back to UTC.
+Go back to `Settings`, name each display, and assign a layout or set.
 
-- Default runtime URL is `http://<host>:3000`.
-- Set `HOST=0.0.0.0` if devices on your LAN need to reach a native install.
+On Synology, use `.env.synology` and `docker-compose.synology.yml` instead of the standard files.
+
+For native Linux or Raspberry Pi, install Node, pnpm, and git first, then run `pnpm install`, `pnpm build`, and `pnpm start`.
+
+- Default runtime URL: `http://<host>:3000`
+- Admin login: `http://<host>:3000/admin/login`
+- Set `HOST=0.0.0.0` if other devices on your LAN need to reach a native install.
 - Do not expose Hearth directly to the public internet.
-- Use `pnpm verify` before publishing or building a release image.
 
-### Docker or Synology update flow
+### Docker install
 
 ```bash
-pnpm verify
+cp .env.example .env
+# edit .env and set ADMIN_PASSWORD, TZ, DEFAULT_SITE_TIMEZONE
 
-# Docker host
-docker compose pull
 docker compose up -d
 
-# Synology
-docker compose -f docker-compose.synology.yml pull
-docker compose -f docker-compose.synology.yml up -d
-docker compose -f docker-compose.synology.yml ps
+# later updates
+docker compose pull
+docker compose up -d
 ```
 
 ## Build modules
@@ -159,21 +158,20 @@ _SDK_
 
 Most new modules should be added as web SDK modules.
 
-Use the generator for the fastest start, or add a module file under apps/web/src/modules/sdk.
+Use the generator for the fastest start.
 
 Each module defines a manifest, settings schema, runtime component, and optional admin panel.
 
 If a module needs secrets or provider calls, move that work to the server.
 
-Use the shared data hooks instead of writing custom fetch effects.
+Use the shared data hooks instead of writing your own fetch effects.
 
 - The web registry auto-discovers modules.
 - Use `useModuleQuery` for polling, cache, and refreshes.
-- Use `useModuleStream` only when a module truly needs streaming state.
-- Keep provider secrets and private feed URLs server-side.
+- Keep provider secrets and private feed URLs on the server.
 - Block-style modules should store theme palette slots, not raw hex colours.
 
-### Scaffold a new module
+### Create a new module
 
 ```bash
 pnpm create-module
@@ -185,18 +183,18 @@ _Hardening_
 
 If a module depends on household time or `today`, use synced display time instead of browser time.
 
-Set `manifest.timeMode` intentionally: `device-local`, `site-local`, or `source-local`.
+Set `manifest.timeMode` on purpose: `device-local`, `site-local`, or `source-local`.
 
-For `site-local` modules, read time and timezone from `apps/web/src/runtime/display-time.ts` and refresh at the next site-local day boundary.
+For `site-local` modules, read time and timezone from `apps/web/src/runtime/display-time.ts`.
 
-If a module reuses cached data, check that the cache still matches the current household date.
+Refresh at the next site-local day boundary.
 
-If cached data is shown after a failure, prefer a soft stale badge over a hard error.
+If a module uses cached data, make sure the cache still matches the current household date.
 
-- Good references: clock, chores, calendar, bible verse, and School planner.
-- Do not trust raw `new Date()` for household-day logic on displays.
-- Use timezone-aware helpers from `@hearth/shared` for day comparisons.
-- The School planner uses synced household time for day selection and its current-time line.
+- Good references: clock, chores, calendar, Bible verse, and School planner.
+- Do not trust raw `new Date()` for household-day logic.
+- Use timezone-aware helpers from `@hearth/shared`.
+- School planner uses synced household time for day selection and its current-time line.
 
 ### Site-local module pattern
 
@@ -217,17 +215,13 @@ _Quality_
 
 Use the root scripts so builds and tests run in the right order.
 
-The root `test` script builds shared packages first, then runs package tests in sequence.
+The root `test` script builds shared packages first, then runs tests in order.
 
 The root `verify` script is the main local and CI check.
 
 Avoid `pnpm -r test` because workspace order can cause false failures.
 
-The set-logic editor has helper tests and browser smoke tests.
-
-The graph editor reducer also has undo/redo tests.
-
-### Supported verification commands
+### Commands to run
 
 ```bash
 pnpm test
