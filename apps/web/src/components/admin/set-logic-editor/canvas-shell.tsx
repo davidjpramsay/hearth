@@ -92,11 +92,16 @@ export const SetLogicPalette = ({
 
 export const SetLogicCanvas = ({
   graph,
+  selectedNodeSummary,
+  canUndo,
+  canRedo,
   reactFlowProps,
   runtimeStatusMeta,
   reactFlowInstance,
   isCanvasInteractive,
   onToggleCanvasInteractive,
+  onUndo,
+  onRedo,
   onFitView,
   onZoomIn,
   onZoomOut,
@@ -104,6 +109,9 @@ export const SetLogicCanvas = ({
   onDragOver,
 }: {
   graph: { nodes: Node[]; edges: Edge[] };
+  selectedNodeSummary: string;
+  canUndo: boolean;
+  canRedo: boolean;
   reactFlowProps: Record<string, unknown>;
   runtimeStatusMeta: RuntimeStatusMeta | null;
   reactFlowInstance: {
@@ -113,6 +121,8 @@ export const SetLogicCanvas = ({
   } | null;
   isCanvasInteractive: boolean;
   onToggleCanvasInteractive: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
   onFitView: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -150,6 +160,41 @@ export const SetLogicCanvas = ({
       {...reactFlowProps}
     >
       <Background color="#1e293b" gap={24} size={1.2} />
+      <Panel position="top-left">
+        <div className="max-w-[340px] rounded-2xl border border-slate-700/80 bg-slate-950/90 px-4 py-3 shadow-[0_10px_24px_rgba(2,6,23,0.5)]">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Selection
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-100">{selectedNodeSummary}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={!canUndo}
+                className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-400 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
+                title="Undo last graph edit (Cmd/Ctrl+Z)"
+                onClick={onUndo}
+              >
+                Undo
+              </button>
+              <button
+                type="button"
+                disabled={!canRedo}
+                className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-400 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
+                title="Redo last graph edit (Shift+Cmd/Ctrl+Z)"
+                onClick={onRedo}
+              >
+                Redo
+              </button>
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Connecting from a used output replaces its current path.
+          </p>
+        </div>
+      </Panel>
       {runtimeStatusMeta ? (
         <Panel position="top-right">
           <div

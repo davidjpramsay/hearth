@@ -123,3 +123,110 @@ Done criteria:
 - Multi-device installs can run different layouts simultaneously without conflicts.
 
 Status: Completed for current milestone.
+
+## Current Polish and Reliability Backlog
+
+This is the current concrete polish backlog after the major platform and module work above.
+
+### 1. Set-logic editor UX hardening
+
+Goal: make the layout-set graph editor predictable under heavy daily admin use.
+
+Scope:
+
+- Undo/redo for graph edits.
+- Clearer selected-node state and graph-status feedback.
+- Better inline connection guidance when an output already has a path.
+- Draft recovery for interrupted graph edits.
+- Tighter first-run empty states and guidance.
+
+### 2. Planner display polish
+
+Goal: make the School display module feel production-finished on wall displays.
+
+Scope:
+
+- Scale row height to available vertical space.
+- Add optional current-time indicator and now/next emphasis.
+- Improve long-title and note overflow.
+- Tune portrait density and compact mode behavior.
+
+### 3. Admin autosave consistency
+
+Goal: make admin edits feel consistent across settings-heavy screens.
+
+Scope:
+
+- Prefer autosave for low-risk changes.
+- Reserve explicit save buttons for structural or destructive edits.
+- Standardize saving/saved/error status affordances.
+
+### 4. Offline and degraded-state polish
+
+Goal: keep Hearth calm and understandable on flaky networks and cold boots.
+
+Scope:
+
+- Replace harsh blocking errors with softer stale/offline states where safe.
+- Show when a tile is rendering cached data.
+- Improve first-boot empty states.
+
+### 5. Theme system refinement
+
+Goal: make palette-slot themes feel more intentional and less purely generated.
+
+Scope:
+
+- Tune the 12-slot palette per theme.
+- Tighten contrast rules for pale slots.
+- Add a few stronger curated theme presets.
+
+### 6. Admin UI consistency pass
+
+Goal: reduce the “grown over time” feel across admin pages.
+
+Scope:
+
+- Align section headers, action rows, and helper copy.
+- Standardize button/chip/input sizing.
+- Trim low-value explanatory text.
+
+### 7. Module loading and transition polish
+
+Goal: improve perceived quality on low-power display hardware.
+
+Scope:
+
+- Better module skeleton states.
+- Smoother state transitions between loading/ready/stale states.
+
+### 8. Operational observability
+
+Goal: make long-running installs easier to operate without shell access.
+
+Scope:
+
+- Display sync health.
+- Module refresh health.
+- Cache/feed status summaries.
+- Stale device detection.
+
+### 9. Safer migrations and backup visibility
+
+Goal: make persistence and recovery more transparent to operators.
+
+Scope:
+
+- Backup status in Settings.
+- DB/migration status.
+- Clear export/import story for household state.
+
+### 10. Public docs media polish
+
+Goal: improve first-run comprehension for new users and contributors.
+
+Scope:
+
+- Short demo video.
+- Selected screenshots for key admin pages.
+- A simple “how Hearth works” flow diagram.

@@ -2,6 +2,8 @@ import type { PhotoRouterBlock } from "@hearth/shared";
 
 export interface GraphEditorState {
   block: PhotoRouterBlock;
+  historyPast: PhotoRouterBlock[];
+  historyFuture: PhotoRouterBlock[];
   selectedNodeId: string | null;
   editorError: string | null;
   isCanvasInteractive: boolean;
@@ -10,15 +12,25 @@ export interface GraphEditorState {
 
 export type GraphEditorAction =
   | { type: "sync-from-props"; block: PhotoRouterBlock }
-  | { type: "set-block"; block: PhotoRouterBlock }
+  | {
+      type: "apply-block";
+      block: PhotoRouterBlock;
+      historyMode?: "push" | "replace";
+      preserveFuture?: boolean;
+    }
   | { type: "select-node"; nodeId: string | null }
   | { type: "set-editor-error"; message: string | null }
   | { type: "toggle-canvas-interactive" }
+  | { type: "undo" }
+  | { type: "redo" }
   | {
       type: "merge-draft-node-positions";
       positions: Record<string, { x: number; y: number }>;
     }
   | { type: "clear-draft-node-positions"; nodeIds?: string[] };
+
+const blocksMatch = (left: PhotoRouterBlock, right: PhotoRouterBlock) =>
+  JSON.stringify(left) === JSON.stringify(right);
 
 const coerceSelectedNodeId = (
   block: PhotoRouterBlock,
@@ -37,16 +49,30 @@ export const graphEditorReducer = (
       return {
         ...state,
         block: action.block,
+        historyPast: blocksMatch(action.block, state.block) ? state.historyPast : [],
+        historyFuture: blocksMatch(action.block, state.block) ? state.historyFuture : [],
         selectedNodeId: coerceSelectedNodeId(action.block, state.selectedNodeId),
         draftNodePositions: {},
       };
-    case "set-block":
+    case "apply-block": {
+      const nextHistoryMode = action.historyMode ?? "push";
+      const shouldPushHistory =
+        nextHistoryMode === "push" && !blocksMatch(action.block, state.block);
       return {
         ...state,
         block: action.block,
+        historyPast: shouldPushHistory ? [...state.historyPast, state.block] : state.historyPast,
+        historyFuture: shouldPushHistory
+          ? []
+          : action.preserveFuture
+            ? state.historyFuture
+            : nextHistoryMode === "replace"
+              ? []
+              : state.historyFuture,
         selectedNodeId: coerceSelectedNodeId(action.block, state.selectedNodeId),
         draftNodePositions: {},
       };
+    }
     case "select-node":
       return {
         ...state,
@@ -62,6 +88,34 @@ export const graphEditorReducer = (
         ...state,
         isCanvasInteractive: !state.isCanvasInteractive,
       };
+    case "undo": {
+      const previousBlock = state.historyPast.at(-1);
+      if (!previousBlock) {
+        return state;
+      }
+      return {
+        ...state,
+        block: previousBlock,
+        historyPast: state.historyPast.slice(0, -1),
+        historyFuture: [state.block, ...state.historyFuture],
+        selectedNodeId: coerceSelectedNodeId(previousBlock, state.selectedNodeId),
+        draftNodePositions: {},
+      };
+    }
+    case "redo": {
+      const nextBlock = state.historyFuture[0];
+      if (!nextBlock) {
+        return state;
+      }
+      return {
+        ...state,
+        block: nextBlock,
+        historyPast: [...state.historyPast, state.block],
+        historyFuture: state.historyFuture.slice(1),
+        selectedNodeId: coerceSelectedNodeId(nextBlock, state.selectedNodeId),
+        draftNodePositions: {},
+      };
+    }
     case "merge-draft-node-positions":
       return {
         ...state,

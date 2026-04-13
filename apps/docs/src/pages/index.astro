@@ -1,16 +1,6 @@
 ---
 import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
-import docsContent from "../../../../docs/content/app-docs.json";
-
-const { hero, sections } = docsContent;
-const startLinks = sections.map((section) => ({
-  href: `/${section.id
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")}/`,
-  label: section.title,
-}));
+import { docsHomeHero as hero, docsHomeStartLinks as startLinks } from "../generated/homepage-data.mjs";
 ---
 
 <StarlightPage

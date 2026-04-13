@@ -95,6 +95,8 @@ export const SetLogicEditor = ({
   const selectedNodeIdRef = useRef<string | null>(null);
   const [state, dispatch] = useReducer(graphEditorReducer, {
     block,
+    historyPast: [],
+    historyFuture: [],
     selectedNodeId: null,
     editorError: null,
     isCanvasInteractive: true,
@@ -156,7 +158,7 @@ export const SetLogicEditor = ({
         const normalizedNextBlock = getPrimaryPhotoRouterBlock(nextAuthoring);
         latestBlockRef.current = normalizedNextBlock;
         dispatch({
-          type: "set-block",
+          type: "apply-block",
           block: normalizedNextBlock,
         });
         dispatch({
@@ -167,7 +169,7 @@ export const SetLogicEditor = ({
           latestAuthoringRef.current = currentAuthoring;
           latestBlockRef.current = currentBlock;
           dispatch({
-            type: "set-block",
+            type: "sync-from-props",
             block: currentBlock,
           });
           dispatch({
@@ -179,6 +181,63 @@ export const SetLogicEditor = ({
         dispatch({
           type: "set-editor-error",
           message: error instanceof Error ? error.message : "Unable to apply this graph edit.",
+        });
+      }
+    },
+    [onChange],
+  );
+
+  const applyHistoryBlock = useCallback(
+    (nextBlock: PhotoRouterBlock, historyDirection: "undo" | "redo") => {
+      const currentAuthoring = latestAuthoringRef.current;
+      const currentBlock = latestBlockRef.current;
+
+      try {
+        const nextAuthoring = setPrimaryPhotoRouterBlock({
+          authoring: currentAuthoring,
+          block: nextBlock,
+        });
+        const validationIssue = getLayoutSetAuthoringValidationIssues(nextAuthoring)[0] ?? null;
+        if (validationIssue) {
+          dispatch({
+            type: "set-editor-error",
+            message: validationIssue.message,
+          });
+          return;
+        }
+
+        latestAuthoringRef.current = nextAuthoring;
+        latestBlockRef.current = nextBlock;
+        dispatch({
+          type: historyDirection,
+        });
+        dispatch({
+          type: "set-editor-error",
+          message: null,
+        });
+
+        void Promise.resolve(onChange(nextAuthoring)).catch((error) => {
+          latestAuthoringRef.current = currentAuthoring;
+          latestBlockRef.current = currentBlock;
+          dispatch({
+            type: "sync-from-props",
+            block: currentBlock,
+          });
+          dispatch({
+            type: "set-editor-error",
+            message:
+              error instanceof Error
+                ? error.message
+                : `Unable to ${historyDirection} this graph edit.`,
+          });
+        });
+      } catch (error) {
+        dispatch({
+          type: "set-editor-error",
+          message:
+            error instanceof Error
+              ? error.message
+              : `Unable to ${historyDirection} this graph edit.`,
         });
       }
     },
@@ -667,6 +726,73 @@ export const SetLogicEditor = ({
     };
   }, [runtimeHealth]);
 
+  const selectedNodeSummary = selectedLayoutNode
+    ? `Layout: ${selectedLayoutNode.layoutName}`
+    : selectedActionNode
+      ? selectedActionNode.title
+      : selectedTimeGateNode
+        ? selectedTimeGateNode.title
+        : "No node selected";
+
+  const canUndo = state.historyPast.length > 0;
+  const canRedo = state.historyFuture.length > 0;
+
+  const handleUndo = useCallback(() => {
+    const previousBlock = state.historyPast.at(-1);
+    if (!previousBlock) {
+      return;
+    }
+    applyHistoryBlock(previousBlock, "undo");
+  }, [applyHistoryBlock, state.historyPast]);
+
+  const handleRedo = useCallback(() => {
+    const nextBlock = state.historyFuture[0];
+    if (!nextBlock) {
+      return;
+    }
+    applyHistoryBlock(nextBlock, "redo");
+  }, [applyHistoryBlock, state.historyFuture]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      const usesPrimaryModifier = event.metaKey || event.ctrlKey;
+      if (!usesPrimaryModifier || event.altKey) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (key !== "z") {
+        return;
+      }
+
+      event.preventDefault();
+      if (event.shiftKey) {
+        handleRedo();
+        return;
+      }
+
+      handleUndo();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleRedo, handleUndo]);
+
   const updateSelectedLayoutNode = (
     updater: (current: PhotoRouterLayoutNode) => PhotoRouterLayoutNode,
   ) => {
@@ -778,6 +904,9 @@ export const SetLogicEditor = ({
 
         <SetLogicCanvas
           graph={graph}
+          selectedNodeSummary={selectedNodeSummary}
+          canUndo={canUndo}
+          canRedo={canRedo}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           runtimeStatusMeta={runtimeStatusMeta}
@@ -800,6 +929,8 @@ export const SetLogicEditor = ({
               type: "toggle-canvas-interactive",
             });
           }}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
           reactFlowProps={{
             onInit: setReactFlowInstance,
             onNodesChange: handleNodesChange,

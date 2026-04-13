@@ -10,6 +10,7 @@ const docsContentPath = path.join(rootDir, "docs/content/app-docs.json");
 const markdownOutputPath = path.join(rootDir, "docs/APP_DOCS.md");
 const docsSiteContentDirPath = path.join(rootDir, "apps/docs/src/content/docs");
 const docsSiteSidebarPath = path.join(rootDir, "apps/docs/src/generated/starlight-sidebar.mjs");
+const docsSiteHomeDataPath = path.join(rootDir, "apps/docs/src/generated/homepage-data.mjs");
 const checkMode = process.argv.includes("--check");
 
 const formatWithProjectPrettier = async (value, filepath) => {
@@ -142,6 +143,19 @@ const generateStarlightSidebarModule = (content) => {
   return `export const docsSidebar = ${JSON.stringify(groups, null, 2)};\n`;
 };
 
+const generateHomepageDataModule = (content) => {
+  const startLinks = (content.sections ?? []).map((section) => ({
+    href: `/${slugifySectionId(section.id)}/`,
+    label: section.title,
+  }));
+
+  return [
+    `export const docsHomeHero = ${JSON.stringify(content.hero, null, 2)};`,
+    `export const docsHomeStartLinks = ${JSON.stringify(startLinks, null, 2)};`,
+    "",
+  ].join("\n");
+};
+
 const run = async () => {
   const rawContent = await fs.readFile(docsContentPath, "utf8");
   const parsedContent = JSON.parse(rawContent);
@@ -153,6 +167,10 @@ const run = async () => {
   const nextSidebarModule = await formatWithProjectPrettier(
     generateStarlightSidebarModule(parsedContent),
     docsSiteSidebarPath,
+  );
+  const nextHomepageDataModule = await formatWithProjectPrettier(
+    generateHomepageDataModule(parsedContent),
+    docsSiteHomeDataPath,
   );
   const nextSectionPages = await Promise.all(
     sections.map(async (section) => {
@@ -166,6 +184,9 @@ const run = async () => {
   if (checkMode) {
     const existingMarkdown = await fs.readFile(markdownOutputPath, "utf8").catch(() => null);
     const existingSidebarModule = await fs.readFile(docsSiteSidebarPath, "utf8").catch(() => null);
+    const existingHomepageDataModule = await fs
+      .readFile(docsSiteHomeDataPath, "utf8")
+      .catch(() => null);
 
     const pagesAreCurrent = await Promise.all(
       nextSectionPages.map(async ({ filepath, content }) => {
@@ -177,6 +198,7 @@ const run = async () => {
     if (
       existingMarkdown !== nextMarkdown ||
       existingSidebarModule !== nextSidebarModule ||
+      existingHomepageDataModule !== nextHomepageDataModule ||
       pagesAreCurrent.some((value) => value === false)
     ) {
       console.error(
@@ -203,6 +225,7 @@ const run = async () => {
     nextSectionPages.map(({ filepath, content }) => fs.writeFile(filepath, content, "utf8")),
   );
   await fs.writeFile(docsSiteSidebarPath, nextSidebarModule, "utf8");
+  await fs.writeFile(docsSiteHomeDataPath, nextHomepageDataModule, "utf8");
 };
 
 run().catch((error) => {
