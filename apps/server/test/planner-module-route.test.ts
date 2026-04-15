@@ -218,6 +218,91 @@ test("planner completion route updates the current day summary", async () => {
   }
 });
 
+test("planner completion route can clear an activity completion", async () => {
+  const app = Fastify();
+  let requestedCompletion: {
+    blockId: number;
+    date: string;
+    completed: boolean;
+    dayWindow: { startTime: string; endTime: string; slotMinutes: 30 };
+  } | null = null;
+
+  registerPlannerModuleRoutes(app, {
+    layoutEventBus: {
+      publish: () => undefined,
+    },
+    layoutRepository: {
+      findModuleInstance: () => ({
+        module: {
+          config: {},
+        },
+      }),
+    },
+    settingsRepository: {
+      getSiteTimeConfig: () => ({
+        siteTimezone: "Australia/Perth",
+      }),
+      getPlannerDayWindow: () => ({
+        startTime: "08:00",
+        endTime: "15:00",
+        slotMinutes: 30,
+      }),
+    },
+    plannerRepository: {
+      listUsers: () => [],
+      getTodayPlan: (input: { siteDate: string }) => ({
+        generatedAt: new Date().toISOString(),
+        siteDate: input.siteDate,
+        dayWindow: {
+          startTime: "08:00",
+          endTime: "15:00",
+          slotMinutes: 30,
+        },
+        users: [],
+        template: null,
+        blocks: [],
+        completions: [],
+      }),
+      setActivityCompletion: (input: {
+        blockId: number;
+        date: string;
+        completed: boolean;
+        dayWindow: { startTime: string; endTime: string; slotMinutes: 30 };
+      }) => {
+        requestedCompletion = input;
+        return [];
+      },
+    },
+  } as unknown as AppServices);
+
+  try {
+    const response = await app.inject({
+      method: "PUT",
+      url: "/modules/homeschool-planner/test-instance/completions",
+      payload: {
+        blockId: 4,
+        date: "2026-04-06",
+        completed: false,
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(requestedCompletion, {
+      blockId: 4,
+      date: "2026-04-06",
+      completed: false,
+      dayWindow: {
+        startTime: "08:00",
+        endTime: "15:00",
+        slotMinutes: 30,
+      },
+    });
+    assert.equal(response.json().completions.length, 0);
+  } finally {
+    await app.close();
+  }
+});
+
 test("planner completion route rejects activities that are not part of the requested day", async () => {
   const app = Fastify();
 

@@ -359,7 +359,6 @@ export const moduleDefinition = defineModule({
               plannerViewportHeight > 0 ? plannerViewportHeight / slots.length : MIN_SLOT_HEIGHT_PX,
             )
           : MIN_SLOT_HEIGHT_PX;
-      const totalHeight = slots.length * slotHeightPx;
       const formatter = new Intl.DateTimeFormat(undefined, {
         weekday: "long",
         month: "short",
@@ -371,10 +370,16 @@ export const moduleDefinition = defineModule({
       const currentTimeMinutes = currentTime.hour * 60 + currentTime.minute;
       const dayStartMinutes = plannerTimeToMinutes(response.dayWindow.startTime);
       const dayEndMinutes = plannerTimeToMinutes(response.dayWindow.endTime);
+      const totalMinutes = Math.max(
+        dayEndMinutes - dayStartMinutes,
+        response.dayWindow.slotMinutes,
+      );
+      const minuteHeightPx = slotHeightPx / response.dayWindow.slotMinutes;
+      const totalHeight = totalMinutes * minuteHeightPx;
       const currentTimeWithinWindow =
         currentTimeMinutes >= dayStartMinutes && currentTimeMinutes < dayEndMinutes;
       const currentTimeOffsetPx = currentTimeWithinWindow
-        ? ((currentTimeMinutes - dayStartMinutes) / response.dayWindow.slotMinutes) * slotHeightPx
+        ? (currentTimeMinutes - dayStartMinutes) * minuteHeightPx
         : null;
       const saveCompletionKey = (blockId: number): string => `${response.siteDate}:${blockId}`;
       const onToggleCompletion = async (blockId: number, completed: boolean) => {
@@ -526,12 +531,10 @@ export const moduleDefinition = defineModule({
                           const startMinutes =
                             plannerTimeToMinutes(block.startTime) - dayStartMinutes;
                           const endMinutes = plannerTimeToMinutes(block.endTime) - dayStartMinutes;
-                          const top =
-                            (startMinutes / response.dayWindow.slotMinutes) * slotHeightPx;
+                          const top = startMinutes * minuteHeightPx;
                           const height = Math.max(
-                            ((endMinutes - startMinutes) / response.dayWindow.slotMinutes) *
-                              slotHeightPx,
-                            slotHeightPx,
+                            (endMinutes - startMinutes) * minuteHeightPx,
+                            response.dayWindow.slotMinutes * minuteHeightPx,
                           );
                           const isActive = block.id === activeBlockId;
                           return (
@@ -543,8 +546,8 @@ export const moduleDefinition = defineModule({
                                   : "border-slate-950/50"
                               }`}
                               style={{
-                                top: `${top + 1}px`,
-                                height: `${height - 2}px`,
+                                top: `${top}px`,
+                                height: `${height}px`,
                                 backgroundColor: getThemePaletteColorVar(block.colour),
                                 borderColor: `rgb(${getThemePaletteRgbVar(block.colour)} / 0.42)`,
                                 color: getThemePaletteForegroundVar(block.colour),
@@ -566,12 +569,13 @@ export const moduleDefinition = defineModule({
                                   disabled={savingCompletionKeys.includes(
                                     saveCompletionKey(block.id),
                                   )}
-                                  onClick={() =>
+                                  onClick={(event?: { stopPropagation?: () => void }) => {
+                                    event?.stopPropagation?.();
                                     void onToggleCompletion(
                                       block.id,
                                       !completedBlockIds.has(block.id),
-                                    )
-                                  }
+                                    );
+                                  }}
                                   className={`flex h-5 items-center gap-1 rounded px-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition ${
                                     completedBlockIds.has(block.id)
                                       ? "bg-white/18 text-current"

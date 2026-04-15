@@ -362,6 +362,7 @@ test("planner module can toggle activity completion", async () => {
         },
       ],
     },
+    createResponse({ siteDate: "2026-04-06", templateName: "Monday core" }),
   ]);
   syncDisplayTimeContext({
     siteTimeZone: "Australia/Perth",
@@ -396,6 +397,18 @@ test("planner module can toggle activity completion", async () => {
 
     assert.match(JSON.stringify(renderer!.toJSON()), /Done/);
     assert.equal(shims.getFetchCallCount(), 2);
+
+    const updatedCheckbox = renderer!.root.findAll((node) => node.props.role === "checkbox")[0];
+    await act(async () => {
+      updatedCheckbox!.props.onClick({
+        stopPropagation: () => undefined,
+      });
+      await flushMicrotasks();
+    });
+
+    assert.doesNotMatch(JSON.stringify(renderer!.toJSON()), /Done/);
+    assert.match(JSON.stringify(renderer!.toJSON()), /Incomplete/);
+    assert.equal(shims.getFetchCallCount(), 3);
   } finally {
     if (renderer) {
       await act(async () => {
