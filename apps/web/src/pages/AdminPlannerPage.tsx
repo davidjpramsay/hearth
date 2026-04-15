@@ -7,6 +7,7 @@ import {
   plannerBlocksFitDayWindow,
   plannerDayWindowConfigSchema,
   toCalendarDateInTimeZone,
+  type PlannerActivityBlock,
   type PlannerActivityBlockDraft,
   type PlannerSummaryArchive,
   type PlannerDashboardResponse,
@@ -44,16 +45,57 @@ const repeatDayOrder = [1, 2, 3, 4, 5, 6, 0] as const;
 const todayDate = (timeZone = getRuntimeTimeZone()): string =>
   toCalendarDateInTimeZone(new Date(), timeZone);
 
-const toEditorBlocks = (template: PlannerTemplateDetail | null): PlannerEditorBlock[] =>
-  (template?.blocks ?? []).map((block) => ({
-    clientId: `block-${block.id}`,
-    userId: block.userId,
-    name: block.name,
-    colour: block.colour,
-    notes: block.notes,
-    startTime: block.startTime,
-    endTime: block.endTime,
-  }));
+const plannerBlockClientKey = (block: PlannerActivityBlockDraft): string =>
+  [
+    block.userId,
+    block.startTime,
+    block.endTime,
+    block.name.trim(),
+    block.colour,
+    block.notes?.trim() ?? "",
+  ].join("::");
+
+const toEditorBlocks = (
+  template: PlannerTemplateDetail | null,
+  previousBlocks: PlannerEditorBlock[] = [],
+): PlannerEditorBlock[] => {
+  const reusableClientIds = new Map<string, string[]>();
+  for (const block of previousBlocks) {
+    const key = plannerBlockClientKey(block);
+    const existing = reusableClientIds.get(key) ?? [];
+    existing.push(block.clientId);
+    reusableClientIds.set(key, existing);
+  }
+
+  return (template?.blocks ?? []).map((block, index) => {
+    const key = plannerBlockClientKey(block);
+    const reusableIds = reusableClientIds.get(key) ?? [];
+    const reusableId = reusableIds.shift();
+    if (reusableIds.length > 0) {
+      reusableClientIds.set(key, reusableIds);
+    } else {
+      reusableClientIds.delete(key);
+    }
+
+    return {
+      clientId: reusableId ?? `block-${block.id}-${index}`,
+      userId: block.userId,
+      name: block.name,
+      colour: block.colour,
+      notes: block.notes,
+      startTime: block.startTime,
+      endTime: block.endTime,
+    };
+  });
+};
+
+const getRetainedSelectedBlockId = (
+  nextBlocks: PlannerEditorBlock[],
+  previousSelectedBlockId: string | null,
+): string | null =>
+  previousSelectedBlockId && nextBlocks.some((block) => block.clientId === previousSelectedBlockId)
+    ? previousSelectedBlockId
+    : null;
 
 export const AdminPlannerPage = () => {
   const token = getAuthToken();
@@ -188,13 +230,25 @@ export const AdminPlannerPage = () => {
     const shouldResetEditorState = !blocksDirty || preferredTemplateIdInput !== undefined;
 
     if (shouldResetEditorState) {
+      const nextEditorBlocks = toEditorBlocks(preferredTemplate, editorBlocks);
+      const preserveSelection =
+        preferredTemplateIdInput === undefined && preferredTemplateId === selectedTemplateId;
       invalidateBlockAutosave();
       setTemplateNameDraft(preferredTemplate?.name ?? "");
-      setEditorBlocks(toEditorBlocks(preferredTemplate));
-      setSelectedBlockId(null);
+      setEditorBlocks(nextEditorBlocks);
+      setSelectedBlockId(
+        preserveSelection ? getRetainedSelectedBlockId(nextEditorBlocks, selectedBlockId) : null,
+      );
       setBlocksDirty(false);
     }
-  }, [blocksDirty, invalidateBlockAutosave, plannerQuery.data, selectedTemplateId]);
+  }, [
+    blocksDirty,
+    editorBlocks,
+    invalidateBlockAutosave,
+    plannerQuery.data,
+    selectedBlockId,
+    selectedTemplateId,
+  ]);
 
   const selectTemplate = (templateId: number) => {
     if (templateId === selectedTemplateId) {
@@ -209,7 +263,7 @@ export const AdminPlannerPage = () => {
     invalidateBlockAutosave();
     setSelectedTemplateId(templateId);
     setTemplateNameDraft(nextTemplate?.name ?? "");
-    setEditorBlocks(toEditorBlocks(nextTemplate));
+    setEditorBlocks(toEditorBlocks(nextTemplate, editorBlocks));
     setSelectedBlockId(null);
     setBlocksDirty(false);
   };
@@ -467,6 +521,12 @@ export const AdminPlannerPage = () => {
                 : template,
             ),
           );
+          const nextEditorBlocks = toEditorBlocks(
+            { ...selectedTemplate, blocks: nextBlocks },
+            editorBlocks,
+          );
+          setEditorBlocks(nextEditorBlocks);
+          setSelectedBlockId(getRetainedSelectedBlockId(nextEditorBlocks, selectedBlockId));
           setBlocksDirty(false);
         } catch (saveError) {
           if (blockAutosaveRevisionRef.current !== revision) {
@@ -486,7 +546,7 @@ export const AdminPlannerPage = () => {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [blocksDirty, editorBlocks, selectedTemplate, token, validationError]);
+  }, [blocksDirty, editorBlocks, selectedBlockId, selectedTemplate, token, validationError]);
 
   return (
     <PageShell
