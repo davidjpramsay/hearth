@@ -3,7 +3,7 @@ export const docsSidebar = [
     label: "Getting Started",
     items: [
       {
-        label: "What Hearth is",
+        label: "Hearth overview",
         slug: "overview",
       },
       {
@@ -25,7 +25,7 @@ export const docsSidebar = [
     label: "Operations",
     items: [
       {
-        label: "Use the admin",
+        label: "Admin guide",
         slug: "admin",
       },
       {

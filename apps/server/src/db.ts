@@ -113,6 +113,82 @@ CREATE INDEX IF NOT EXISTS idx_planner_template_blocks_template_id
 CREATE INDEX IF NOT EXISTS idx_planner_template_blocks_user_id
   ON planner_template_blocks(user_id);
 
+CREATE TABLE IF NOT EXISTS planner_activity_completions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  block_id INTEGER NOT NULL,
+  completion_date TEXT NOT NULL,
+  completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(block_id) REFERENCES planner_template_blocks(id) ON DELETE CASCADE,
+  UNIQUE(block_id, completion_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_planner_activity_completions_date
+  ON planner_activity_completions(completion_date);
+
+CREATE TABLE IF NOT EXISTS planner_daily_plan_snapshots (
+  snapshot_date TEXT PRIMARY KEY,
+  week_start_date TEXT NOT NULL,
+  week_end_date TEXT NOT NULL,
+  template_id INTEGER,
+  template_name TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_planner_daily_plan_snapshots_week_start
+  ON planner_daily_plan_snapshots(week_start_date);
+
+CREATE TABLE IF NOT EXISTS planner_daily_plan_snapshot_blocks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  snapshot_date TEXT NOT NULL,
+  template_id INTEGER NOT NULL,
+  source_block_id INTEGER,
+  user_id INTEGER NOT NULL,
+  user_name TEXT NOT NULL,
+  name TEXT NOT NULL,
+  colour TEXT NOT NULL,
+  notes TEXT,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(snapshot_date) REFERENCES planner_daily_plan_snapshots(snapshot_date) ON DELETE CASCADE,
+  FOREIGN KEY(user_id) REFERENCES members(id) ON DELETE CASCADE,
+  FOREIGN KEY(source_block_id) REFERENCES planner_template_blocks(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_planner_snapshot_blocks_date
+  ON planner_daily_plan_snapshot_blocks(snapshot_date);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_planner_snapshot_blocks_source
+  ON planner_daily_plan_snapshot_blocks(snapshot_date, source_block_id)
+  WHERE source_block_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS planner_snapshot_activity_completions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  snapshot_block_id INTEGER NOT NULL,
+  completion_date TEXT NOT NULL,
+  completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(snapshot_block_id) REFERENCES planner_daily_plan_snapshot_blocks(id) ON DELETE CASCADE,
+  UNIQUE(snapshot_block_id, completion_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_planner_snapshot_activity_completions_date
+  ON planner_snapshot_activity_completions(completion_date);
+
+CREATE TABLE IF NOT EXISTS planner_weekly_summary_archives (
+  week_start_date TEXT PRIMARY KEY,
+  week_end_date TEXT NOT NULL,
+  generated_at TEXT NOT NULL,
+  pdf_relative_path TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS planner_date_assignments (
   assignment_date TEXT PRIMARY KEY,
   template_id INTEGER NOT NULL,

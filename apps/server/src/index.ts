@@ -13,6 +13,7 @@ import { LayoutEventBus } from "./services/layout-event-bus.js";
 import { configureLayoutLogicRegistry } from "./layout-logic/registry.js";
 import { PhotosSlideshowService } from "./services/photos-slideshow-service.js";
 import { LocalWarningService } from "./services/local-warning-service.js";
+import { PlannerSummaryArchiveService } from "./services/planner-summary-archive-service.js";
 import { ScreenProfileService } from "./services/screen-profile-service.js";
 import { ModuleAdapterService } from "./modules/service.js";
 import { ModuleEventBus } from "./modules/event-bus.js";
@@ -78,6 +79,9 @@ const services = {
   moduleStateRepository,
   calendarFeedService: new CalendarFeedService(moduleStateRepository, settingsRepository),
   photosSlideshowService: new PhotosSlideshowService(moduleStateRepository),
+  plannerSummaryArchiveService: new PlannerSummaryArchiveService(plannerRepository, {
+    archiveDir: `${config.dataDir}/planner-summaries`,
+  }),
   localWarningService,
   screenProfileService: new ScreenProfileService(
     layoutRepository,

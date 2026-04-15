@@ -243,9 +243,15 @@ export const registerChoresRoutes = (app: FastifyInstance, services: AppServices
       return reply.code(400).send({ message: params.error.message });
     }
 
-    const deleted = services.choresRepository.deleteMember(params.data.id);
-    if (!deleted) {
-      return reply.code(404).send({ message: "Member not found" });
+    try {
+      const deleted = services.choresRepository.deleteMember(params.data.id);
+      if (!deleted) {
+        return reply.code(404).send({ message: "Member not found" });
+      }
+    } catch (error) {
+      return reply.code(400).send({
+        message: error instanceof Error ? error.message : "Failed to delete child",
+      });
     }
 
     publishChoreEvent(services, {

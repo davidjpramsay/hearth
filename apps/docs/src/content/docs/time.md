@@ -18,7 +18,7 @@ If a module uses cached data, make sure the cache still matches the current hous
 - Good references: clock, chores, calendar, Bible verse, and School planner.
 - Do not trust raw `new Date()` for household-day logic.
 - Use timezone-aware helpers from `@hearth/shared`.
-- School planner uses synced household time for day selection and its current-time line.
+- School planner uses synced household time for day selection, its current-time line, and the chosen 15, 30, or 60 minute grid.
 
 ### Site-local module pattern
 

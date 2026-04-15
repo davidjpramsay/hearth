@@ -14,16 +14,16 @@ Hearth shows photos, calendars, chores, school plans, clocks, and more on a full
 
 ## Sections
 
-- [What Hearth is](#overview)
+- [Hearth overview](#overview)
 - [Choose your install path](#install)
 - [How Hearth is built](#application-structure)
-- [Use the admin](#admin)
+- [Admin guide](#admin)
 - [Install step by step](#deploy)
 - [Build modules](#build-sdk-modules)
 - [Build time-safe modules](#time)
 - [Check your changes](#quality-checks)
 
-## What Hearth is
+## Hearth overview
 
 _Platform_
 
@@ -36,6 +36,8 @@ Use the admin app to build layouts, add modules, and choose what each screen sho
 Built-in modules include photos, calendar, clock, weather, chores, Bible verse, and School planner.
 
 Each display checks in with the server so layout changes appear quickly.
+
+School activities can be marked complete on the display, and School keeps the latest week plus older weeks as PDF downloads.
 
 - One app for the display and the admin tools.
 - Different screens can show different layouts.
@@ -89,7 +91,7 @@ packages/module-sdk contains the SDK used by built-in and future modules.
 - `apps/server/src/routes` and `apps/server/src/services` hold backend logic.
 - `apps/web/src/components/admin/set-logic-editor` holds the set-logic editor internals.
 
-## Use the admin
+## Admin guide
 
 _Usage_
 
@@ -105,7 +107,7 @@ Use Children to manage the shared child list.
 
 Use Chores to manage tasks and payouts.
 
-Use School to manage weekly plans and timetables.
+Use School to manage weekly plans, grid size, timetables, and activity checkoffs.
 
 - The fullscreen display runs at `/`.
 - Saved calendar feeds can be reused across layouts.
@@ -113,6 +115,7 @@ Use School to manage weekly plans and timetables.
 - Each weekday can belong to only one School plan.
 - Settings shows display health, backups, and database status.
 - The set-logic editor supports undo, redo, and draft recovery.
+- School keeps the latest week ready as a PDF and keeps older weeks in a PDF archive.
 
 ## Install step by step
 
@@ -194,7 +197,7 @@ If a module uses cached data, make sure the cache still matches the current hous
 - Good references: clock, chores, calendar, Bible verse, and School planner.
 - Do not trust raw `new Date()` for household-day logic.
 - Use timezone-aware helpers from `@hearth/shared`.
-- School planner uses synced household time for day selection and its current-time line.
+- School planner uses synced household time for day selection, its current-time line, and the chosen 15, 30, or 60 minute grid.
 
 ### Site-local module pattern
 

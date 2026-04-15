@@ -19,12 +19,14 @@
     "better-sqlite3": "^11.8.1",
     "fastify": "^5.1.0",
     "node-ical": "^0.25.4",
+    "pdfkit": "^0.18.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.1",
+    "@types/pdfkit": "^0.17.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }

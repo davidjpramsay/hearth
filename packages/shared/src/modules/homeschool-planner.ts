@@ -4,6 +4,7 @@ import { themeColorSlotValueSchema } from "../theme-palette.js";
 
 export const plannerIsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 export const plannerTimeSchema = z.string().regex(/^([01]\d|2[0-3]):(00|15|30|45)$/);
+export const plannerSlotMinutesSchema = z.union([z.literal(15), z.literal(30), z.literal(60)]);
 export const plannerWeekdaySchema = z.number().int().min(0).max(6);
 export const plannerRepeatDaysSchema = z.array(plannerWeekdaySchema).max(7).default([]);
 
@@ -23,12 +24,17 @@ export const plannerMinutesToTime = (value: number): string => {
 export const comparePlannerTimes = (left: string, right: string): number =>
   plannerTimeToMinutes(left) - plannerTimeToMinutes(right);
 
-export const buildPlannerTimeSlots = (startTime: string, endTime: string): string[] => {
+export const buildPlannerTimeSlots = (
+  startTime: string,
+  endTime: string,
+  slotMinutes = 15,
+): string[] => {
   const slots: string[] = [];
   const startMinutes = plannerTimeToMinutes(startTime);
   const endMinutes = plannerTimeToMinutes(endTime);
+  const safeSlotMinutes = plannerSlotMinutesSchema.parse(slotMinutes);
 
-  for (let current = startMinutes; current < endMinutes; current += 15) {
+  for (let current = startMinutes; current < endMinutes; current += safeSlotMinutes) {
     slots.push(plannerMinutesToTime(current));
   }
 
@@ -39,6 +45,7 @@ export const plannerDayWindowConfigSchema = z
   .object({
     startTime: plannerTimeSchema.default("08:00"),
     endTime: plannerTimeSchema.default("15:00"),
+    slotMinutes: plannerSlotMinutesSchema.default(15),
   })
   .refine((value) => comparePlannerTimes(value.startTime, value.endTime) < 0, {
     message: "Planner day window end must be after start",
@@ -69,6 +76,13 @@ const plannerActivityBlockDraftBaseSchema = z.object({
   endTime: plannerTimeSchema,
 });
 
+const plannerActivityBlockCoreSchema = plannerActivityBlockDraftBaseSchema.extend({
+  id: z.number().int().positive(),
+  templateId: z.number().int().positive(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 export const plannerActivityBlockDraftSchema = plannerActivityBlockDraftBaseSchema.refine(
   (value) => comparePlannerTimes(value.startTime, value.endTime) < 0,
   {
@@ -77,20 +91,22 @@ export const plannerActivityBlockDraftSchema = plannerActivityBlockDraftBaseSche
   },
 );
 
-export const plannerActivityBlockSchema = plannerActivityBlockDraftBaseSchema
-  .extend({
-    id: z.number().int().positive(),
-    templateId: z.number().int().positive(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-  })
-  .refine((value) => comparePlannerTimes(value.startTime, value.endTime) < 0, {
+export const plannerActivityBlockSchema = plannerActivityBlockCoreSchema.refine(
+  (value) => comparePlannerTimes(value.startTime, value.endTime) < 0,
+  {
     message: "Activity end time must be after start time",
     path: ["endTime"],
-  });
+  },
+);
 
 export const plannerTemplateDetailSchema = plannerTemplateSchema.extend({
   blocks: z.array(plannerActivityBlockSchema),
+});
+
+export const plannerActivityCompletionSchema = z.object({
+  blockId: z.number().int().positive(),
+  date: plannerIsoDateSchema,
+  completedAt: z.string(),
 });
 
 export const plannerDateAssignmentSchema = z.object({
@@ -116,6 +132,26 @@ export const plannerTodayResponseSchema = z.object({
   users: z.array(plannerUserSchema),
   template: plannerTemplateSchema.nullable(),
   blocks: z.array(plannerActivityBlockSchema),
+  completions: z.array(plannerActivityCompletionSchema),
+});
+
+export const plannerWeeklyBlockSummarySchema = plannerActivityBlockCoreSchema.extend({
+  completed: z.boolean(),
+});
+
+export const plannerWeekDaySummarySchema = z.object({
+  date: plannerIsoDateSchema,
+  template: plannerTemplateSchema.nullable(),
+  blocks: z.array(plannerWeeklyBlockSummarySchema),
+});
+
+export const plannerWeekSummaryResponseSchema = z.object({
+  generatedAt: z.string().datetime({ offset: true }),
+  startDate: plannerIsoDateSchema,
+  endDate: plannerIsoDateSchema,
+  dayWindow: plannerDayWindowConfigSchema,
+  users: z.array(plannerUserSchema),
+  days: z.array(plannerWeekDaySummarySchema),
 });
 
 export const plannerModuleConfigSchema = withModulePresentation(z.object({}));
@@ -161,6 +197,17 @@ export const upsertPlannerDateAssignmentRequestSchema = z.object({
 
 export const deletePlannerDateAssignmentParamsSchema = z.object({
   date: plannerIsoDateSchema,
+});
+
+export const plannerSummaryQuerySchema = z.object({
+  startDate: plannerIsoDateSchema.optional(),
+  days: z.coerce.number().int().min(1).max(31).default(7),
+});
+
+export const setPlannerActivityCompletionRequestSchema = z.object({
+  blockId: z.number().int().positive(),
+  date: plannerIsoDateSchema,
+  completed: z.boolean(),
 });
 
 export interface PlannerBlockConflict {
@@ -226,15 +273,52 @@ export const normalizePlannerRepeatDays = (repeatDays: number[]): number[] =>
 export const plannerDateToDayOfWeek = (siteDate: string): number =>
   new Date(`${plannerIsoDateSchema.parse(siteDate)}T00:00:00.000Z`).getUTCDay();
 
+export const addPlannerUtcDays = (siteDate: string, days: number): string => {
+  const date = new Date(`${plannerIsoDateSchema.parse(siteDate)}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+};
+
+export const getPlannerWeekStartDate = (siteDate: string): string => {
+  const dayOfWeek = plannerDateToDayOfWeek(siteDate);
+  const distanceFromMonday = (dayOfWeek + 6) % 7;
+  return addPlannerUtcDays(siteDate, -distanceFromMonday);
+};
+
+export const getPlannerWeekEndDate = (siteDate: string): string =>
+  addPlannerUtcDays(getPlannerWeekStartDate(siteDate), 6);
+
+export const getPreviousPlannerWeekStartDate = (siteDate: string): string =>
+  addPlannerUtcDays(getPlannerWeekStartDate(siteDate), -7);
+
+export const plannerSummaryArchiveSchema = z.object({
+  weekStartDate: plannerIsoDateSchema,
+  weekEndDate: plannerIsoDateSchema,
+  generatedAt: z.string().datetime({ offset: true }),
+  pdfAvailable: z.boolean(),
+});
+
+export const plannerSummaryArchiveListResponseSchema = z.object({
+  archives: z.array(plannerSummaryArchiveSchema),
+});
+
 export type PlannerDayWindowConfig = z.infer<typeof plannerDayWindowConfigSchema>;
 export type PlannerUser = z.infer<typeof plannerUserSchema>;
 export type PlannerTemplate = z.infer<typeof plannerTemplateSchema>;
 export type PlannerActivityBlock = z.infer<typeof plannerActivityBlockSchema>;
 export type PlannerActivityBlockDraft = z.infer<typeof plannerActivityBlockDraftSchema>;
 export type PlannerTemplateDetail = z.infer<typeof plannerTemplateDetailSchema>;
+export type PlannerActivityCompletion = z.infer<typeof plannerActivityCompletionSchema>;
 export type PlannerDateAssignment = z.infer<typeof plannerDateAssignmentSchema>;
 export type PlannerDashboardResponse = z.infer<typeof plannerDashboardResponseSchema>;
 export type PlannerTodayResponse = z.infer<typeof plannerTodayResponseSchema>;
+export type PlannerWeeklyBlockSummary = z.infer<typeof plannerWeeklyBlockSummarySchema>;
+export type PlannerWeekDaySummary = z.infer<typeof plannerWeekDaySummarySchema>;
+export type PlannerWeekSummaryResponse = z.infer<typeof plannerWeekSummaryResponseSchema>;
+export type PlannerSummaryArchive = z.infer<typeof plannerSummaryArchiveSchema>;
+export type PlannerSummaryArchiveListResponse = z.infer<
+  typeof plannerSummaryArchiveListResponseSchema
+>;
 export type PlannerModuleConfig = z.infer<typeof plannerModuleConfigSchema>;
 export type CreatePlannerUserRequest = z.infer<typeof createPlannerUserRequestSchema>;
 export type UpdatePlannerUserRequest = z.infer<typeof updatePlannerUserRequestSchema>;
@@ -246,4 +330,8 @@ export type ReplacePlannerTemplateBlocksRequest = z.infer<
 >;
 export type UpsertPlannerDateAssignmentRequest = z.infer<
   typeof upsertPlannerDateAssignmentRequestSchema
+>;
+export type PlannerSummaryQuery = z.infer<typeof plannerSummaryQuerySchema>;
+export type SetPlannerActivityCompletionRequest = z.infer<
+  typeof setPlannerActivityCompletionRequestSchema
 >;

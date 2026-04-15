@@ -6,8 +6,11 @@ import {
   plannerDashboardResponseSchema,
   plannerDateAssignmentSchema,
   plannerDayWindowConfigSchema,
+  plannerIsoDateSchema,
+  plannerSummaryArchiveListResponseSchema,
   plannerTemplateDetailSchema,
   plannerTemplateSchema,
+  plannerWeekSummaryResponseSchema,
   replacePlannerTemplateBlocksRequestSchema,
   updatePlannerTemplateRequestSchema,
   upsertPlannerDateAssignmentRequestSchema,
@@ -27,6 +30,20 @@ const publishPlannerEvent = (
   services.layoutEventBus.publish(payload);
 };
 
+const freezeElapsedPlannerDays = (services: AppServices): void => {
+  const siteTimezone = services.settingsRepository.getSiteTimeConfig().siteTimezone;
+  const siteToday = toCalendarDateInTimeZone(new Date(), siteTimezone);
+  const dayWindow = services.settingsRepository.getPlannerDayWindow();
+  services.plannerRepository.freezeCompletedWeeksThrough({
+    siteDate: siteToday,
+    dayWindow,
+  });
+  services.plannerRepository.freezeElapsedDatesThrough({
+    siteDate: siteToday,
+    dayWindow,
+  });
+};
+
 export const registerPlannerRoutes = (app: FastifyInstance, services: AppServices): void => {
   app.get("/planner/dashboard", async (request, reply) => {
     await app.authenticate(request, reply);
@@ -44,6 +61,82 @@ export const registerPlannerRoutes = (app: FastifyInstance, services: AppService
         }),
       ),
     );
+  });
+
+  app.get("/planner/summary", async (request, reply) => {
+    await app.authenticate(request, reply);
+    if (reply.sent) {
+      return;
+    }
+
+    const siteTimezone = services.settingsRepository.getSiteTimeConfig().siteTimezone;
+    const siteToday = toCalendarDateInTimeZone(new Date(), siteTimezone);
+    freezeElapsedPlannerDays(services);
+    const summary = services.plannerRepository.getLatestWeekSummary({
+      siteToday,
+      dayWindow: services.settingsRepository.getPlannerDayWindow(),
+    });
+    await services.plannerSummaryArchiveService.ensurePdfForSummary(summary);
+    return reply.send(plannerWeekSummaryResponseSchema.parse(summary));
+  });
+
+  app.get("/planner/summary/archives", async (request, reply) => {
+    await app.authenticate(request, reply);
+    if (reply.sent) {
+      return;
+    }
+
+    const siteTimezone = services.settingsRepository.getSiteTimeConfig().siteTimezone;
+    const siteToday = toCalendarDateInTimeZone(new Date(), siteTimezone);
+    const dayWindow = services.settingsRepository.getPlannerDayWindow();
+    const archives = services.plannerRepository.freezeCompletedWeeksThrough({
+      siteDate: siteToday,
+      dayWindow,
+    });
+    const latestArchive = archives.archives[0];
+    if (latestArchive && !latestArchive.pdfAvailable) {
+      await services.plannerSummaryArchiveService.ensurePdfForWeekStart(
+        latestArchive.weekStartDate,
+        dayWindow,
+      );
+      return reply.send(
+        plannerSummaryArchiveListResponseSchema.parse(
+          services.plannerRepository.listSummaryArchives(),
+        ),
+      );
+    }
+
+    return reply.send(plannerSummaryArchiveListResponseSchema.parse(archives));
+  });
+
+  app.get("/planner/summary/archives/:weekStartDate/pdf", async (request, reply) => {
+    await app.authenticate(request, reply);
+    if (reply.sent) {
+      return;
+    }
+
+    const weekStartDate = plannerIsoDateSchema.safeParse(
+      (request.params as { weekStartDate?: string } | undefined)?.weekStartDate,
+    );
+    if (!weekStartDate.success) {
+      return reply.code(400).send({ message: weekStartDate.error.message });
+    }
+
+    const archive = services.plannerRepository.getSummaryArchive(weekStartDate.data);
+    if (!archive) {
+      return reply.code(404).send({ message: "School summary archive not found" });
+    }
+
+    const pdfBuffer = await services.plannerSummaryArchiveService.readPdf(
+      weekStartDate.data,
+      services.settingsRepository.getPlannerDayWindow(),
+    );
+    reply.header("content-type", "application/pdf");
+    reply.header(
+      "content-disposition",
+      `attachment; filename="hearth-school-summary-${archive.weekStartDate}-to-${archive.weekEndDate}.pdf"`,
+    );
+    return reply.send(pdfBuffer);
   });
 
   app.get("/planner/day-window", async (request, reply) => {
@@ -149,6 +242,7 @@ export const registerPlannerRoutes = (app: FastifyInstance, services: AppService
     }
 
     try {
+      freezeElapsedPlannerDays(services);
       const updated = services.plannerRepository.updateTemplate(params.data.id, body.data);
       if (!updated) {
         return reply.code(404).send({ message: "Planner template not found" });
@@ -184,6 +278,7 @@ export const registerPlannerRoutes = (app: FastifyInstance, services: AppService
       return reply.code(400).send({ message: body.error.message });
     }
 
+    freezeElapsedPlannerDays(services);
     const duplicated = services.plannerRepository.duplicateTemplate(params.data.id, body.data);
     if (!duplicated) {
       return reply.code(404).send({ message: "Planner template not found" });
@@ -210,6 +305,7 @@ export const registerPlannerRoutes = (app: FastifyInstance, services: AppService
       return reply.code(400).send({ message: params.error.message });
     }
 
+    freezeElapsedPlannerDays(services);
     const deleted = services.plannerRepository.deleteTemplate(params.data.id);
     if (!deleted) {
       return reply.code(404).send({ message: "Planner template not found" });
@@ -242,6 +338,7 @@ export const registerPlannerRoutes = (app: FastifyInstance, services: AppService
     }
 
     try {
+      freezeElapsedPlannerDays(services);
       const blocks = services.plannerRepository.replaceTemplateBlocks(params.data.id, {
         blocks: body.data.blocks,
         dayWindow: services.settingsRepository.getPlannerDayWindow(),
@@ -288,6 +385,7 @@ export const registerPlannerRoutes = (app: FastifyInstance, services: AppService
     }
 
     try {
+      freezeElapsedPlannerDays(services);
       const assignment = services.plannerRepository.upsertAssignment(body.data);
       publishPlannerEvent(services, {
         type: "planner-updated",
@@ -315,6 +413,7 @@ export const registerPlannerRoutes = (app: FastifyInstance, services: AppService
       return reply.code(400).send({ message: params.error.message });
     }
 
+    freezeElapsedPlannerDays(services);
     const deleted = services.plannerRepository.deleteAssignment(params.data.date);
     if (!deleted) {
       return reply.code(404).send({ message: "Planner assignment not found" });

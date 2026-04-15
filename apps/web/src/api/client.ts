@@ -20,6 +20,8 @@ import {
   plannerTemplateDetailSchema,
   plannerTemplateSchema,
   plannerTodayResponseSchema,
+  plannerSummaryArchiveListResponseSchema,
+  plannerWeekSummaryResponseSchema,
   photoCollectionsResponseSchema,
   photoLibraryFoldersResponseSchema,
   reportScreenProfileRequestSchema,
@@ -54,6 +56,8 @@ import {
   type PlannerTemplate,
   type PlannerTemplateDetail,
   type PlannerTodayResponse,
+  type PlannerSummaryArchiveListResponse,
+  type PlannerWeekSummaryResponse,
   type PhotoCollectionsResponse,
   type PhotoLibraryFoldersResponse,
   type ReportScreenProfileRequest,
@@ -517,6 +521,54 @@ export const getPlannerDashboard = async (token: string): Promise<PlannerDashboa
     },
     (payload) => plannerDashboardResponseSchema.parse(payload),
   );
+
+export const getPlannerSummary = async (token: string): Promise<PlannerWeekSummaryResponse> =>
+  request(
+    "/planner/summary",
+    {
+      method: "GET",
+      headers: withAuth(token),
+    },
+    (payload) => plannerWeekSummaryResponseSchema.parse(payload),
+  );
+
+export const getPlannerSummaryArchives = async (
+  token: string,
+): Promise<PlannerSummaryArchiveListResponse> =>
+  request(
+    "/planner/summary/archives",
+    {
+      method: "GET",
+      headers: withAuth(token),
+    },
+    (payload) => plannerSummaryArchiveListResponseSchema.parse(payload),
+  );
+
+export const downloadPlannerSummaryPdf = async (
+  token: string,
+  weekStartDate: string,
+): Promise<Blob> => {
+  const authHeaders = new Headers(withAuth(token));
+  const response = await fetch(
+    `${API_BASE}/planner/summary/archives/${encodeURIComponent(weekStartDate)}/pdf`,
+    {
+      method: "GET",
+      headers: authHeaders,
+    },
+  );
+
+  if (!response.ok) {
+    handleUnauthorizedAdminResponse(response.status, authHeaders);
+    const errorBody = await response.json().catch(() => ({}));
+    const message =
+      typeof errorBody.message === "string"
+        ? errorBody.message
+        : `Request failed (${response.status})`;
+    throw new Error(message);
+  }
+
+  return response.blob();
+};
 
 export const getPlannerDayWindow = async (token: string): Promise<PlannerDayWindowConfig> =>
   request(

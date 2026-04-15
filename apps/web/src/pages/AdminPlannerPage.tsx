@@ -8,6 +8,7 @@ import {
   plannerDayWindowConfigSchema,
   toCalendarDateInTimeZone,
   type PlannerActivityBlockDraft,
+  type PlannerSummaryArchive,
   type PlannerDashboardResponse,
   type PlannerDayWindowConfig,
   type PlannerTemplateDetail,
@@ -15,10 +16,12 @@ import {
 } from "@hearth/shared";
 import {
   createPlannerTemplate,
+  downloadPlannerSummaryPdf,
   deletePlannerTemplate,
   duplicatePlannerTemplate,
   replacePlannerTemplateBlocks,
   getPlannerDashboard,
+  getPlannerSummaryArchives,
   updatePlannerDayWindow,
   updatePlannerTemplate,
 } from "../api/client";
@@ -68,6 +71,7 @@ export const AdminPlannerPage = () => {
   const [blocksDirty, setBlocksDirty] = useState(false);
   const [isAutosavingBlocks, setIsAutosavingBlocks] = useState(false);
   const [createTemplateName, setCreateTemplateName] = useState("");
+  const [summaryStatus, setSummaryStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const blockAutosaveRevisionRef = useRef(0);
@@ -114,10 +118,14 @@ export const AdminPlannerPage = () => {
 
   const timeOptions = useMemo(
     () => [
-      ...buildPlannerTimeSlots(dayWindowForm.startTime, dayWindowForm.endTime),
+      ...buildPlannerTimeSlots(
+        dayWindowForm.startTime,
+        dayWindowForm.endTime,
+        dayWindowForm.slotMinutes,
+      ),
       dayWindowForm.endTime,
     ],
-    [dayWindowForm.endTime, dayWindowForm.startTime],
+    [dayWindowForm.endTime, dayWindowForm.slotMinutes, dayWindowForm.startTime],
   );
 
   const plannerQuery = useModuleQuery<PlannerDashboardResponse>({
@@ -129,8 +137,21 @@ export const AdminPlannerPage = () => {
     eventSourceUrl: "/api/events/layouts",
     eventNames: ["planner-updated", "site-time-updated"],
   });
+  const summaryArchiveQuery = useModuleQuery<{ archives: PlannerSummaryArchive[] }>({
+    key: `admin-planner-summary-archives:${token ?? "anonymous"}`,
+    enabled: Boolean(token),
+    queryFn: async () => getPlannerSummaryArchives(token!),
+    intervalMs: FALLBACK_REFRESH_INTERVAL_MS,
+    staleMs: 0,
+    eventSourceUrl: "/api/events/layouts",
+    eventNames: ["planner-updated", "site-time-updated"],
+  });
   const loading = plannerQuery.loading && templates.length === 0;
   const activeError = error ?? plannerQuery.error;
+  const summaryArchives = summaryArchiveQuery.data?.archives ?? [];
+  const latestSummaryArchive = summaryArchives[0] ?? null;
+  const archivedSummaryArchives = useMemo(() => summaryArchives.slice(1), [summaryArchives]);
+  const summaryLoading = summaryArchiveQuery.loading && summaryArchives.length === 0;
 
   useEffect(() => {
     if (!token) {
@@ -180,7 +201,7 @@ export const AdminPlannerPage = () => {
       return;
     }
 
-    if (blocksDirty && !window.confirm("Discard unsaved school block changes?")) {
+    if (blocksDirty && !window.confirm("Discard unsaved school activity changes?")) {
       return;
     }
 
@@ -363,6 +384,59 @@ export const AdminPlannerPage = () => {
     );
   };
 
+  const onDownloadSummary = async () => {
+    if (!latestSummaryArchive || !token) {
+      return;
+    }
+
+    try {
+      const blob = await downloadPlannerSummaryPdf(token, latestSummaryArchive.weekStartDate);
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `hearth-school-summary-${latestSummaryArchive.weekStartDate}-to-${latestSummaryArchive.weekEndDate}.pdf`;
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+      setSummaryStatus("Downloaded");
+      window.setTimeout(() => setSummaryStatus(null), 2000);
+    } catch {
+      setSummaryStatus("Download failed");
+      window.setTimeout(() => setSummaryStatus(null), 2500);
+    }
+  };
+
+  const onDownloadArchivedSummary = async (weekStartDate: string) => {
+    if (!token) {
+      return;
+    }
+
+    try {
+      const archive =
+        archivedSummaryArchives.find((entry) => entry.weekStartDate === weekStartDate) ??
+        latestSummaryArchive;
+      const blob = await downloadPlannerSummaryPdf(token, weekStartDate);
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `hearth-school-summary-${weekStartDate}-to-${
+        archive?.weekEndDate ?? weekStartDate
+      }.pdf`;
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+      setSummaryStatus("Downloaded");
+      window.setTimeout(() => setSummaryStatus(null), 2000);
+    } catch {
+      setSummaryStatus("Download failed");
+      window.setTimeout(() => setSummaryStatus(null), 2500);
+    }
+  };
+
   useEffect(() => {
     if (!token || !selectedTemplate || !blocksDirty || validationError) {
       return;
@@ -398,7 +472,9 @@ export const AdminPlannerPage = () => {
           if (blockAutosaveRevisionRef.current !== revision) {
             return;
           }
-          setError(saveError instanceof Error ? saveError.message : "Failed to save school blocks");
+          setError(
+            saveError instanceof Error ? saveError.message : "Failed to save school activities",
+          );
         } finally {
           if (blockAutosaveRevisionRef.current === revision) {
             setIsAutosavingBlocks(false);
@@ -464,6 +540,24 @@ export const AdminPlannerPage = () => {
                     {value}
                   </option>
                 ))}
+              </select>
+            </label>
+
+            <label className="flex min-w-[10rem] flex-col gap-1 text-sm text-slate-200">
+              <span>Grid size</span>
+              <select
+                value={String(dayWindowForm.slotMinutes)}
+                onChange={(event) =>
+                  setDayWindowForm((current) => ({
+                    ...current,
+                    slotMinutes: Number(event.target.value) as 15 | 30 | 60,
+                  }))
+                }
+                className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
+              >
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="60">1 hour</option>
               </select>
             </label>
 
@@ -663,7 +757,7 @@ export const AdminPlannerPage = () => {
 
           <AdminSectionHeader
             title="Timetable editor"
-            description="Drag on a column to create a block. Drag a block to move it, or drag its edges to resize it."
+            description="Drag on a column to create an activity. Drag an activity to move it, or drag its edges to resize it."
             actions={
               <button
                 type="button"
@@ -699,7 +793,7 @@ export const AdminPlannerPage = () => {
             </p>
           ) : users.length === 0 ? (
             <p className="mt-4 rounded-lg border border-slate-700 bg-slate-950/50 px-3 py-3 text-sm text-slate-300">
-              Add a child in Admin &gt; Children before creating timetable blocks.
+              Add a child in Admin &gt; Children before creating timetable activities.
             </p>
           ) : (
             <div className="mt-4 space-y-4">
@@ -816,12 +910,112 @@ export const AdminPlannerPage = () => {
                   </div>
                 ) : (
                   <p className="mt-4 text-sm text-slate-300">
-                    Select a timetable block to edit its name, colour, notes, or times.
+                    Select a timetable activity to edit its name, colour, notes, or times.
                   </p>
                 )}
               </div>
             </div>
           )}
+        </AdminSection>
+
+        <AdminSection>
+          <AdminSectionHeader
+            title="Weekly summary"
+            description="Download the latest weekly summary PDF, or open an older PDF below."
+            meta={
+              latestSummaryArchive ? (
+                <span className="text-cyan-100">
+                  {latestSummaryArchive.weekStartDate} to {latestSummaryArchive.weekEndDate}
+                </span>
+              ) : (
+                <span className="text-slate-400">Waiting for the latest PDF summary</span>
+              )
+            }
+            actions={
+              <button
+                type="button"
+                onClick={() => void onDownloadSummary()}
+                disabled={!latestSummaryArchive}
+                className="rounded-lg border border-cyan-400/60 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Download latest PDF
+              </button>
+            }
+          />
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <p className="max-w-2xl text-sm text-slate-400">
+              PDFs group the week by child, then by completed and incomplete activities.
+            </p>
+            {summaryStatus ? (
+              <span className="rounded-full border border-slate-600 bg-slate-900/70 px-2 py-1 text-xs font-semibold text-slate-200">
+                {summaryStatus}
+              </span>
+            ) : null}
+          </div>
+
+          {summaryArchiveQuery.error ? (
+            <div className="mt-4 rounded-lg border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+              {summaryArchiveQuery.error}
+            </div>
+          ) : null}
+
+          {summaryLoading ? (
+            <p className="mt-4 text-sm text-slate-300">Preparing the latest weekly PDF...</p>
+          ) : latestSummaryArchive ? (
+            <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-100">Latest PDF summary</h3>
+                  <p className="text-sm text-slate-400">
+                    {latestSummaryArchive.weekStartDate} to {latestSummaryArchive.weekEndDate}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void onDownloadSummary()}
+                  disabled={!latestSummaryArchive}
+                  className="rounded-lg border border-cyan-400/60 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Download PDF
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-4 rounded-lg border border-slate-700 bg-slate-950/50 px-3 py-3 text-sm text-slate-300">
+              No weekly PDF summary yet.
+            </p>
+          )}
+
+          <div className="mt-6 rounded-xl border border-slate-700 bg-slate-950/40 p-4">
+            <h3 className="text-base font-semibold text-slate-100">Archived PDFs</h3>
+            <div className="mt-3 space-y-2">
+              {archivedSummaryArchives.length > 0 ? (
+                archivedSummaryArchives.map((archive) => (
+                  <div
+                    key={archive.weekStartDate}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-700 bg-slate-950/50 px-3 py-3"
+                  >
+                    <div>
+                      <p className="font-semibold text-slate-100">
+                        {archive.weekStartDate} to {archive.weekEndDate}
+                      </p>
+                      <p className="text-xs text-slate-400">School summary PDF</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void onDownloadArchivedSummary(archive.weekStartDate)}
+                      className="rounded-lg border border-cyan-400/60 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300"
+                    >
+                      Download PDF
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-300">No archived PDFs yet.</p>
+              )}
+            </div>
+          </div>
         </AdminSection>
 
         {loading ? <p className="text-sm text-slate-300">Loading school plans...</p> : null}

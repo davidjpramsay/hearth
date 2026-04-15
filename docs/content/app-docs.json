@@ -16,13 +16,14 @@
       "id": "overview",
       "group": "Getting Started",
       "eyebrow": "Platform",
-      "title": "What Hearth is",
+      "title": "Hearth overview",
       "summary": "Hearth is a self-hosted dashboard for a wall display, TV, tablet, or kiosk browser.",
       "body": [
         "Open Hearth on a display to show a full-screen family dashboard.",
         "Use the admin app to build layouts, add modules, and choose what each screen shows.",
         "Built-in modules include photos, calendar, clock, weather, chores, Bible verse, and School planner.",
-        "Each display checks in with the server so layout changes appear quickly."
+        "Each display checks in with the server so layout changes appear quickly.",
+        "School activities can be marked complete on the display, and School keeps the latest week plus older weeks as PDF downloads."
       ],
       "bullets": [
         "One app for the display and the admin tools.",
@@ -77,7 +78,7 @@
       "id": "admin",
       "group": "Operations",
       "eyebrow": "Usage",
-      "title": "Use the admin",
+      "title": "Admin guide",
       "summary": "Most setup happens in Layouts, Settings, Children, Chores, and School.",
       "body": [
         "Open `/admin/login` to sign in.",
@@ -85,7 +86,7 @@
         "Use Settings to manage displays, timezone, calendar feeds, and system health.",
         "Use Children to manage the shared child list.",
         "Use Chores to manage tasks and payouts.",
-        "Use School to manage weekly plans and timetables."
+        "Use School to manage weekly plans, grid size, timetables, and activity checkoffs."
       ],
       "bullets": [
         "The fullscreen display runs at `/`.",
@@ -93,7 +94,8 @@
         "Settings autosaves simple edits.",
         "Each weekday can belong to only one School plan.",
         "Settings shows display health, backups, and database status.",
-        "The set-logic editor supports undo, redo, and draft recovery."
+        "The set-logic editor supports undo, redo, and draft recovery.",
+        "School keeps the latest week ready as a PDF and keeps older weeks in a PDF archive."
       ]
     },
     {
@@ -163,7 +165,7 @@
         "Good references: clock, chores, calendar, Bible verse, and School planner.",
         "Do not trust raw `new Date()` for household-day logic.",
         "Use timezone-aware helpers from `@hearth/shared`.",
-        "School planner uses synced household time for day selection and its current-time line."
+        "School planner uses synced household time for day selection, its current-time line, and the chosen 15, 30, or 60 minute grid."
       ],
       "code": {
         "language": "ts",

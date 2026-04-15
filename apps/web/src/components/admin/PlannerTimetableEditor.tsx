@@ -14,6 +14,7 @@ import {
   getThemePaletteForegroundVar,
   getThemePaletteRgbVar,
 } from "../../theme/theme";
+import { getPlannerTimetableSlotHeight } from "./planner-timetable";
 
 export interface PlannerEditorBlock extends PlannerActivityBlockDraft {
   clientId: string;
@@ -58,8 +59,6 @@ type Interaction =
       originalEndSlot: number;
     };
 
-const SLOT_HEIGHT_PX = 32;
-
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
@@ -96,9 +95,10 @@ const slotRangeToTimes = (
   dayWindow: PlannerDayWindowConfig,
 ): { startTime: string; endTime: string } => {
   const dayStartMinutes = plannerTimeToMinutes(dayWindow.startTime);
+  const slotMinutes = dayWindow.slotMinutes;
   return {
-    startTime: plannerMinutesToTime(dayStartMinutes + startSlot * 15),
-    endTime: plannerMinutesToTime(dayStartMinutes + endSlotExclusive * 15),
+    startTime: plannerMinutesToTime(dayStartMinutes + startSlot * slotMinutes),
+    endTime: plannerMinutesToTime(dayStartMinutes + endSlotExclusive * slotMinutes),
   };
 };
 
@@ -107,9 +107,12 @@ const blockToSlots = (
   dayWindow: PlannerDayWindowConfig,
 ): { startSlot: number; endSlotExclusive: number } => {
   const dayStartMinutes = plannerTimeToMinutes(dayWindow.startTime);
+  const slotMinutes = dayWindow.slotMinutes;
+  const startDelta = plannerTimeToMinutes(block.startTime) - dayStartMinutes;
+  const endDelta = plannerTimeToMinutes(block.endTime) - dayStartMinutes;
   return {
-    startSlot: Math.round((plannerTimeToMinutes(block.startTime) - dayStartMinutes) / 15),
-    endSlotExclusive: Math.round((plannerTimeToMinutes(block.endTime) - dayStartMinutes) / 15),
+    startSlot: Math.floor(startDelta / slotMinutes),
+    endSlotExclusive: Math.max(Math.ceil(endDelta / slotMinutes), 1),
   };
 };
 
@@ -123,13 +126,14 @@ export const PlannerTimetableEditor = ({
   onSelectBlock,
 }: PlannerTimetableEditorProps) => {
   const [interaction, setInteraction] = useState<Interaction | null>(null);
+  const slotHeightPx = getPlannerTimetableSlotHeight(dayWindow.slotMinutes);
 
   const slots = useMemo(
-    () => buildPlannerTimeSlots(dayWindow.startTime, dayWindow.endTime),
-    [dayWindow.endTime, dayWindow.startTime],
+    () => buildPlannerTimeSlots(dayWindow.startTime, dayWindow.endTime, dayWindow.slotMinutes),
+    [dayWindow.endTime, dayWindow.slotMinutes, dayWindow.startTime],
   );
   const slotCount = slots.length;
-  const totalHeight = slotCount * SLOT_HEIGHT_PX;
+  const totalHeight = slotCount * slotHeightPx;
 
   useEffect(() => {
     if (!interaction) {
@@ -153,7 +157,7 @@ export const PlannerTimetableEditor = ({
         return;
       }
 
-      const deltaSlots = Math.round((event.clientY - interaction.startClientY) / SLOT_HEIGHT_PX);
+      const deltaSlots = Math.round((event.clientY - interaction.startClientY) / slotHeightPx);
       const activeBlock = blocks.find((block) => block.clientId === interaction.blockId);
       if (!activeBlock) {
         return;
@@ -240,7 +244,7 @@ export const PlannerTimetableEditor = ({
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [blocks, dayWindow, interaction, onChange, slotCount]);
+  }, [blocks, dayWindow, interaction, onChange, slotCount, slotHeightPx]);
 
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-950/70">
@@ -269,7 +273,7 @@ export const PlannerTimetableEditor = ({
               className={`flex items-start border-b border-slate-800 px-2 py-1 text-[11px] text-slate-400 ${
                 index % 4 === 0 ? "bg-slate-950/80" : ""
               }`}
-              style={{ height: `${SLOT_HEIGHT_PX}px` }}
+              style={{ height: `${slotHeightPx}px` }}
             >
               {formatTimeLabel(slot)}
             </div>
@@ -318,16 +322,16 @@ export const PlannerTimetableEditor = ({
                   className={`pointer-events-auto border-b border-slate-800 ${
                     index % 4 === 0 ? "bg-slate-900/20" : ""
                   }`}
-                  style={{ height: `${SLOT_HEIGHT_PX}px` }}
+                  style={{ height: `${slotHeightPx}px` }}
                 />
               ))}
 
               {userBlocks.map((block) => {
                 const { startSlot, endSlotExclusive } = blockToSlots(block, dayWindow);
-                const top = startSlot * SLOT_HEIGHT_PX;
+                const top = startSlot * slotHeightPx;
                 const height = Math.max(
-                  (endSlotExclusive - startSlot) * SLOT_HEIGHT_PX,
-                  SLOT_HEIGHT_PX,
+                  (endSlotExclusive - startSlot) * slotHeightPx,
+                  slotHeightPx,
                 );
                 const isSelected = block.clientId === selectedBlockId;
 
@@ -384,7 +388,7 @@ export const PlannerTimetableEditor = ({
                     />
                     <div className="pointer-events-none flex h-full flex-col justify-center">
                       <span className="truncate text-sm font-semibold">{block.name}</span>
-                      {height >= SLOT_HEIGHT_PX * 2.75 && block.notes ? (
+                      {height >= slotHeightPx * 2.75 && block.notes ? (
                         <span className="mt-0.5 line-clamp-2 text-[11px] opacity-80">
                           {block.notes}
                         </span>

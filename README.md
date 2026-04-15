@@ -8,7 +8,7 @@ Run it on a TV, tablet, Raspberry Pi, mini PC, or kiosk browser to show things l
 - Calendar
 - Clock and weather
 - Chores
-- School planner
+- School planner with 15, 30, or 60 minute grid sizes
 - Bible verse
 - Custom layouts for each screen
 
@@ -37,6 +37,7 @@ Demo video:
 - Admin app at `/admin/login`
 - Per-screen layout routing
 - Photo, calendar, chores, weather, clock, Bible verse, and School planner modules
+- School activities can be marked complete on the display, with the latest week kept as a PDF and older weeks stored in a PDF archive
 - SQLite storage with automatic backups
 
 ## Install For Development

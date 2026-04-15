@@ -25,6 +25,7 @@ const flushMicrotasks = async () => {
 const createResponse = (input: {
   siteDate: string;
   templateName: string | null;
+  slotMinutes?: 15 | 30 | 60;
 }): PlannerTodayResponse =>
   plannerTodayResponseSchema.parse({
     generatedAt: new Date("2026-04-06T08:00:00.000Z").toISOString(),
@@ -32,6 +33,7 @@ const createResponse = (input: {
     dayWindow: {
       startTime: "08:00",
       endTime: "15:00",
+      slotMinutes: input.slotMinutes ?? 15,
     },
     users: [
       {
@@ -66,6 +68,7 @@ const createResponse = (input: {
           },
         ]
       : [],
+    completions: [],
   });
 
 const callListener = (listener: Listener, event: Event): void => {
@@ -297,6 +300,102 @@ test("planner module refreshes when synced display time rolls into a new site da
 
     assert.equal(shims.getFetchCallCount(), 2);
     assert.match(JSON.stringify(renderer!.toJSON()), /Tuesday core/);
+  } finally {
+    if (renderer) {
+      await act(async () => {
+        renderer?.unmount();
+      });
+    }
+    restoreBrowserShims();
+  }
+});
+
+test("planner module respects a 30 minute grid size", async () => {
+  installBrowserShims([
+    createResponse({ siteDate: "2026-04-06", templateName: "Monday core", slotMinutes: 30 }),
+  ]);
+  syncDisplayTimeContext({
+    siteTimeZone: "Australia/Perth",
+    serverNowMs: new Date("2026-04-06T08:00:00.000Z").getTime(),
+    localReceivedAtMs: new Date("2026-04-06T08:00:00.000Z").getTime(),
+  });
+
+  let renderer: ReactTestRenderer | null = null;
+
+  try {
+    await act(async () => {
+      renderer = create(
+        React.createElement(plannerModule.runtime.Component, {
+          instanceId: "planner-3",
+          settings: plannerModule.settingsSchema.parse({}),
+          data: null,
+          loading: false,
+          error: null,
+          isEditing: false,
+        }),
+      );
+      await flushMicrotasks();
+    });
+
+    const text = JSON.stringify(renderer!.toJSON());
+    assert.match(text, /08:30/);
+  } finally {
+    if (renderer) {
+      await act(async () => {
+        renderer?.unmount();
+      });
+    }
+    restoreBrowserShims();
+  }
+});
+
+test("planner module can toggle activity completion", async () => {
+  const shims = installBrowserShims([
+    createResponse({ siteDate: "2026-04-06", templateName: "Monday core" }),
+    {
+      ...createResponse({ siteDate: "2026-04-06", templateName: "Monday core" }),
+      completions: [
+        {
+          blockId: 1,
+          date: "2026-04-06",
+          completedAt: "2026-04-06T08:15:00.000Z",
+        },
+      ],
+    },
+  ]);
+  syncDisplayTimeContext({
+    siteTimeZone: "Australia/Perth",
+    serverNowMs: new Date("2026-04-06T08:00:00.000Z").getTime(),
+    localReceivedAtMs: new Date("2026-04-06T08:00:00.000Z").getTime(),
+  });
+
+  let renderer: ReactTestRenderer | null = null;
+
+  try {
+    await act(async () => {
+      renderer = create(
+        React.createElement(plannerModule.runtime.Component, {
+          instanceId: "planner-4",
+          settings: plannerModule.settingsSchema.parse({}),
+          data: null,
+          loading: false,
+          error: null,
+          isEditing: false,
+        }),
+      );
+      await flushMicrotasks();
+    });
+
+    const checkbox = renderer!.root.findAll((node) => node.props.role === "checkbox")[0];
+    assert.ok(checkbox);
+
+    await act(async () => {
+      checkbox!.props.onClick();
+      await flushMicrotasks();
+    });
+
+    assert.match(JSON.stringify(renderer!.toJSON()), /Done/);
+    assert.equal(shims.getFetchCallCount(), 2);
   } finally {
     if (renderer) {
       await act(async () => {

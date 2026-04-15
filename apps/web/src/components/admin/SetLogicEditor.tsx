@@ -138,11 +138,27 @@ export const SetLogicEditor = ({
     null,
   );
   const hasPerformedInitialFitRef = useRef(false);
+  const lastAutoFitSignatureRef = useRef<string | null>(null);
   const [recoverableDraft, setRecoverableDraft] = useState<StoredGraphDraft | null>(null);
   const draftBlock = state.block;
   const selectedNodeId = state.selectedNodeId;
   const editorError = state.editorError;
   const isCanvasInteractive = state.isCanvasInteractive;
+  const structuralGraphSignature = useMemo(() => {
+    const nodeSignature = [...draftBlock.nodes]
+      .map((node) => node.id)
+      .sort()
+      .join("|");
+    const connectionSignature = [...draftBlock.connections]
+      .map((connection) => {
+        const sourceHandle = connection.sourceHandle?.trim() ?? "";
+        return `${connection.source}:${sourceHandle}->${connection.target}`;
+      })
+      .sort()
+      .join("|");
+
+    return `${nodeSignature}::${connectionSignature}`;
+  }, [draftBlock.connections, draftBlock.nodes]);
   const effectiveBlock = useMemo(
     () => ({
       ...draftBlock,
@@ -613,13 +629,34 @@ export const SetLogicEditor = ({
     }
 
     hasPerformedInitialFitRef.current = true;
+    lastAutoFitSignatureRef.current = structuralGraphSignature;
     requestAnimationFrame(() => {
       reactFlowInstance.fitView({
         padding: 0.2,
         duration: 180,
       });
     });
-  }, [reactFlowInstance]);
+  }, [reactFlowInstance, structuralGraphSignature]);
+
+  useEffect(() => {
+    if (!reactFlowInstance || !hasPerformedInitialFitRef.current) {
+      return;
+    }
+
+    if (lastAutoFitSignatureRef.current === structuralGraphSignature) {
+      return;
+    }
+
+    lastAutoFitSignatureRef.current = structuralGraphSignature;
+    const frame = requestAnimationFrame(() => {
+      reactFlowInstance.fitView({
+        padding: 0.2,
+        duration: 180,
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [reactFlowInstance, structuralGraphSignature]);
 
   const isValidConnection = (candidate: Edge | Connection): boolean => {
     const currentBlock = latestBlockRef.current;
@@ -874,7 +911,7 @@ export const SetLogicEditor = ({
   const hasEditableNodes = draftBlock.nodes.length > 0;
 
   const handleUndo = useCallback(() => {
-    const previousBlock = state.historyPast.at(-1);
+    const previousBlock = state.historyPast[state.historyPast.length - 1];
     if (!previousBlock) {
       return;
     }

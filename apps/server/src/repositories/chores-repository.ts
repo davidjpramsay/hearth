@@ -238,6 +238,21 @@ export class ChoresRepository {
   }
 
   deleteMember(id: number): boolean {
+    const hasSchoolHistory = this.db
+      .prepare<{ id: number }, { found: number }>(
+        `
+        SELECT 1 AS found
+        FROM planner_daily_plan_snapshot_blocks
+        WHERE user_id = @id
+        LIMIT 1
+        `,
+      )
+      .get({ id });
+
+    if (hasSchoolHistory) {
+      throw new Error("Child has School history and cannot be deleted");
+    }
+
     const result = this.db.prepare("DELETE FROM members WHERE id = @id").run({ id });
     return result.changes > 0;
   }

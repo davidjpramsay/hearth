@@ -50,10 +50,12 @@ export interface PlannerUpdatedEvent {
     | "template-duplicated"
     | "template-blocks-updated"
     | "assignment-updated"
-    | "assignment-deleted";
+    | "assignment-deleted"
+    | "activity-completion-updated";
   userId?: number;
   templateId?: number;
   date?: string;
+  blockId?: number;
 }
 
 export type AppEvent =

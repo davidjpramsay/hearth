@@ -89,7 +89,7 @@ export const graphEditorReducer = (
         isCanvasInteractive: !state.isCanvasInteractive,
       };
     case "undo": {
-      const previousBlock = state.historyPast.at(-1);
+      const previousBlock = state.historyPast[state.historyPast.length - 1];
       if (!previousBlock) {
         return state;
       }

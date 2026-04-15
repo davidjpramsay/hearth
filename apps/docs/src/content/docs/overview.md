@@ -1,5 +1,5 @@
 ---
-title: "What Hearth is"
+title: "Hearth overview"
 description: "Hearth is a self-hosted dashboard for a wall display, TV, tablet, or kiosk browser."
 ---
 
@@ -12,6 +12,8 @@ Use the admin app to build layouts, add modules, and choose what each screen sho
 Built-in modules include photos, calendar, clock, weather, chores, Bible verse, and School planner.
 
 Each display checks in with the server so layout changes appear quickly.
+
+School activities can be marked complete on the display, and School keeps the latest week plus older weeks as PDF downloads.
 
 ## Key Points
 

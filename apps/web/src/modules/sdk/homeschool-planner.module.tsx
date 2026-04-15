@@ -4,6 +4,7 @@ import {
   buildPlannerTimeSlots,
   getMillisecondsUntilNextCalendarDateInTimeZone,
   plannerModuleConfigSchema,
+  setPlannerActivityCompletionRequestSchema,
   plannerTimeToMinutes,
   plannerTodayResponseSchema,
   toCalendarDateInTimeZone,
@@ -61,10 +62,12 @@ const emptyTodayResponse = (siteDate: string): PlannerTodayResponse =>
     dayWindow: {
       startTime: "08:00",
       endTime: "15:00",
+      slotMinutes: 15,
     },
     users: [],
     template: null,
     blocks: [],
+    completions: [],
   });
 
 const fetchTodayPlan = async (instanceId: string): Promise<PlannerTodayResponse> => {
@@ -73,6 +76,33 @@ const fetchTodayPlan = async (instanceId: string): Promise<PlannerTodayResponse>
     {
       method: "GET",
       cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const message =
+      payload && typeof payload.message === "string"
+        ? payload.message
+        : `Request failed (${response.status})`;
+    throw new Error(message);
+  }
+
+  return plannerTodayResponseSchema.parse(await response.json());
+};
+
+const updateActivityCompletion = async (
+  instanceId: string,
+  input: { blockId: number; date: string; completed: boolean },
+): Promise<PlannerTodayResponse> => {
+  const response = await fetch(
+    `/api/modules/homeschool-planner/${encodeURIComponent(instanceId)}/completions`,
+    {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(setPlannerActivityCompletionRequestSchema.parse(input)),
     },
   );
 
@@ -123,6 +153,7 @@ export const moduleDefinition = defineModule({
       );
       const [loading, setLoading] = useState(() => initialSnapshot === null);
       const [error, setError] = useState<string | null>(null);
+      const [savingCompletionKeys, setSavingCompletionKeys] = useState<string[]>([]);
       const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(
         () => initialSnapshot?.updatedAtMs ?? null,
       );
@@ -137,6 +168,10 @@ export const moduleDefinition = defineModule({
         hasSnapshot: lastUpdatedMs !== null,
         isOnline: browserOnline,
       });
+      const completedBlockIds = useMemo(
+        () => new Set(response.completions.map((completion) => completion.blockId)),
+        [response.completions],
+      );
 
       useEffect(() => {
         responseRef.current = response;
@@ -281,7 +316,11 @@ export const moduleDefinition = defineModule({
         };
       }, [isEditing]);
 
-      const slots = buildPlannerTimeSlots(response.dayWindow.startTime, response.dayWindow.endTime);
+      const slots = buildPlannerTimeSlots(
+        response.dayWindow.startTime,
+        response.dayWindow.endTime,
+        response.dayWindow.slotMinutes,
+      );
 
       useEffect(() => {
         const element = plannerViewportRef.current;
@@ -335,8 +374,59 @@ export const moduleDefinition = defineModule({
       const currentTimeWithinWindow =
         currentTimeMinutes >= dayStartMinutes && currentTimeMinutes < dayEndMinutes;
       const currentTimeOffsetPx = currentTimeWithinWindow
-        ? ((currentTimeMinutes - dayStartMinutes) / 15) * slotHeightPx
+        ? ((currentTimeMinutes - dayStartMinutes) / response.dayWindow.slotMinutes) * slotHeightPx
         : null;
+      const saveCompletionKey = (blockId: number): string => `${response.siteDate}:${blockId}`;
+      const onToggleCompletion = async (blockId: number, completed: boolean) => {
+        const key = saveCompletionKey(blockId);
+        const previousResponse = responseRef.current;
+        setSavingCompletionKeys((current) => (current.includes(key) ? current : [...current, key]));
+        setError(null);
+        setResponse((current) => {
+          const nextCompletions = completed
+            ? [
+                ...current.completions.filter((completion) => completion.blockId !== blockId),
+                {
+                  blockId,
+                  date: current.siteDate,
+                  completedAt: new Date().toISOString(),
+                },
+              ]
+            : current.completions.filter((completion) => completion.blockId !== blockId);
+
+          return {
+            ...current,
+            completions: nextCompletions,
+          };
+        });
+
+        try {
+          const nextResponse = await updateActivityCompletion(instanceId, {
+            blockId,
+            date: previousResponse.siteDate,
+            completed,
+          });
+          const updatedAtMs = Date.now();
+          setResponse(nextResponse);
+          setLastUpdatedMs(updatedAtMs);
+          writePersistedModuleSnapshot(snapshotKey, nextResponse, updatedAtMs);
+        } catch (toggleError) {
+          const nextResponse = await fetchTodayPlan(instanceId).catch(() => null);
+          if (nextResponse) {
+            const updatedAtMs = Date.now();
+            setResponse(nextResponse);
+            setLastUpdatedMs(updatedAtMs);
+            writePersistedModuleSnapshot(snapshotKey, nextResponse, updatedAtMs);
+          } else {
+            setResponse(previousResponse);
+          }
+          setError(
+            toggleError instanceof Error ? toggleError.message : "Failed to update activity",
+          );
+        } finally {
+          setSavingCompletionKeys((current) => current.filter((entry) => entry !== key));
+        }
+      };
 
       return (
         <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 p-2 text-slate-100">
@@ -408,11 +498,6 @@ export const moduleDefinition = defineModule({
                           currentTimeMinutes >= startMinutes && currentTimeMinutes < endMinutes
                         );
                       })?.id ?? null;
-                    const nextBlockId =
-                      userBlocks.find(
-                        (block) => plannerTimeToMinutes(block.startTime) > currentTimeMinutes,
-                      )?.id ?? null;
-
                     return (
                       <div
                         key={user.id}
@@ -441,23 +526,21 @@ export const moduleDefinition = defineModule({
                           const startMinutes =
                             plannerTimeToMinutes(block.startTime) - dayStartMinutes;
                           const endMinutes = plannerTimeToMinutes(block.endTime) - dayStartMinutes;
-                          const top = (startMinutes / 15) * slotHeightPx;
+                          const top =
+                            (startMinutes / response.dayWindow.slotMinutes) * slotHeightPx;
                           const height = Math.max(
-                            ((endMinutes - startMinutes) / 15) * slotHeightPx,
+                            ((endMinutes - startMinutes) / response.dayWindow.slotMinutes) *
+                              slotHeightPx,
                             slotHeightPx,
                           );
                           const isActive = block.id === activeBlockId;
-                          const isNext = !isActive && block.id === nextBlockId;
-
                           return (
                             <div
                               key={block.id}
                               className={`absolute left-1 right-1 overflow-hidden rounded border px-2 py-1 shadow transition ${
                                 isActive
                                   ? "z-[2] ring-2 ring-white/55 shadow-[0_12px_28px_rgba(15,23,42,0.36)]"
-                                  : isNext
-                                    ? "z-[2] ring-1 ring-white/30"
-                                    : "border-slate-950/50"
+                                  : "border-slate-950/50"
                               }`}
                               style={{
                                 top: `${top + 1}px`,
@@ -470,17 +553,47 @@ export const moduleDefinition = defineModule({
                               <p className="truncate text-sm font-semibold leading-tight">
                                 {block.name}
                               </p>
-                              {isActive ? (
-                                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] opacity-80">
-                                  Now
-                                </p>
-                              ) : isNext ? (
-                                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] opacity-75">
-                                  Next
-                                </p>
-                              ) : null}
-                              {height >= slotHeightPx * 2.5 && block.notes ? (
-                                <p className="mt-1 line-clamp-3 text-[11px] leading-snug opacity-85 normal-case tracking-normal">
+                              <div className="mt-1 flex items-center justify-between gap-2">
+                                <button
+                                  type="button"
+                                  role="checkbox"
+                                  aria-checked={completedBlockIds.has(block.id)}
+                                  aria-label={
+                                    completedBlockIds.has(block.id)
+                                      ? `Mark ${block.name} incomplete`
+                                      : `Mark ${block.name} complete`
+                                  }
+                                  disabled={savingCompletionKeys.includes(
+                                    saveCompletionKey(block.id),
+                                  )}
+                                  onClick={() =>
+                                    void onToggleCompletion(
+                                      block.id,
+                                      !completedBlockIds.has(block.id),
+                                    )
+                                  }
+                                  className={`flex h-5 items-center gap-1 rounded px-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition ${
+                                    completedBlockIds.has(block.id)
+                                      ? "bg-white/18 text-current"
+                                      : "bg-black/12 text-current opacity-90"
+                                  }`}
+                                >
+                                  <span
+                                    className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${
+                                      completedBlockIds.has(block.id)
+                                        ? "border-current bg-current text-slate-950"
+                                        : "border-current/80 bg-transparent"
+                                    }`}
+                                  >
+                                    {completedBlockIds.has(block.id) ? "✓" : null}
+                                  </span>
+                                  <span>
+                                    {completedBlockIds.has(block.id) ? "Done" : "Incomplete"}
+                                  </span>
+                                </button>
+                              </div>
+                              {block.notes && height >= slotHeightPx * 1.25 ? (
+                                <p className="mt-1 line-clamp-2 text-[11px] leading-snug opacity-85 normal-case tracking-normal">
                                   {block.notes}
                                 </p>
                               ) : null}

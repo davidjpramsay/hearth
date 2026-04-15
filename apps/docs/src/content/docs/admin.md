@@ -1,5 +1,5 @@
 ---
-title: "Use the admin"
+title: "Admin guide"
 description: "Most setup happens in Layouts, Settings, Children, Chores, and School."
 ---
 
@@ -15,7 +15,7 @@ Use Children to manage the shared child list.
 
 Use Chores to manage tasks and payouts.
 
-Use School to manage weekly plans and timetables.
+Use School to manage weekly plans, grid size, timetables, and activity checkoffs.
 
 ## Key Points
 
@@ -25,3 +25,4 @@ Use School to manage weekly plans and timetables.
 - Each weekday can belong to only one School plan.
 - Settings shows display health, backups, and database status.
 - The set-logic editor supports undo, redo, and draft recovery.
+- School keeps the latest week ready as a PDF and keeps older weeks in a PDF archive.

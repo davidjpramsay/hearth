@@ -14,7 +14,7 @@ export const docsHomeHero = {
 export const docsHomeStartLinks = [
   {
     href: "/overview/",
-    label: "What Hearth is",
+    label: "Hearth overview",
   },
   {
     href: "/install/",
@@ -26,7 +26,7 @@ export const docsHomeStartLinks = [
   },
   {
     href: "/admin/",
-    label: "Use the admin",
+    label: "Admin guide",
   },
   {
     href: "/deploy/",
