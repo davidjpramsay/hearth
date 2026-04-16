@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import interact from "interactjs";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   buildPlannerTimeSlots,
   comparePlannerTimes,
@@ -30,34 +31,24 @@ interface PlannerTimetableEditorProps {
   onSelectBlock: (blockId: string | null) => void;
 }
 
-type Interaction =
-  | {
-      type: "create";
-      userId: number;
-      startSlot: number;
-      currentSlot: number;
-    }
-  | {
-      type: "move";
-      blockId: string;
-      startClientY: number;
-      originalStartSlot: number;
-      originalEndSlot: number;
-    }
-  | {
-      type: "resize-start";
-      blockId: string;
-      startClientY: number;
-      originalStartSlot: number;
-      originalEndSlot: number;
-    }
-  | {
-      type: "resize-end";
-      blockId: string;
-      startClientY: number;
-      originalStartSlot: number;
-      originalEndSlot: number;
-    };
+interface PlannerBlockGeometry {
+  top: number;
+  height: number;
+}
+
+interface PlannerCreateDraft {
+  userId: number;
+  startSlot: number;
+  currentSlot: number;
+}
+
+interface PlannerInteractState {
+  clientId: string;
+  mode: "move" | "resize-start" | "resize-end";
+  startPointerY: number;
+  startGeometry: PlannerBlockGeometry;
+  currentGeometry: PlannerBlockGeometry;
+}
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -116,6 +107,50 @@ const blockToSlots = (
   };
 };
 
+const blockToGeometry = (
+  block: PlannerEditorBlock,
+  dayWindow: PlannerDayWindowConfig,
+  slotHeightPx: number,
+): PlannerBlockGeometry => {
+  const { startSlot, endSlotExclusive } = blockToSlots(block, dayWindow);
+  return {
+    top: startSlot * slotHeightPx,
+    height: Math.max((endSlotExclusive - startSlot) * slotHeightPx, slotHeightPx),
+  };
+};
+
+const geometryToSlotRange = (
+  geometry: PlannerBlockGeometry,
+  slotHeightPx: number,
+  slotCount: number,
+): { startSlot: number; endSlotExclusive: number } => {
+  const startSlot = clamp(Math.round(geometry.top / slotHeightPx), 0, Math.max(slotCount - 1, 0));
+  const durationSlots = clamp(
+    Math.round(geometry.height / slotHeightPx),
+    1,
+    Math.max(slotCount - startSlot, 1),
+  );
+  return {
+    startSlot,
+    endSlotExclusive: startSlot + durationSlots,
+  };
+};
+
+const snapPixelValue = (value: number, slotHeightPx: number): number =>
+  Math.round(value / slotHeightPx) * slotHeightPx;
+
+const buildCreatePreviewGeometry = (
+  draft: PlannerCreateDraft,
+  slotHeightPx: number,
+): PlannerBlockGeometry => {
+  const startSlot = Math.min(draft.startSlot, draft.currentSlot);
+  const endSlotExclusive = Math.max(draft.startSlot, draft.currentSlot) + 1;
+  return {
+    top: startSlot * slotHeightPx,
+    height: Math.max((endSlotExclusive - startSlot) * slotHeightPx, slotHeightPx),
+  };
+};
+
 export const PlannerTimetableEditor = ({
   dayWindow,
   users,
@@ -125,7 +160,11 @@ export const PlannerTimetableEditor = ({
   onChange,
   onSelectBlock,
 }: PlannerTimetableEditorProps) => {
-  const [interaction, setInteraction] = useState<Interaction | null>(null);
+  const [createDraft, setCreateDraft] = useState<PlannerCreateDraft | null>(null);
+  const [previewGeometries, setPreviewGeometries] = useState<Record<string, PlannerBlockGeometry>>(
+    {},
+  );
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const slotHeightPx = getPlannerTimetableSlotHeight(dayWindow.slotMinutes);
 
   const slots = useMemo(
@@ -134,120 +173,219 @@ export const PlannerTimetableEditor = ({
   );
   const slotCount = slots.length;
   const totalHeight = slotCount * slotHeightPx;
+  const blocksRef = useRef(blocks);
+  const onChangeRef = useRef(onChange);
+  const onSelectBlockRef = useRef(onSelectBlock);
+  const interactStateRef = useRef<PlannerInteractState | null>(null);
 
   useEffect(() => {
-    if (!interaction) {
+    blocksRef.current = blocks;
+  }, [blocks]);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    onSelectBlockRef.current = onSelectBlock;
+  }, [onSelectBlock]);
+
+  useEffect(() => {
+    if (disabled) {
       return;
     }
 
-    const handlePointerMove = (event: PointerEvent) => {
-      if (interaction.type === "create") {
-        const element = document.elementFromPoint(event.clientX, event.clientY);
-        const slotAttribute = element
-          ?.closest?.("[data-planner-slot-index]")
-          ?.getAttribute("data-planner-slot-index");
-        const nextSlot =
-          slotAttribute === null || slotAttribute === undefined
-            ? interaction.currentSlot
-            : clamp(Number(slotAttribute), 0, Math.max(slotCount - 1, 0));
-        setInteraction({
-          ...interaction,
-          currentSlot: nextSlot,
-        });
-        return;
-      }
+    const root = containerRef.current;
+    if (!root) {
+      return;
+    }
 
-      const deltaSlots = Math.round((event.clientY - interaction.startClientY) / slotHeightPx);
-      const activeBlock = blocks.find((block) => block.clientId === interaction.blockId);
-      if (!activeBlock) {
-        return;
-      }
+    const elements = Array.from(root.querySelectorAll<HTMLElement>("[data-planner-block]"));
+    const interactables = elements.map((element) =>
+      interact(element)
+        .draggable({
+          lockAxis: "y",
+          listeners: {
+            start: (event) => {
+              const clientId = element.dataset.clientId;
+              if (!clientId) {
+                return;
+              }
+              const block = blocksRef.current.find((entry) => entry.clientId === clientId);
+              if (!block) {
+                return;
+              }
 
-      const durationSlots = interaction.originalEndSlot - interaction.originalStartSlot;
+              const startGeometry = blockToGeometry(block, dayWindow, slotHeightPx);
+              interactStateRef.current = {
+                clientId,
+                mode: "move",
+                startPointerY: event.pageY,
+                startGeometry,
+                currentGeometry: startGeometry,
+              };
+              onSelectBlockRef.current(clientId);
+            },
+            move: (event) => {
+              const state = interactStateRef.current;
+              if (!state || state.mode !== "move") {
+                return;
+              }
 
-      if (interaction.type === "move") {
-        const nextStartSlot = clamp(
-          interaction.originalStartSlot + deltaSlots,
-          0,
-          Math.max(slotCount - durationSlots, 0),
-        );
-        const nextTimes = slotRangeToTimes(nextStartSlot, nextStartSlot + durationSlots, dayWindow);
-        onChange(
-          sortBlocks(
-            blocks.map((block) =>
-              block.clientId === activeBlock.clientId ? { ...block, ...nextTimes } : block,
-            ),
-          ),
-          activeBlock.clientId,
-        );
-        return;
-      }
+              const maxTop = Math.max(totalHeight - state.startGeometry.height, 0);
+              const deltaY = snapPixelValue(event.pageY - state.startPointerY, slotHeightPx);
+              const nextTop = clamp(state.startGeometry.top + deltaY, 0, maxTop);
+              state.currentGeometry = {
+                top: nextTop,
+                height: state.startGeometry.height,
+              };
+              setPreviewGeometries((current) => ({
+                ...current,
+                [state.clientId]: state.currentGeometry,
+              }));
+            },
+            end: () => {
+              const state = interactStateRef.current;
+              if (!state || state.mode !== "move") {
+                return;
+              }
 
-      if (interaction.type === "resize-start") {
-        const nextStartSlot = clamp(
-          interaction.originalStartSlot + deltaSlots,
-          0,
-          interaction.originalEndSlot - 1,
-        );
-        const nextTimes = slotRangeToTimes(nextStartSlot, interaction.originalEndSlot, dayWindow);
-        onChange(
-          sortBlocks(
-            blocks.map((block) =>
-              block.clientId === activeBlock.clientId ? { ...block, ...nextTimes } : block,
-            ),
-          ),
-          activeBlock.clientId,
-        );
-        return;
-      }
+              const geometry = state.currentGeometry;
+              const nextSlotRange = geometryToSlotRange(geometry, slotHeightPx, slotCount);
+              const nextTimes = slotRangeToTimes(
+                nextSlotRange.startSlot,
+                nextSlotRange.endSlotExclusive,
+                dayWindow,
+              );
+              onChangeRef.current(
+                sortBlocks(
+                  blocksRef.current.map((block) =>
+                    block.clientId === state.clientId ? { ...block, ...nextTimes } : block,
+                  ),
+                ),
+                state.clientId,
+              );
+              setPreviewGeometries((current) => {
+                const next = { ...current };
+                delete next[state.clientId];
+                return next;
+              });
+              interactStateRef.current = null;
+            },
+          },
+        })
+        .resizable({
+          edges: {
+            top: ".planner-resize-start",
+            bottom: ".planner-resize-end",
+            left: false,
+            right: false,
+          },
+          listeners: {
+            start: (event) => {
+              const clientId = element.dataset.clientId;
+              if (!clientId) {
+                return;
+              }
+              const block = blocksRef.current.find((entry) => entry.clientId === clientId);
+              if (!block) {
+                return;
+              }
 
-      const nextEndSlot = clamp(
-        interaction.originalEndSlot + deltaSlots,
-        interaction.originalStartSlot + 1,
-        slotCount,
-      );
-      const nextTimes = slotRangeToTimes(interaction.originalStartSlot, nextEndSlot, dayWindow);
-      onChange(
-        sortBlocks(
-          blocks.map((block) =>
-            block.clientId === activeBlock.clientId ? { ...block, ...nextTimes } : block,
-          ),
-        ),
-        activeBlock.clientId,
-      );
-    };
+              const edgeName = event.edges?.top ? "resize-start" : "resize-end";
+              const startGeometry = blockToGeometry(block, dayWindow, slotHeightPx);
+              interactStateRef.current = {
+                clientId,
+                mode: edgeName,
+                startPointerY: event.pageY,
+                startGeometry,
+                currentGeometry: startGeometry,
+              };
+              onSelectBlockRef.current(clientId);
+            },
+            move: (event) => {
+              const state = interactStateRef.current;
+              if (!state || (state.mode !== "resize-start" && state.mode !== "resize-end")) {
+                return;
+              }
 
-    const handlePointerUp = () => {
-      if (interaction.type === "create") {
-        const startSlot = Math.min(interaction.startSlot, interaction.currentSlot);
-        const endSlotExclusive = Math.max(interaction.startSlot, interaction.currentSlot) + 1;
-        const times = slotRangeToTimes(startSlot, endSlotExclusive, dayWindow);
-        const nextBlock: PlannerEditorBlock = {
-          clientId: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          userId: interaction.userId,
-          name: "New activity",
-          colour: DEFAULT_THEME_COLOR_SLOT,
-          notes: null,
-          ...times,
-        };
+              const deltaY = snapPixelValue(event.pageY - state.startPointerY, slotHeightPx);
+              if (state.mode === "resize-start") {
+                const maxTop = state.startGeometry.top + state.startGeometry.height - slotHeightPx;
+                const nextTop = clamp(state.startGeometry.top + deltaY, 0, maxTop);
+                const nextHeight = state.startGeometry.height - (nextTop - state.startGeometry.top);
+                state.currentGeometry = {
+                  top: nextTop,
+                  height: nextHeight,
+                };
+                setPreviewGeometries((current) => ({
+                  ...current,
+                  [state.clientId]: state.currentGeometry,
+                }));
+                return;
+              }
 
-        onChange(sortBlocks([...blocks, nextBlock]), nextBlock.clientId);
-      }
+              const maxHeight = Math.max(totalHeight - state.startGeometry.top, slotHeightPx);
+              const nextHeight = clamp(
+                state.startGeometry.height + deltaY,
+                slotHeightPx,
+                maxHeight,
+              );
+              state.currentGeometry = {
+                top: state.startGeometry.top,
+                height: nextHeight,
+              };
+              setPreviewGeometries((current) => ({
+                ...current,
+                [state.clientId]: state.currentGeometry,
+              }));
+            },
+            end: () => {
+              const state = interactStateRef.current;
+              if (!state || (state.mode !== "resize-start" && state.mode !== "resize-end")) {
+                return;
+              }
 
-      setInteraction(null);
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
+              const geometry = state.currentGeometry;
+              const nextSlotRange = geometryToSlotRange(geometry, slotHeightPx, slotCount);
+              const nextTimes = slotRangeToTimes(
+                nextSlotRange.startSlot,
+                nextSlotRange.endSlotExclusive,
+                dayWindow,
+              );
+              onChangeRef.current(
+                sortBlocks(
+                  blocksRef.current.map((block) =>
+                    block.clientId === state.clientId ? { ...block, ...nextTimes } : block,
+                  ),
+                ),
+                state.clientId,
+              );
+              setPreviewGeometries((current) => {
+                const next = { ...current };
+                delete next[state.clientId];
+                return next;
+              });
+              interactStateRef.current = null;
+            },
+          },
+        }),
+    );
 
     return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
+      for (const instance of interactables) {
+        instance.unset();
+      }
+      interactStateRef.current = null;
+      setPreviewGeometries({});
     };
-  }, [blocks, dayWindow, interaction, onChange, slotCount, slotHeightPx]);
+  }, [dayWindow, disabled, slotCount, slotHeightPx, totalHeight]);
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-950/70">
+    <div
+      ref={containerRef}
+      className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-950/70"
+    >
       <div
         className="grid min-w-[620px]"
         style={{
@@ -282,6 +420,10 @@ export const PlannerTimetableEditor = ({
 
         {users.map((user) => {
           const userBlocks = blocks.filter((block) => block.userId === user.id);
+          const createPreview =
+            createDraft && createDraft.userId === user.id
+              ? buildCreatePreviewGeometry(createDraft, slotHeightPx)
+              : null;
 
           return (
             <div
@@ -289,10 +431,7 @@ export const PlannerTimetableEditor = ({
               className="relative border-r border-slate-700 bg-slate-950/40 last:border-r-0"
               style={{ height: `${totalHeight}px` }}
               onPointerDown={(event) => {
-                if (disabled) {
-                  return;
-                }
-                if (event.button !== 0) {
+                if (disabled || event.button !== 0) {
                   return;
                 }
                 const target = event.target as HTMLElement | null;
@@ -307,12 +446,58 @@ export const PlannerTimetableEditor = ({
                     ? 0
                     : clamp(Number(slotAttribute), 0, Math.max(slotCount - 1, 0));
                 onSelectBlock(null);
-                setInteraction({
-                  type: "create",
+                setCreateDraft({
                   userId: user.id,
                   startSlot,
                   currentSlot: startSlot,
                 });
+              }}
+              onPointerMove={(event) => {
+                if (!createDraft || createDraft.userId !== user.id) {
+                  return;
+                }
+                const target = event.target as HTMLElement | null;
+                const slotAttribute = target
+                  ?.closest?.("[data-planner-slot-index]")
+                  ?.getAttribute("data-planner-slot-index");
+                const nextSlot =
+                  slotAttribute === null || slotAttribute === undefined
+                    ? createDraft.currentSlot
+                    : clamp(Number(slotAttribute), 0, Math.max(slotCount - 1, 0));
+                setCreateDraft((current) =>
+                  current && current.userId === user.id
+                    ? {
+                        ...current,
+                        currentSlot: nextSlot,
+                      }
+                    : current,
+                );
+              }}
+              onPointerUp={() => {
+                if (!createDraft || createDraft.userId !== user.id) {
+                  return;
+                }
+                const startSlot = Math.min(createDraft.startSlot, createDraft.currentSlot);
+                const endSlotExclusive =
+                  Math.max(createDraft.startSlot, createDraft.currentSlot) + 1;
+                const times = slotRangeToTimes(startSlot, endSlotExclusive, dayWindow);
+                const nextBlock: PlannerEditorBlock = {
+                  clientId: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                  userId: user.id,
+                  name: "New activity",
+                  colour: DEFAULT_THEME_COLOR_SLOT,
+                  notes: null,
+                  ...times,
+                };
+                onChange(sortBlocks([...blocks, nextBlock]), nextBlock.clientId);
+                setCreateDraft(null);
+              }}
+              onPointerLeave={() => {
+                if (createDraft?.userId === user.id) {
+                  setCreateDraft((current) =>
+                    current && current.userId === user.id ? current : null,
+                  );
+                }
               }}
             >
               {slots.map((slot, index) => (
@@ -327,12 +512,8 @@ export const PlannerTimetableEditor = ({
               ))}
 
               {userBlocks.map((block) => {
-                const { startSlot, endSlotExclusive } = blockToSlots(block, dayWindow);
-                const top = startSlot * slotHeightPx;
-                const height = Math.max(
-                  (endSlotExclusive - startSlot) * slotHeightPx,
-                  slotHeightPx,
-                );
+                const baseGeometry = blockToGeometry(block, dayWindow, slotHeightPx);
+                const geometry = previewGeometries[block.clientId] ?? baseGeometry;
                 const isSelected = block.clientId === selectedBlockId;
 
                 return (
@@ -340,80 +521,45 @@ export const PlannerTimetableEditor = ({
                     key={block.clientId}
                     type="button"
                     data-planner-block="true"
+                    data-client-id={block.clientId}
                     onClick={(event) => {
                       event.stopPropagation();
                       onSelectBlock(block.clientId);
                     }}
-                    onPointerDown={(event) => {
-                      if (disabled) {
-                        return;
-                      }
-                      event.stopPropagation();
-                      onSelectBlock(block.clientId);
-                      setInteraction({
-                        type: "move",
-                        blockId: block.clientId,
-                        startClientY: event.clientY,
-                        originalStartSlot: startSlot,
-                        originalEndSlot: endSlotExclusive,
-                      });
-                    }}
-                    className={`absolute left-1 right-1 overflow-hidden rounded-lg border px-2 text-left shadow ${
+                    className={`absolute left-1 right-1 touch-none select-none overflow-hidden rounded-lg border px-2 text-left shadow ${
                       isSelected ? "border-cyan-300 ring-2 ring-cyan-400/70" : "border-slate-950/60"
                     }`}
                     style={{
-                      top: `${top + 1}px`,
-                      height: `${height - 2}px`,
+                      top: `${geometry.top}px`,
+                      height: `${geometry.height}px`,
                       backgroundColor: getThemePaletteColorVar(block.colour),
                       borderColor: `rgb(${getThemePaletteRgbVar(block.colour)} / 0.42)`,
                       color: getThemePaletteForegroundVar(block.colour),
                     }}
                   >
-                    <span
-                      className="absolute inset-x-0 top-0 h-2 cursor-ns-resize rounded-t-lg bg-black/10"
-                      onPointerDown={(event) => {
-                        if (disabled) {
-                          return;
-                        }
-                        event.stopPropagation();
-                        onSelectBlock(block.clientId);
-                        setInteraction({
-                          type: "resize-start",
-                          blockId: block.clientId,
-                          startClientY: event.clientY,
-                          originalStartSlot: startSlot,
-                          originalEndSlot: endSlotExclusive,
-                        });
-                      }}
-                    />
+                    <span className="planner-resize-start absolute inset-x-0 top-0 h-2 cursor-ns-resize rounded-t-lg bg-black/10" />
                     <div className="pointer-events-none flex h-full flex-col justify-center">
                       <span className="truncate text-sm font-semibold">{block.name}</span>
-                      {height >= slotHeightPx * 2.75 && block.notes ? (
+                      {geometry.height >= slotHeightPx * 2.75 && block.notes ? (
                         <span className="mt-0.5 line-clamp-2 text-[11px] opacity-80">
                           {block.notes}
                         </span>
                       ) : null}
                     </div>
-                    <span
-                      className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize rounded-b-lg bg-black/10"
-                      onPointerDown={(event) => {
-                        if (disabled) {
-                          return;
-                        }
-                        event.stopPropagation();
-                        onSelectBlock(block.clientId);
-                        setInteraction({
-                          type: "resize-end",
-                          blockId: block.clientId,
-                          startClientY: event.clientY,
-                          originalStartSlot: startSlot,
-                          originalEndSlot: endSlotExclusive,
-                        });
-                      }}
-                    />
+                    <span className="planner-resize-end absolute inset-x-0 bottom-0 h-2 cursor-ns-resize rounded-b-lg bg-black/10" />
                   </button>
                 );
               })}
+
+              {createPreview ? (
+                <div
+                  className="pointer-events-none absolute left-1 right-1 rounded-lg border border-cyan-300/80 bg-cyan-400/20 shadow"
+                  style={{
+                    top: `${createPreview.top}px`,
+                    height: `${createPreview.height}px`,
+                  }}
+                />
+              ) : null}
             </div>
           );
         })}
