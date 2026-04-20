@@ -1116,6 +1116,7 @@ export class PlannerRepository {
         `
         SELECT week_start_date, week_end_date, generated_at, pdf_relative_path
         FROM planner_weekly_summary_archives
+        WHERE pdf_relative_path IS NOT NULL
         ORDER BY week_start_date DESC
         `,
       )
@@ -1181,6 +1182,21 @@ export class PlannerRepository {
       .run({
         weekStartDate,
         pdfRelativePath,
+      });
+  }
+
+  clearSummaryArchivePdfRelativePath(weekStartDate: string): void {
+    this.db
+      .prepare(
+        `
+        UPDATE planner_weekly_summary_archives
+        SET pdf_relative_path = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE week_start_date = @weekStartDate
+        `,
+      )
+      .run({
+        weekStartDate,
       });
   }
 

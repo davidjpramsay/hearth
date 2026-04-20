@@ -396,8 +396,8 @@ export const moduleDefinition = defineModule({
           />
           <header className="mb-2 flex items-center justify-between rounded border border-slate-700 bg-slate-900/80 px-3 py-2">
             <p className="module-copy-title text-slate-100">Today&apos;s Chores</p>
-            <p className="module-copy-meta text-slate-300">
-              {`${totalTodayCompleted}/${todayItems.length}`}
+            <p className="module-copy-meta rounded border border-slate-700/70 bg-slate-950/60 px-2 py-1 text-slate-300">
+              {`${totalTodayCompleted} of ${todayItems.length}`}
             </p>
           </header>
 
@@ -419,21 +419,21 @@ export const moduleDefinition = defineModule({
                     key={member.memberId}
                     className="rounded border border-slate-700 bg-slate-900/70"
                   >
-                    <header className="flex items-center justify-between border-b border-slate-700 px-2 py-1.5">
+                    <header className="flex items-center justify-between gap-3 border-b border-slate-700 px-2.5 py-2">
                       <p className="module-copy-title text-slate-100">{member.memberName}</p>
                       {settings.showStats ? (
-                        <div className="module-copy-label flex items-center gap-2 text-slate-300">
-                          <span className="rounded border border-cyan-500/40 bg-cyan-500/10 px-1.5 py-0.5 text-cyan-200">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5 text-slate-300">
+                          <span className="module-copy-meta rounded border border-cyan-500/40 bg-cyan-500/10 px-2 py-1 text-cyan-200">
                             Week {completionPercent}%
                           </span>
                           {settings.enableMoneyTracking ? (
-                            <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
+                            <span className="module-copy-meta rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-emerald-200">
                               Pay ${member.basePayout.toFixed(2)} / $
                               {member.baseAllowance.toFixed(2)}
                             </span>
                           ) : null}
                           {settings.enableMoneyTracking && member.bonusPayout > 0 ? (
-                            <span className="rounded border border-emerald-500/30 bg-emerald-500/5 px-1.5 py-0.5 text-emerald-100">
+                            <span className="module-copy-meta rounded border border-emerald-500/30 bg-emerald-500/5 px-2 py-1 text-emerald-100">
                               +${member.bonusPayout.toFixed(2)} bonus
                             </span>
                           ) : null}
@@ -441,12 +441,12 @@ export const moduleDefinition = defineModule({
                       ) : null}
                     </header>
 
-                    <div className="space-y-1 px-2 py-1.5">
+                    <div className="space-y-1.5 px-2.5 py-2">
                       {memberItems.length > 0 ? (
                         memberItems.map((item) => (
                           <label
                             key={itemKey(item)}
-                            className={`flex items-center gap-2 rounded border px-2 py-1 ${
+                            className={`flex items-center gap-2.5 rounded border px-2.5 py-1.5 ${
                               item.completed
                                 ? "border-emerald-500/60 bg-emerald-500/15"
                                 : "border-slate-700 bg-slate-900/90"
@@ -465,14 +465,14 @@ export const moduleDefinition = defineModule({
                               {item.choreName}
                             </span>
                             {settings.enableMoneyTracking && item.valueAmount !== null ? (
-                              <span className="module-copy-label text-emerald-200">
+                              <span className="module-copy-meta text-emerald-200">
                                 ${item.valueAmount.toFixed(2)}
                               </span>
                             ) : null}
                           </label>
                         ))
                       ) : (
-                        <p className="module-copy-label rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-slate-300">
+                        <p className="module-copy-meta rounded border border-slate-700 bg-slate-900/60 px-2.5 py-1.5 text-slate-300">
                           No chores today.
                         </p>
                       )}
@@ -481,7 +481,7 @@ export const moduleDefinition = defineModule({
                 );
               })}
               {memberRows.length === 0 ? (
-                <p className="module-copy-meta rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-slate-300">
+                <p className="module-copy-meta rounded border border-slate-700 bg-slate-900/60 px-2.5 py-1.5 text-slate-300">
                   No children configured yet.
                 </p>
               ) : null}

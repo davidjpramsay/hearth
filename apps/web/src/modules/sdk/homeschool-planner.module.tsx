@@ -53,6 +53,19 @@ const localTimeParts = (timeZone: string, date: Date): { hour: number; minute: n
   };
 };
 
+const formatPlannerTimeLabel = (value: string): string => {
+  const [hoursString, minutesString] = value.split(":");
+  const hours = Number(hoursString);
+  const minutes = Number(minutesString);
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+};
+
 const buildSnapshotKey = (instanceId: string): string => `homeschool-planner:${instanceId}`;
 
 const emptyTodayResponse = (siteDate: string): PlannerTodayResponse =>
@@ -462,7 +475,7 @@ export const moduleDefinition = defineModule({
                 className="min-h-0 flex-1 overflow-auto rounded border border-slate-700 bg-slate-950/60"
               >
                 <div
-                  className="grid min-w-[44rem]"
+                  className="grid min-w-[46rem]"
                   style={{
                     gridTemplateColumns: `5rem repeat(${Math.max(response.users.length, 1)}, minmax(9rem, 1fr))`,
                   }}
@@ -479,7 +492,7 @@ export const moduleDefinition = defineModule({
                     </div>
                   ))}
 
-                  <div className="border-r border-slate-700 bg-slate-950/60">
+                  <div className="relative border-r border-slate-700 bg-slate-950/60">
                     {slots.map((slot, index) => (
                       <div
                         key={slot}
@@ -488,9 +501,14 @@ export const moduleDefinition = defineModule({
                         }`}
                         style={{ height: `${slotHeightPx}px` }}
                       >
-                        {slot}
+                        {formatPlannerTimeLabel(slot)}
                       </div>
                     ))}
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 border-t border-slate-600/80">
+                      <span className="absolute bottom-0 left-2 translate-y-1/2 bg-slate-950 px-1 text-[10px] text-slate-400">
+                        {formatPlannerTimeLabel(response.dayWindow.endTime)}
+                      </span>
+                    </div>
                   </div>
 
                   {response.users.map((user) => {
@@ -540,7 +558,7 @@ export const moduleDefinition = defineModule({
                           return (
                             <div
                               key={block.id}
-                              className={`absolute left-1 right-1 overflow-hidden rounded border px-2 py-1 shadow transition ${
+                              className={`absolute left-1 right-1 overflow-hidden rounded border px-2.5 py-1.5 shadow transition ${
                                 isActive
                                   ? "z-[2] ring-2 ring-white/55 shadow-[0_12px_28px_rgba(15,23,42,0.36)]"
                                   : "border-slate-950/50"
@@ -556,7 +574,7 @@ export const moduleDefinition = defineModule({
                               <p className="truncate text-sm font-semibold leading-tight">
                                 {block.name}
                               </p>
-                              <div className="mt-1 flex items-center justify-between gap-2">
+                              <div className="mt-1.5 flex items-center justify-between gap-2">
                                 <button
                                   type="button"
                                   role="checkbox"
@@ -576,7 +594,7 @@ export const moduleDefinition = defineModule({
                                       !completedBlockIds.has(block.id),
                                     );
                                   }}
-                                  className={`flex h-5 items-center gap-1 rounded px-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition ${
+                                  className={`flex h-5 items-center gap-1.5 rounded px-1.5 text-[10px] font-semibold tracking-[0.04em] transition ${
                                     completedBlockIds.has(block.id)
                                       ? "bg-white/18 text-current"
                                       : "bg-black/12 text-current opacity-90"
@@ -597,7 +615,7 @@ export const moduleDefinition = defineModule({
                                 </button>
                               </div>
                               {block.notes && height >= slotHeightPx * 1.25 ? (
-                                <p className="mt-1 line-clamp-2 text-[11px] leading-snug opacity-85 normal-case tracking-normal">
+                                <p className="mt-1.5 line-clamp-2 text-[11px] leading-snug opacity-85 normal-case tracking-normal">
                                   {block.notes}
                                 </p>
                               ) : null}

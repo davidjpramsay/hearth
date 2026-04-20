@@ -32,6 +32,7 @@ import { AdminNavActions } from "../components/admin/AdminNavActions";
 import { AdminSection, AdminSectionHeader } from "../components/admin/AdminSection";
 import { ThemePalettePicker } from "../components/admin/ThemePalettePicker";
 import { PageShell } from "../components/PageShell";
+import { ThemePreviewStrip } from "../components/ThemePreviewStrip";
 import { getSupportedTimeZoneOptions } from "../time-zone-options";
 import { THEME_OPTIONS, type ThemeId } from "../theme/theme";
 
@@ -1325,6 +1326,7 @@ export const AdminDevicesPage = () => {
                           </option>
                         ))}
                       </select>
+                      <ThemePreviewStrip themeId={draft.themeId} />
                     </label>
 
                     <label className="flex flex-col gap-2 text-sm text-slate-300">

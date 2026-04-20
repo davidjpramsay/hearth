@@ -1,11 +1,11 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  buildPlannerTimeSlots,
+  comparePlannerTimes,
   findPlannerBlockConflict,
   getRuntimeTimeZone,
-  plannerBlocksFitDayWindow,
   plannerDayWindowConfigSchema,
+  plannerMinutesToTime,
   toCalendarDateInTimeZone,
   type PlannerActivityBlock,
   type PlannerActivityBlockDraft,
@@ -54,6 +54,33 @@ const plannerBlockClientKey = (block: PlannerActivityBlockDraft): string =>
     block.colour,
     block.notes?.trim() ?? "",
   ].join("::");
+
+const plannerBlocksSignature = (blocks: Array<PlannerActivityBlockDraft>): string =>
+  [...blocks]
+    .map((block) => plannerBlockClientKey(block))
+    .sort()
+    .join("|");
+
+const buildTimeOptionsForIncrement = (minutesStep: number): string[] => {
+  const options: string[] = [];
+  for (let currentMinutes = 0; currentMinutes < 24 * 60; currentMinutes += minutesStep) {
+    options.push(plannerMinutesToTime(currentMinutes));
+  }
+  return options;
+};
+
+const withCurrentValue = (options: string[], currentValue: string): string[] =>
+  options.includes(currentValue) ? options : [...options, currentValue].sort();
+
+const findPlannerDayWindowConflict = (
+  blocks: PlannerEditorBlock[],
+  dayWindow: PlannerDayWindowConfig,
+): PlannerEditorBlock | null =>
+  blocks.find(
+    (block) =>
+      comparePlannerTimes(dayWindow.startTime, block.startTime) > 0 ||
+      comparePlannerTimes(block.endTime, dayWindow.endTime) > 0,
+  ) ?? null;
 
 const toEditorBlocks = (
   template: PlannerTemplateDetail | null,
@@ -112,12 +139,17 @@ export const AdminPlannerPage = () => {
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [blocksDirty, setBlocksDirty] = useState(false);
   const [isAutosavingBlocks, setIsAutosavingBlocks] = useState(false);
+  const [isInteractingWithBlocks, setIsInteractingWithBlocks] = useState(false);
+  const [dayWindowDirty, setDayWindowDirty] = useState(false);
   const [createTemplateName, setCreateTemplateName] = useState("");
   const [summaryStatus, setSummaryStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const blockAutosaveRevisionRef = useRef(0);
   const preferredTemplateIdRef = useRef<number | null | undefined>(undefined);
+  const pendingTemplateBlocksSyncRef = useRef<{ templateId: number; signature: string } | null>(
+    null,
+  );
 
   const invalidateBlockAutosave = useCallback(() => {
     blockAutosaveRevisionRef.current += 1;
@@ -145,8 +177,11 @@ export const AdminPlannerPage = () => {
   }, [templates]);
 
   const validationError = useMemo(() => {
-    if (!plannerBlocksFitDayWindow(editorBlocks, dayWindowForm)) {
-      return "All school activities must fit within the configured day window.";
+    const dayWindowConflict = findPlannerDayWindowConflict(editorBlocks, dayWindowForm);
+    if (dayWindowConflict) {
+      const userName =
+        users.find((entry) => entry.id === dayWindowConflict.userId)?.name ?? "This child";
+      return `${userName}'s activity "${dayWindowConflict.name}" (${dayWindowConflict.startTime}-${dayWindowConflict.endTime}) falls outside the school day. Move or resize it first.`;
     }
 
     const conflict = findPlannerBlockConflict(editorBlocks);
@@ -158,16 +193,21 @@ export const AdminPlannerPage = () => {
     return null;
   }, [dayWindowForm, editorBlocks, users]);
 
-  const timeOptions = useMemo(
-    () => [
-      ...buildPlannerTimeSlots(
-        dayWindowForm.startTime,
-        dayWindowForm.endTime,
-        dayWindowForm.slotMinutes,
-      ),
-      dayWindowForm.endTime,
-    ],
-    [dayWindowForm.endTime, dayWindowForm.slotMinutes, dayWindowForm.startTime],
+  const dayWindowTimeOptions = useMemo(
+    () => buildTimeOptionsForIncrement(dayWindowForm.slotMinutes),
+    [dayWindowForm.slotMinutes],
+  );
+  const dayWindowStartOptions = useMemo(
+    () => withCurrentValue(dayWindowTimeOptions.slice(0, -1), dayWindowForm.startTime),
+    [dayWindowForm.startTime, dayWindowTimeOptions],
+  );
+  const dayWindowEndOptions = useMemo(
+    () => withCurrentValue(dayWindowTimeOptions.slice(1), dayWindowForm.endTime),
+    [dayWindowForm.endTime, dayWindowTimeOptions],
+  );
+  const activityTimeOptions = useMemo(
+    () => buildTimeOptionsForIncrement(dayWindowForm.slotMinutes),
+    [dayWindowForm.slotMinutes],
   );
 
   const plannerQuery = useModuleQuery<PlannerDashboardResponse>({
@@ -208,7 +248,9 @@ export const AdminPlannerPage = () => {
     }
 
     setSiteToday(snapshot.siteToday);
-    setDayWindowForm(snapshot.dayWindow);
+    if (!dayWindowDirty) {
+      setDayWindowForm(snapshot.dayWindow);
+    }
     setUsers(snapshot.users);
     setTemplates(snapshot.templates);
 
@@ -227,9 +269,31 @@ export const AdminPlannerPage = () => {
 
     const preferredTemplate =
       snapshot.templates.find((entry) => entry.id === preferredTemplateId) ?? null;
-    const shouldResetEditorState = !blocksDirty || preferredTemplateIdInput !== undefined;
+    const shouldResetEditorState =
+      (!blocksDirty && !isInteractingWithBlocks) || preferredTemplateIdInput !== undefined;
 
     if (shouldResetEditorState) {
+      const pendingTemplateBlocksSync = pendingTemplateBlocksSyncRef.current;
+      const snapshotSignature = preferredTemplate
+        ? plannerBlocksSignature(preferredTemplate.blocks)
+        : "";
+      if (
+        preferredTemplateIdInput === undefined &&
+        pendingTemplateBlocksSync &&
+        pendingTemplateBlocksSync.templateId === preferredTemplateId &&
+        snapshotSignature !== pendingTemplateBlocksSync.signature
+      ) {
+        return;
+      }
+
+      if (
+        pendingTemplateBlocksSync &&
+        pendingTemplateBlocksSync.templateId === preferredTemplateId &&
+        snapshotSignature === pendingTemplateBlocksSync.signature
+      ) {
+        pendingTemplateBlocksSyncRef.current = null;
+      }
+
       const nextEditorBlocks = toEditorBlocks(preferredTemplate, editorBlocks);
       const preserveSelection =
         preferredTemplateIdInput === undefined && preferredTemplateId === selectedTemplateId;
@@ -244,7 +308,9 @@ export const AdminPlannerPage = () => {
   }, [
     blocksDirty,
     editorBlocks,
+    dayWindowDirty,
     invalidateBlockAutosave,
+    isInteractingWithBlocks,
     plannerQuery.data,
     selectedBlockId,
     selectedTemplateId,
@@ -260,6 +326,7 @@ export const AdminPlannerPage = () => {
     }
 
     const nextTemplate = templates.find((template) => template.id === templateId) ?? null;
+    pendingTemplateBlocksSyncRef.current = null;
     invalidateBlockAutosave();
     setSelectedTemplateId(templateId);
     setTemplateNameDraft(nextTemplate?.name ?? "");
@@ -302,6 +369,7 @@ export const AdminPlannerPage = () => {
       setBusyKey("day-window");
       setError(null);
       await updatePlannerDayWindow(token, dayWindowForm);
+      setDayWindowDirty(false);
       await plannerQuery.revalidate();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Failed to save school day window");
@@ -323,6 +391,7 @@ export const AdminPlannerPage = () => {
         name: createTemplateName,
         repeatDays: [],
       });
+      pendingTemplateBlocksSyncRef.current = null;
       preferredTemplateIdRef.current = created.id;
       setCreateTemplateName("");
       await plannerQuery.revalidate();
@@ -343,6 +412,7 @@ export const AdminPlannerPage = () => {
       setBusyKey("template-rename");
       setError(null);
       await updatePlannerTemplate(token, selectedTemplate.id, { name: templateNameDraft });
+      pendingTemplateBlocksSyncRef.current = null;
       preferredTemplateIdRef.current = selectedTemplate.id;
       await plannerQuery.revalidate();
     } catch (saveError) {
@@ -363,6 +433,7 @@ export const AdminPlannerPage = () => {
       const duplicated = await duplicatePlannerTemplate(token, template.id, {
         name: `${template.name} copy`,
       });
+      pendingTemplateBlocksSyncRef.current = null;
       preferredTemplateIdRef.current = duplicated.id;
       await plannerQuery.revalidate();
     } catch (saveError) {
@@ -389,6 +460,7 @@ export const AdminPlannerPage = () => {
         ? (templates.find((entry) => entry.id !== template.id)?.id ?? null)
         : selectedTemplateId;
       await deletePlannerTemplate(token, template.id);
+      pendingTemplateBlocksSyncRef.current = null;
       preferredTemplateIdRef.current = fallbackTemplateId;
       await plannerQuery.revalidate();
     } catch (saveError) {
@@ -411,6 +483,7 @@ export const AdminPlannerPage = () => {
       setBusyKey(`template-repeat-${template.id}`);
       setError(null);
       await updatePlannerTemplate(token, template.id, { repeatDays: nextRepeatDays });
+      pendingTemplateBlocksSyncRef.current = null;
       preferredTemplateIdRef.current = selectedTemplateId;
       await plannerQuery.revalidate();
     } catch (saveError) {
@@ -421,6 +494,7 @@ export const AdminPlannerPage = () => {
   };
 
   const onRevertBlocks = () => {
+    pendingTemplateBlocksSyncRef.current = null;
     invalidateBlockAutosave();
     setEditorBlocks(toEditorBlocks(selectedTemplate));
     setSelectedBlockId(null);
@@ -492,7 +566,7 @@ export const AdminPlannerPage = () => {
   };
 
   useEffect(() => {
-    if (!token || !selectedTemplate || !blocksDirty || validationError) {
+    if (!token || !selectedTemplate || !blocksDirty || validationError || isInteractingWithBlocks) {
       return;
     }
 
@@ -510,6 +584,11 @@ export const AdminPlannerPage = () => {
           if (blockAutosaveRevisionRef.current !== revision) {
             return;
           }
+
+          pendingTemplateBlocksSyncRef.current = {
+            templateId: selectedTemplate.id,
+            signature: plannerBlocksSignature(nextBlocks),
+          };
 
           setTemplates((current) =>
             current.map((template) =>
@@ -546,7 +625,15 @@ export const AdminPlannerPage = () => {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [blocksDirty, editorBlocks, selectedBlockId, selectedTemplate, token, validationError]);
+  }, [
+    blocksDirty,
+    editorBlocks,
+    isInteractingWithBlocks,
+    selectedBlockId,
+    selectedTemplate,
+    token,
+    validationError,
+  ]);
 
   return (
     <PageShell
@@ -573,12 +660,13 @@ export const AdminPlannerPage = () => {
               <span>Start time</span>
               <select
                 value={dayWindowForm.startTime}
-                onChange={(event) =>
-                  setDayWindowForm((current) => ({ ...current, startTime: event.target.value }))
-                }
+                onChange={(event) => {
+                  setDayWindowForm((current) => ({ ...current, startTime: event.target.value }));
+                  setDayWindowDirty(true);
+                }}
                 className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
               >
-                {timeOptions.slice(0, -1).map((value) => (
+                {dayWindowStartOptions.map((value) => (
                   <option key={value} value={value}>
                     {value}
                   </option>
@@ -590,12 +678,13 @@ export const AdminPlannerPage = () => {
               <span>End time</span>
               <select
                 value={dayWindowForm.endTime}
-                onChange={(event) =>
-                  setDayWindowForm((current) => ({ ...current, endTime: event.target.value }))
-                }
+                onChange={(event) => {
+                  setDayWindowForm((current) => ({ ...current, endTime: event.target.value }));
+                  setDayWindowDirty(true);
+                }}
                 className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
               >
-                {timeOptions.slice(1).map((value) => (
+                {dayWindowEndOptions.map((value) => (
                   <option key={value} value={value}>
                     {value}
                   </option>
@@ -607,12 +696,13 @@ export const AdminPlannerPage = () => {
               <span>Grid size</span>
               <select
                 value={String(dayWindowForm.slotMinutes)}
-                onChange={(event) =>
+                onChange={(event) => {
                   setDayWindowForm((current) => ({
                     ...current,
                     slotMinutes: Number(event.target.value) as 15 | 30 | 60,
-                  }))
-                }
+                  }));
+                  setDayWindowDirty(true);
+                }}
                 className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
               >
                 <option value="15">15 minutes</option>
@@ -864,7 +954,8 @@ export const AdminPlannerPage = () => {
                 selectedBlockId={selectedBlockId}
                 onChange={onEditorChange}
                 onSelectBlock={setSelectedBlockId}
-                disabled={false}
+                onInteractionStateChange={setIsInteractingWithBlocks}
+                disabled={busyKey !== null || isAutosavingBlocks}
               />
 
               <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
@@ -933,7 +1024,10 @@ export const AdminPlannerPage = () => {
                             }
                             className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
                           >
-                            {timeOptions.slice(0, -1).map((value) => (
+                            {withCurrentValue(
+                              activityTimeOptions.slice(0, -1),
+                              selectedBlock.startTime,
+                            ).map((value) => (
                               <option key={value} value={value}>
                                 {value}
                               </option>
@@ -950,7 +1044,10 @@ export const AdminPlannerPage = () => {
                             }
                             className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
                           >
-                            {timeOptions.slice(1).map((value) => (
+                            {withCurrentValue(
+                              activityTimeOptions.slice(1),
+                              selectedBlock.endTime,
+                            ).map((value) => (
                               <option key={value} value={value}>
                                 {value}
                               </option>

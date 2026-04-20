@@ -338,7 +338,7 @@ test("planner module respects a 30 minute grid size", async () => {
     });
 
     const text = JSON.stringify(renderer!.toJSON());
-    assert.match(text, /08:30/);
+    assert.match(text, /8:30 AM/);
   } finally {
     if (renderer) {
       await act(async () => {

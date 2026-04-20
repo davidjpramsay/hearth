@@ -373,12 +373,14 @@ test("planner latest week summary creates an archive record for the previous wee
       siteToday: "2026-04-15",
       dayWindow: { startTime: "08:00", endTime: "15:00", slotMinutes: 15 },
     });
+    const archive = harness.repository.getSummaryArchive("2026-04-06");
     const archives = harness.repository.listSummaryArchives();
 
     assert.equal(summary.startDate, "2026-04-06");
     assert.equal(summary.endDate, "2026-04-12");
-    assert.equal(archives.archives[0]?.weekStartDate, "2026-04-06");
-    assert.equal(archives.archives[0]?.pdfAvailable, false);
+    assert.equal(archive?.weekStartDate, "2026-04-06");
+    assert.equal(archive?.pdfAvailable, false);
+    assert.equal(archives.archives.length, 0);
   } finally {
     harness.cleanup();
   }

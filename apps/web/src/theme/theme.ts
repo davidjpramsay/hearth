@@ -3,9 +3,17 @@ import { DEFAULT_THEME_COLOR_SLOT, THEME_COLOR_SLOTS, type ThemeColorSlot } from
 export const THEME_STORAGE_KEY = "hearth:theme-id";
 const THEME_CHANGE_EVENT = "hearth:theme-change";
 
-export type ThemeId = "default" | "nord" | "solarized" | "monokai" | "forest" | "ember";
+export type ThemeId =
+  | "default"
+  | "nord"
+  | "solarized"
+  | "monokai"
+  | "forest"
+  | "ember"
+  | "aurora"
+  | "dusk";
 
-interface ThemeOption {
+export interface ThemeOption {
   id: ThemeId;
   label: string;
   primary: string;
@@ -38,7 +46,7 @@ const DARK_FOREGROUND = "#020617";
 export const THEME_OPTIONS: ThemeOption[] = [
   {
     id: "default",
-    label: "Default (Current)",
+    label: "Default",
     primary: "#67E8F9",
     palette: {
       "color-1": "#F97066",
@@ -148,6 +156,44 @@ export const THEME_OPTIONS: ThemeOption[] = [
       "color-10": "#D946EF",
       "color-11": "#A8A29E",
       "color-12": "#EAB308",
+    },
+  },
+  {
+    id: "aurora",
+    label: "Aurora",
+    primary: "#58C9F3",
+    palette: {
+      "color-1": "#FF7A7A",
+      "color-2": "#F4A261",
+      "color-3": "#E9C46A",
+      "color-4": "#7BD389",
+      "color-5": "#43D9BD",
+      "color-6": "#58C9F3",
+      "color-7": "#5B8CFF",
+      "color-8": "#7C83FD",
+      "color-9": "#A56EFF",
+      "color-10": "#E879F9",
+      "color-11": "#9FB3C8",
+      "color-12": "#C7D36F",
+    },
+  },
+  {
+    id: "dusk",
+    label: "Dusk",
+    primary: "#C084FC",
+    palette: {
+      "color-1": "#F87171",
+      "color-2": "#FB923C",
+      "color-3": "#FACC15",
+      "color-4": "#9AC46B",
+      "color-5": "#34D399",
+      "color-6": "#2DD4BF",
+      "color-7": "#60A5FA",
+      "color-8": "#818CF8",
+      "color-9": "#C084FC",
+      "color-10": "#F472B6",
+      "color-11": "#A8A29E",
+      "color-12": "#D4B25E",
     },
   },
 ];

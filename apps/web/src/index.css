@@ -306,6 +306,86 @@
   --tone-slate-950-rgb: 26 15 11;
 }
 
+:root.theme-aurora {
+  --font-display: "Avenir Next", "Segoe UI", "Space Grotesk", sans-serif;
+  --font-body: "Inter", "Avenir Next", "IBM Plex Sans", sans-serif;
+
+  --color-bg-app: #091523;
+  --color-bg-surface: rgba(9, 21, 35, 0.82);
+  --color-bg-surface-strong: rgba(18, 34, 54, 0.76);
+  --color-bg-danger: rgba(255, 122, 122, 0.18);
+  --color-border-subtle: rgba(92, 126, 170, 0.5);
+  --color-border-danger: rgba(255, 122, 122, 0.62);
+
+  --color-text-primary: #edf7ff;
+  --color-text-secondary: #d6e8f7;
+  --color-text-muted: #99b4cf;
+  --color-text-accent: #58c9f3;
+  --color-text-accent-rgb: 88 201 243;
+  --color-text-danger: #ffd1d1;
+  --color-text-danger-rgb: 255 209 209;
+
+  --color-status-ok: #7bd389;
+  --color-status-ok-rgb: 123 211 137;
+  --color-status-loading: #e9c46a;
+  --color-status-loading-rgb: 233 196 106;
+  --color-status-error: #ff7a7a;
+  --color-status-error-rgb: 255 122 122;
+
+  --app-bg-gradient: radial-gradient(circle at 18% 0%, #19395d 0%, #091523 48%, #050b15 100%);
+
+  --tone-slate-100-rgb: 237 247 255;
+  --tone-slate-200-rgb: 214 232 247;
+  --tone-slate-300-rgb: 182 205 228;
+  --tone-slate-400-rgb: 153 180 207;
+  --tone-slate-500-rgb: 113 143 176;
+  --tone-slate-600-rgb: 76 105 141;
+  --tone-slate-700-rgb: 40 65 94;
+  --tone-slate-800-rgb: 18 34 54;
+  --tone-slate-900-rgb: 9 21 35;
+  --tone-slate-950-rgb: 5 11 21;
+}
+
+:root.theme-dusk {
+  --font-display: "Avenir Next", "Segoe UI", "Space Grotesk", sans-serif;
+  --font-body: "Avenir Next", "Segoe UI", "IBM Plex Sans", sans-serif;
+
+  --color-bg-app: #191225;
+  --color-bg-surface: rgba(25, 18, 37, 0.84);
+  --color-bg-surface-strong: rgba(39, 27, 58, 0.78);
+  --color-bg-danger: rgba(248, 113, 113, 0.18);
+  --color-border-subtle: rgba(110, 88, 146, 0.52);
+  --color-border-danger: rgba(248, 113, 113, 0.62);
+
+  --color-text-primary: #f8f1ff;
+  --color-text-secondary: #eadbf8;
+  --color-text-muted: #bea7d8;
+  --color-text-accent: #c084fc;
+  --color-text-accent-rgb: 192 132 252;
+  --color-text-danger: #fecaca;
+  --color-text-danger-rgb: 254 202 202;
+
+  --color-status-ok: #9ac46b;
+  --color-status-ok-rgb: 154 196 107;
+  --color-status-loading: #facc15;
+  --color-status-loading-rgb: 250 204 21;
+  --color-status-error: #f87171;
+  --color-status-error-rgb: 248 113 113;
+
+  --app-bg-gradient: radial-gradient(circle at 18% 0%, #45225f 0%, #191225 52%, #0f0a17 100%);
+
+  --tone-slate-100-rgb: 248 241 255;
+  --tone-slate-200-rgb: 234 219 248;
+  --tone-slate-300-rgb: 209 188 234;
+  --tone-slate-400-rgb: 190 167 216;
+  --tone-slate-500-rgb: 152 129 181;
+  --tone-slate-600-rgb: 110 88 146;
+  --tone-slate-700-rgb: 72 52 103;
+  --tone-slate-800-rgb: 39 27 58;
+  --tone-slate-900-rgb: 25 18 37;
+  --tone-slate-950-rgb: 15 10 23;
+}
+
 html {
   width: 100%;
   height: 100%;
@@ -398,15 +478,15 @@ body {
   .module-copy-meta {
     font-family: var(--font-body);
     font-size: var(--size-module-meta);
-    line-height: 1.35;
+    line-height: 1.45;
     font-weight: 400;
   }
 
   .module-copy-body {
     font-family: var(--font-body);
     font-size: var(--size-module-body);
-    line-height: 1.45;
-    font-weight: 500;
+    line-height: 1.5;
+    font-weight: 400;
   }
 
   .module-copy-title {
@@ -424,6 +504,31 @@ body {
     font-weight: 600;
     letter-spacing: -0.06em;
     font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  .module-stack-compact {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .module-stack-standard {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+
+  .module-stack-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+  }
+
+  .module-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .surface-module {
@@ -538,7 +643,7 @@ body {
     height: 100%;
     min-height: 0;
     overflow: hidden;
-    padding: 0.5rem;
+    padding: 0.625rem;
   }
 
   .module-frame__feedback {

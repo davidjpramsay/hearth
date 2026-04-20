@@ -29,6 +29,7 @@ interface PlannerTimetableEditorProps {
   disabled?: boolean;
   onChange: (blocks: PlannerEditorBlock[], nextSelectedBlockId?: string | null) => void;
   onSelectBlock: (blockId: string | null) => void;
+  onInteractionStateChange?: (isInteracting: boolean) => void;
 }
 
 interface PlannerBlockGeometry {
@@ -40,14 +41,16 @@ interface PlannerCreateDraft {
   userId: number;
   startSlot: number;
   currentSlot: number;
+  pointerId: number;
 }
 
 interface PlannerInteractState {
   clientId: string;
   mode: "move" | "resize-start" | "resize-end";
-  startPointerY: number;
   startGeometry: PlannerBlockGeometry;
   currentGeometry: PlannerBlockGeometry;
+  columnTop: number;
+  pointerOffsetY: number;
 }
 
 const clamp = (value: number, min: number, max: number): number =>
@@ -139,6 +142,78 @@ const geometryToSlotRange = (
 const snapPixelValue = (value: number, slotHeightPx: number): number =>
   Math.round(value / slotHeightPx) * slotHeightPx;
 
+const getInteractClientY = (event: unknown): number | null => {
+  const candidate = event as { clientY?: unknown; client?: { y?: unknown } };
+  if (typeof candidate.clientY === "number") {
+    return candidate.clientY;
+  }
+
+  if (typeof candidate.client?.y === "number") {
+    return candidate.client.y;
+  }
+
+  return null;
+};
+
+const getMoveGeometryFromPointer = (
+  state: PlannerInteractState,
+  pointerY: number,
+  slotHeightPx: number,
+  totalHeight: number,
+): PlannerBlockGeometry => {
+  const maxTop = Math.max(totalHeight - state.startGeometry.height, 0);
+  const nextTop = clamp(
+    snapPixelValue(pointerY - state.columnTop - state.pointerOffsetY, slotHeightPx),
+    0,
+    maxTop,
+  );
+  return {
+    top: nextTop,
+    height: state.currentGeometry.height,
+  };
+};
+
+const getResizeStartGeometryFromPointer = (
+  state: PlannerInteractState,
+  pointerY: number,
+  slotHeightPx: number,
+  totalHeight: number,
+): PlannerBlockGeometry => {
+  const fixedBottom = state.startGeometry.top + state.startGeometry.height;
+  const nextTop = clamp(
+    snapPixelValue(pointerY - state.columnTop, slotHeightPx),
+    0,
+    fixedBottom - slotHeightPx,
+  );
+  const nextHeight = clamp(fixedBottom - nextTop, slotHeightPx, totalHeight - nextTop);
+  return {
+    top: nextTop,
+    height: nextHeight,
+  };
+};
+
+const getResizeEndGeometryFromPointer = (
+  state: PlannerInteractState,
+  pointerY: number,
+  slotHeightPx: number,
+  totalHeight: number,
+): PlannerBlockGeometry => {
+  const nextBottom = clamp(
+    snapPixelValue(pointerY - state.columnTop, slotHeightPx),
+    state.startGeometry.top + slotHeightPx,
+    totalHeight,
+  );
+  const nextHeight = clamp(
+    nextBottom - state.startGeometry.top,
+    slotHeightPx,
+    totalHeight - state.startGeometry.top,
+  );
+  return {
+    top: state.startGeometry.top,
+    height: nextHeight,
+  };
+};
+
 const buildCreatePreviewGeometry = (
   draft: PlannerCreateDraft,
   slotHeightPx: number,
@@ -151,6 +226,25 @@ const buildCreatePreviewGeometry = (
   };
 };
 
+const updateBlocksWithGeometry = (
+  blocks: PlannerEditorBlock[],
+  clientId: string,
+  geometry: PlannerBlockGeometry,
+  dayWindow: PlannerDayWindowConfig,
+  slotHeightPx: number,
+  slotCount: number,
+): PlannerEditorBlock[] => {
+  const nextSlotRange = geometryToSlotRange(geometry, slotHeightPx, slotCount);
+  const nextTimes = slotRangeToTimes(
+    nextSlotRange.startSlot,
+    nextSlotRange.endSlotExclusive,
+    dayWindow,
+  );
+  return sortBlocks(
+    blocks.map((block) => (block.clientId === clientId ? { ...block, ...nextTimes } : block)),
+  );
+};
+
 export const PlannerTimetableEditor = ({
   dayWindow,
   users,
@@ -159,6 +253,7 @@ export const PlannerTimetableEditor = ({
   disabled = false,
   onChange,
   onSelectBlock,
+  onInteractionStateChange,
 }: PlannerTimetableEditorProps) => {
   const [createDraft, setCreateDraft] = useState<PlannerCreateDraft | null>(null);
   const [previewGeometries, setPreviewGeometries] = useState<Record<string, PlannerBlockGeometry>>(
@@ -176,6 +271,7 @@ export const PlannerTimetableEditor = ({
   const blocksRef = useRef(blocks);
   const onChangeRef = useRef(onChange);
   const onSelectBlockRef = useRef(onSelectBlock);
+  const onInteractionStateChangeRef = useRef(onInteractionStateChange);
   const interactStateRef = useRef<PlannerInteractState | null>(null);
 
   useEffect(() => {
@@ -189,6 +285,10 @@ export const PlannerTimetableEditor = ({
   useEffect(() => {
     onSelectBlockRef.current = onSelectBlock;
   }, [onSelectBlock]);
+
+  useEffect(() => {
+    onInteractionStateChangeRef.current = onInteractionStateChange;
+  }, [onInteractionStateChange]);
 
   useEffect(() => {
     if (disabled) {
@@ -217,13 +317,18 @@ export const PlannerTimetableEditor = ({
               }
 
               const startGeometry = blockToGeometry(block, dayWindow, slotHeightPx);
+              const columnTop = element.parentElement?.getBoundingClientRect().top ?? 0;
+              const pointerY = getInteractClientY(event) ?? 0;
+              const blockTop = element.getBoundingClientRect().top;
               interactStateRef.current = {
                 clientId,
                 mode: "move",
-                startPointerY: event.pageY,
                 startGeometry,
                 currentGeometry: startGeometry,
+                columnTop,
+                pointerOffsetY: pointerY - blockTop,
               };
+              onInteractionStateChangeRef.current?.(true);
               onSelectBlockRef.current(clientId);
             },
             move: (event) => {
@@ -232,36 +337,42 @@ export const PlannerTimetableEditor = ({
                 return;
               }
 
-              const maxTop = Math.max(totalHeight - state.startGeometry.height, 0);
-              const deltaY = snapPixelValue(event.pageY - state.startPointerY, slotHeightPx);
-              const nextTop = clamp(state.startGeometry.top + deltaY, 0, maxTop);
-              state.currentGeometry = {
-                top: nextTop,
-                height: state.startGeometry.height,
-              };
+              const pointerY = getInteractClientY(event);
+              if (pointerY === null) {
+                return;
+              }
+
+              state.currentGeometry = getMoveGeometryFromPointer(
+                state,
+                pointerY,
+                slotHeightPx,
+                totalHeight,
+              );
               setPreviewGeometries((current) => ({
                 ...current,
                 [state.clientId]: state.currentGeometry,
               }));
             },
-            end: () => {
+            end: (event) => {
               const state = interactStateRef.current;
               if (!state || state.mode !== "move") {
                 return;
               }
 
-              const geometry = state.currentGeometry;
-              const nextSlotRange = geometryToSlotRange(geometry, slotHeightPx, slotCount);
-              const nextTimes = slotRangeToTimes(
-                nextSlotRange.startSlot,
-                nextSlotRange.endSlotExclusive,
-                dayWindow,
-              );
+              const pointerY = getInteractClientY(event);
+              const geometry =
+                pointerY === null
+                  ? state.currentGeometry
+                  : getMoveGeometryFromPointer(state, pointerY, slotHeightPx, totalHeight);
+              state.currentGeometry = geometry;
               onChangeRef.current(
-                sortBlocks(
-                  blocksRef.current.map((block) =>
-                    block.clientId === state.clientId ? { ...block, ...nextTimes } : block,
-                  ),
+                updateBlocksWithGeometry(
+                  blocksRef.current,
+                  state.clientId,
+                  geometry,
+                  dayWindow,
+                  slotHeightPx,
+                  slotCount,
                 ),
                 state.clientId,
               );
@@ -271,6 +382,7 @@ export const PlannerTimetableEditor = ({
                 return next;
               });
               interactStateRef.current = null;
+              onInteractionStateChangeRef.current?.(false);
             },
           },
         })
@@ -294,13 +406,18 @@ export const PlannerTimetableEditor = ({
 
               const edgeName = event.edges?.top ? "resize-start" : "resize-end";
               const startGeometry = blockToGeometry(block, dayWindow, slotHeightPx);
+              const columnTop = element.parentElement?.getBoundingClientRect().top ?? 0;
+              const pointerY = getInteractClientY(event) ?? 0;
+              const blockTop = element.getBoundingClientRect().top;
               interactStateRef.current = {
                 clientId,
                 mode: edgeName,
-                startPointerY: event.pageY,
                 startGeometry,
                 currentGeometry: startGeometry,
+                columnTop,
+                pointerOffsetY: pointerY - blockTop,
               };
+              onInteractionStateChangeRef.current?.(true);
               onSelectBlockRef.current(clientId);
             },
             move: (event) => {
@@ -309,15 +426,18 @@ export const PlannerTimetableEditor = ({
                 return;
               }
 
-              const deltaY = snapPixelValue(event.pageY - state.startPointerY, slotHeightPx);
+              const pointerY = getInteractClientY(event);
+              if (pointerY === null) {
+                return;
+              }
+
               if (state.mode === "resize-start") {
-                const maxTop = state.startGeometry.top + state.startGeometry.height - slotHeightPx;
-                const nextTop = clamp(state.startGeometry.top + deltaY, 0, maxTop);
-                const nextHeight = state.startGeometry.height - (nextTop - state.startGeometry.top);
-                state.currentGeometry = {
-                  top: nextTop,
-                  height: nextHeight,
-                };
+                state.currentGeometry = getResizeStartGeometryFromPointer(
+                  state,
+                  pointerY,
+                  slotHeightPx,
+                  totalHeight,
+                );
                 setPreviewGeometries((current) => ({
                   ...current,
                   [state.clientId]: state.currentGeometry,
@@ -325,39 +445,39 @@ export const PlannerTimetableEditor = ({
                 return;
               }
 
-              const maxHeight = Math.max(totalHeight - state.startGeometry.top, slotHeightPx);
-              const nextHeight = clamp(
-                state.startGeometry.height + deltaY,
+              state.currentGeometry = getResizeEndGeometryFromPointer(
+                state,
+                pointerY,
                 slotHeightPx,
-                maxHeight,
+                totalHeight,
               );
-              state.currentGeometry = {
-                top: state.startGeometry.top,
-                height: nextHeight,
-              };
               setPreviewGeometries((current) => ({
                 ...current,
                 [state.clientId]: state.currentGeometry,
               }));
             },
-            end: () => {
+            end: (event) => {
               const state = interactStateRef.current;
               if (!state || (state.mode !== "resize-start" && state.mode !== "resize-end")) {
                 return;
               }
 
-              const geometry = state.currentGeometry;
-              const nextSlotRange = geometryToSlotRange(geometry, slotHeightPx, slotCount);
-              const nextTimes = slotRangeToTimes(
-                nextSlotRange.startSlot,
-                nextSlotRange.endSlotExclusive,
-                dayWindow,
-              );
+              const pointerY = getInteractClientY(event);
+              const geometry =
+                pointerY === null
+                  ? state.currentGeometry
+                  : state.mode === "resize-start"
+                    ? getResizeStartGeometryFromPointer(state, pointerY, slotHeightPx, totalHeight)
+                    : getResizeEndGeometryFromPointer(state, pointerY, slotHeightPx, totalHeight);
+              state.currentGeometry = geometry;
               onChangeRef.current(
-                sortBlocks(
-                  blocksRef.current.map((block) =>
-                    block.clientId === state.clientId ? { ...block, ...nextTimes } : block,
-                  ),
+                updateBlocksWithGeometry(
+                  blocksRef.current,
+                  state.clientId,
+                  geometry,
+                  dayWindow,
+                  slotHeightPx,
+                  slotCount,
                 ),
                 state.clientId,
               );
@@ -367,6 +487,7 @@ export const PlannerTimetableEditor = ({
                 return next;
               });
               interactStateRef.current = null;
+              onInteractionStateChangeRef.current?.(false);
             },
           },
         }),
@@ -378,8 +499,15 @@ export const PlannerTimetableEditor = ({
       }
       interactStateRef.current = null;
       setPreviewGeometries({});
+      onInteractionStateChangeRef.current?.(false);
     };
   }, [dayWindow, disabled, slotCount, slotHeightPx, totalHeight]);
+
+  const getSlotIndexFromPointer = (clientY: number, columnElement: HTMLDivElement): number => {
+    const rect = columnElement.getBoundingClientRect();
+    const relativeY = clamp(clientY - rect.top, 0, Math.max(totalHeight - 1, 0));
+    return clamp(Math.floor(relativeY / slotHeightPx), 0, Math.max(slotCount - 1, 0));
+  };
 
   return (
     <div
@@ -416,6 +544,11 @@ export const PlannerTimetableEditor = ({
               {formatTimeLabel(slot)}
             </div>
           ))}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 border-t border-slate-600/80">
+            <span className="absolute bottom-0 left-2 translate-y-1/2 bg-slate-950 px-1 text-[11px] text-slate-400">
+              {formatTimeLabel(dayWindow.endTime)}
+            </span>
+          </div>
         </div>
 
         {users.map((user) => {
@@ -438,32 +571,26 @@ export const PlannerTimetableEditor = ({
                 if (target?.closest("[data-planner-block]")) {
                   return;
                 }
-                const slotAttribute = target
-                  ?.closest?.("[data-planner-slot-index]")
-                  ?.getAttribute("data-planner-slot-index");
-                const startSlot =
-                  slotAttribute === null || slotAttribute === undefined
-                    ? 0
-                    : clamp(Number(slotAttribute), 0, Math.max(slotCount - 1, 0));
+                const startSlot = getSlotIndexFromPointer(event.clientY, event.currentTarget);
+                event.currentTarget.setPointerCapture(event.pointerId);
+                onInteractionStateChangeRef.current?.(true);
                 onSelectBlock(null);
                 setCreateDraft({
                   userId: user.id,
                   startSlot,
                   currentSlot: startSlot,
+                  pointerId: event.pointerId,
                 });
               }}
               onPointerMove={(event) => {
-                if (!createDraft || createDraft.userId !== user.id) {
+                if (
+                  !createDraft ||
+                  createDraft.userId !== user.id ||
+                  createDraft.pointerId !== event.pointerId
+                ) {
                   return;
                 }
-                const target = event.target as HTMLElement | null;
-                const slotAttribute = target
-                  ?.closest?.("[data-planner-slot-index]")
-                  ?.getAttribute("data-planner-slot-index");
-                const nextSlot =
-                  slotAttribute === null || slotAttribute === undefined
-                    ? createDraft.currentSlot
-                    : clamp(Number(slotAttribute), 0, Math.max(slotCount - 1, 0));
+                const nextSlot = getSlotIndexFromPointer(event.clientY, event.currentTarget);
                 setCreateDraft((current) =>
                   current && current.userId === user.id
                     ? {
@@ -489,14 +616,14 @@ export const PlannerTimetableEditor = ({
                   notes: null,
                   ...times,
                 };
-                onChange(sortBlocks([...blocks, nextBlock]), nextBlock.clientId);
+                onChange(sortBlocks([...blocksRef.current, nextBlock]), nextBlock.clientId);
                 setCreateDraft(null);
+                onInteractionStateChangeRef.current?.(false);
               }}
-              onPointerLeave={() => {
+              onLostPointerCapture={() => {
                 if (createDraft?.userId === user.id) {
-                  setCreateDraft((current) =>
-                    current && current.userId === user.id ? current : null,
-                  );
+                  setCreateDraft(null);
+                  onInteractionStateChangeRef.current?.(false);
                 }
               }}
             >

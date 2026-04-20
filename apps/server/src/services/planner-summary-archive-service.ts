@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import PDFDocument from "pdfkit";
 import type { PlannerDayWindowConfig, PlannerWeekSummaryResponse } from "@hearth/shared";
@@ -61,6 +61,22 @@ export class PlannerSummaryArchiveService {
     mkdirSync(this.options.archiveDir, { recursive: true });
   }
 
+  private pruneArchivedPdfsToCurrentYear(currentYear: number): void {
+    const archives = this.plannerRepository.listSummaryArchives().archives;
+    for (const archive of archives) {
+      const archiveYear = Number.parseInt(archive.weekStartDate.slice(0, 4), 10);
+      if (archiveYear === currentYear) {
+        continue;
+      }
+
+      const absolutePath = this.buildPdfAbsolutePath(archive.weekStartDate);
+      if (existsSync(absolutePath)) {
+        rmSync(absolutePath, { force: true });
+      }
+      this.plannerRepository.clearSummaryArchivePdfRelativePath(archive.weekStartDate);
+    }
+  }
+
   private buildPdfRelativePath(weekStartDate: string): string {
     return `planner-summaries/hearth-school-summary-${weekStartDate}.pdf`;
   }
@@ -70,6 +86,7 @@ export class PlannerSummaryArchiveService {
   }
 
   async ensurePdfForSummary(summary: PlannerWeekSummaryResponse): Promise<string> {
+    this.pruneArchivedPdfsToCurrentYear(Number.parseInt(summary.startDate.slice(0, 4), 10));
     const archive = this.plannerRepository.getSummaryArchive(summary.startDate);
     const existingPath = this.plannerRepository.getSummaryArchivePdfRelativePath(summary.startDate);
     if (

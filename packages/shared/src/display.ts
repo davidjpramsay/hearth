@@ -2777,6 +2777,8 @@ export const displayThemeIdSchema = z.enum([
   "monokai",
   "forest",
   "ember",
+  "aurora",
+  "dusk",
 ]);
 
 export const displayDeviceIdSchema = z.string().trim().min(1).max(128);

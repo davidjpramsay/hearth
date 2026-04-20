@@ -567,11 +567,11 @@ export const moduleDefinition = defineModule({
             style={moduleAccentStyle}
           >
             <div className="flex items-start justify-between gap-3">
-              <div>
+              <div className="module-stack-compact">
                 <p className="module-copy-label text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
                   Weather preview
                 </p>
-                <p className="module-copy-title mt-2 text-[color:var(--color-text-primary)]">
+                <p className="module-copy-title text-[color:var(--color-text-primary)]">
                   {settings.locationQuery}
                 </p>
               </div>
@@ -614,8 +614,8 @@ export const moduleDefinition = defineModule({
                     showHeroIcon ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1"
                   }`}
                 >
-                  <div className="flex min-w-0 flex-col gap-4">
-                    <div className="flex items-end gap-3">
+                  <div className="module-stack-hero min-w-0">
+                    <div className="flex items-end gap-3.5">
                       <p
                         className={`${temperatureTextClass} leading-none`}
                         style={{
@@ -626,7 +626,7 @@ export const moduleDefinition = defineModule({
                       </p>
 
                       {showTopCondition ? (
-                        <div className="pb-2">
+                        <div className="pb-2.5">
                           <p className="module-copy-title text-[color:var(--color-text-primary)]">
                             {conditionLabel}
                           </p>
@@ -635,7 +635,7 @@ export const moduleDefinition = defineModule({
                     </div>
 
                     {showStats ? (
-                      <div className="module-panel-card flex max-w-[22rem] flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2">
+                      <div className="module-panel-card module-chip-row max-w-[22rem] px-3.5 py-2.5">
                         {todayStats.map((stat) => (
                           <WeatherInlineStat
                             key={stat.key}
@@ -668,10 +668,10 @@ export const moduleDefinition = defineModule({
                   ) : null}
                 </div>
               ) : (
-                <div className="flex flex-col gap-3">
+                <div className="module-stack-hero">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-end gap-3">
+                    <div className="module-stack-standard min-w-0 flex-1">
+                      <div className="flex items-end gap-3.5">
                         <p
                           className={`${temperatureTextClass} leading-none`}
                           style={{
@@ -682,7 +682,7 @@ export const moduleDefinition = defineModule({
                         </p>
 
                         {showTopCondition ? (
-                          <div className="pb-2">
+                          <div className="pb-2.5">
                             <p className="module-copy-title text-[color:var(--color-text-primary)]">
                               {conditionLabel}
                             </p>
@@ -691,7 +691,7 @@ export const moduleDefinition = defineModule({
                       </div>
 
                       {showStats ? (
-                        <div className="module-panel-card mt-2 flex max-w-[22rem] flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2">
+                        <div className="module-panel-card module-chip-row max-w-[22rem] px-3.5 py-2.5">
                           {todayStats.map((stat) => (
                             <WeatherInlineStat
                               key={stat.key}
@@ -727,7 +727,7 @@ export const moduleDefinition = defineModule({
               )}
 
               {showForecast ? (
-                <section className="module-panel-card mt-3 p-3">
+                <section className="module-panel-card mt-3 p-3.5">
                   {showForecastSectionTitle ? (
                     <div className="mb-2">
                       <p className={WEATHER_SECTION_LABEL_CLASS}>Week ahead</p>
@@ -740,7 +740,7 @@ export const moduleDefinition = defineModule({
                     }}
                   >
                     {forecastDays.map((day, index) => (
-                      <div key={day.date} className="module-panel-card p-2.5 text-left">
+                      <div key={day.date} className="module-panel-card p-3 text-left">
                         <div className="flex items-start justify-between gap-2">
                           <p
                             className={`${WEATHER_SECTION_LABEL_CLASS} text-[color:var(--color-text-secondary)]`}
@@ -794,7 +794,7 @@ export const moduleDefinition = defineModule({
               ) : null}
 
               {payload.warning ? (
-                <p className="module-copy-label module-panel-card mt-3 px-3 py-2 text-[color:var(--color-text-secondary)]">
+                <p className="module-copy-meta module-panel-card mt-3 px-3.5 py-2.5 text-[color:var(--color-text-secondary)]">
                   {payload.warning}
                 </p>
               ) : null}

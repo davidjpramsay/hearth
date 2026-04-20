@@ -327,11 +327,11 @@ export const moduleDefinition = defineModule({
       if (isEditing) {
         return (
           <div className="module-panel-shell flex h-full flex-col justify-between px-4 py-4 text-[color:var(--color-text-primary)]">
-            <div>
+            <div className="module-stack-compact">
               <p className="module-copy-label text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
                 Site time
               </p>
-              <p className="module-copy-title mt-2 text-[color:var(--color-text-primary)]">
+              <p className="module-copy-title text-[color:var(--color-text-primary)]">
                 Clock preview
               </p>
             </div>
@@ -354,11 +354,11 @@ export const moduleDefinition = defineModule({
       }
 
       const dateBlock = settings.showDate ? (
-        <div key="date" className="min-w-0">
+        <div key="date" className="module-stack-compact min-w-0">
           <p className="module-copy-label text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
             {dayFormatter.format(now)}
           </p>
-          <p className="module-copy-body mt-1 text-[color:var(--color-text-primary)]">
+          <p className="module-copy-body text-[color:var(--color-text-primary)]">
             {dateFormatter.format(now)}
           </p>
         </div>
@@ -392,7 +392,7 @@ export const moduleDefinition = defineModule({
           ref={ref}
           className="module-panel-shell relative isolate flex h-full w-full text-[color:var(--color-text-primary)]"
         >
-          <div className="relative z-10 flex h-full w-full flex-col justify-between gap-4 px-4 py-4">
+          <div className="relative z-10 flex h-full w-full flex-col justify-between gap-5 px-4 py-4">
             {showInlineDateLayout ? (
               <div className="flex w-full flex-wrap items-end justify-between gap-4">
                 {orderedContentKeys.map((key) => contentByKey[key])}

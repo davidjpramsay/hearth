@@ -6,6 +6,7 @@ import {
   subscribeToThemeChanges,
   type ThemeId,
 } from "../theme/theme";
+import { ThemePreviewStrip } from "./ThemePreviewStrip";
 
 interface ThemePickerProps {
   className?: string;
@@ -39,6 +40,7 @@ export const ThemePicker = ({ className = "min-w-[180px]", label = "Theme" }: Th
           </option>
         ))}
       </select>
+      <ThemePreviewStrip themeId={activeThemeId} className="mt-1" />
     </div>
   );
 };

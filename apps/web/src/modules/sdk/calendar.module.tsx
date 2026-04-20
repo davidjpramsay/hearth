@@ -591,7 +591,7 @@ export const moduleDefinition = defineModule({
                     <span
                       key={entry.id}
                       title={entry.label}
-                      className="module-copy-label inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-slate-200"
+                      className="module-copy-meta inline-flex items-center gap-1.5 rounded border border-slate-700/70 bg-slate-900/80 px-2 py-1 text-slate-200"
                     >
                       <span
                         className="rounded-full"
@@ -620,16 +620,16 @@ export const moduleDefinition = defineModule({
                     return (
                       <section
                         key={day}
-                        className="rounded border border-slate-700/80 bg-slate-900/70 p-2"
+                        className="rounded border border-slate-700/80 bg-slate-900/70 p-2.5"
                       >
-                        <h4 className="module-copy-label mb-2 text-cyan-200">
+                        <h4 className="module-copy-label mb-2.5 text-cyan-200">
                           {dayFormatter.format(parseCalendarDateKey(day))}
                         </h4>
                         <div className="space-y-2">
                           {dayEvents.map((event) => (
                             <article
                               key={event.id}
-                              className="rounded border border-slate-700/70 bg-slate-950/70 px-2.5 py-1.5 text-left"
+                              className="rounded border border-slate-700/70 bg-slate-950/70 px-3 py-2 text-left"
                               style={eventStyleForView(event, todayCalendarDate, siteTimeZone)}
                             >
                               <p className="module-copy-body line-clamp-2 text-left text-slate-100">
@@ -667,7 +667,7 @@ export const moduleDefinition = defineModule({
                     <span
                       key={entry.id}
                       title={entry.label}
-                      className="module-copy-label inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-slate-200"
+                      className="module-copy-meta inline-flex items-center gap-1.5 rounded border border-slate-700/70 bg-slate-900/80 px-2 py-1 text-slate-200"
                     >
                       <span
                         className="rounded-full"
@@ -691,7 +691,7 @@ export const moduleDefinition = defineModule({
                   return (
                     <section
                       key={day}
-                      className="rounded border border-slate-700/80 bg-slate-900/70 p-2"
+                      className="rounded border border-slate-700/80 bg-slate-900/70 p-2.5"
                     >
                       <h4 className="module-copy-label mb-2 text-center text-cyan-200">
                         {dayFormatter.format(parseCalendarDateKey(day))}
@@ -700,7 +700,7 @@ export const moduleDefinition = defineModule({
                         {dayEvents.map((event) => (
                           <article
                             key={event.id}
-                            className="rounded border border-slate-700/70 bg-slate-950/80 px-2.5 py-1 text-left"
+                            className="rounded border border-slate-700/70 bg-slate-950/80 px-3 py-1.5 text-left"
                             style={eventStyleForView(event, todayCalendarDate, siteTimeZone)}
                           >
                             <p className="module-copy-body line-clamp-2 text-left text-slate-100">
@@ -730,7 +730,7 @@ export const moduleDefinition = defineModule({
                     <span
                       key={entry.id}
                       title={entry.label}
-                      className="module-copy-label inline-flex items-center gap-1 rounded border border-slate-700/70 bg-slate-900/80 px-1.5 py-0.5 text-slate-200"
+                      className="module-copy-meta inline-flex items-center gap-1.5 rounded border border-slate-700/70 bg-slate-900/80 px-2 py-1 text-slate-200"
                     >
                       <span
                         className="rounded-full"
@@ -812,7 +812,7 @@ export const moduleDefinition = defineModule({
           ) : null}
 
           {!loading && !connectivityState.blockingError && payload.warnings.length > 0 ? (
-            <div className="module-copy-label mt-2 rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-amber-100">
+            <div className="module-copy-meta mt-2 rounded border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-amber-100">
               {payload.warnings[0]}
             </div>
           ) : null}
