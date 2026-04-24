@@ -19,6 +19,9 @@ import { useTileDensity } from "../ui/useTileDensity";
 const clockDateLayoutSchema = z.enum(["stacked", "inline"]);
 const clockTimeSourceSchema = z.enum(["household", "specific", "device"]);
 const CLOCK_TIME_ZONE_DATALIST_ID = "clock-module-time-zones";
+const CLOCK_INLINE_COMPACT_MIN_HEIGHT = 104;
+const CLOCK_INLINE_MIN_WIDTH_24H = 300;
+const CLOCK_INLINE_MIN_WIDTH_SECONDS_OR_PERIOD = 420;
 
 const baseSettingsSchema = withModulePresentation(
   z.object({
@@ -118,6 +121,25 @@ const buildClockParts = (date: Date, use24Hour: boolean, timeZone: string) => {
     second,
     dayPeriod,
   };
+};
+
+export const shouldStackClockInlineDateLayout = (input: {
+  hasTileMeasurement: boolean;
+  height: number;
+  showSeconds: boolean;
+  use24Hour: boolean;
+  width: number;
+}): boolean => {
+  if (!input.hasTileMeasurement) {
+    return false;
+  }
+
+  const inlineMinimumWidth =
+    input.showSeconds || !input.use24Hour
+      ? CLOCK_INLINE_MIN_WIDTH_SECONDS_OR_PERIOD
+      : CLOCK_INLINE_MIN_WIDTH_24H;
+
+  return input.width < inlineMinimumWidth || input.height < CLOCK_INLINE_COMPACT_MIN_HEIGHT;
 };
 
 const SettingsPanel = ({
@@ -338,9 +360,13 @@ export const moduleDefinition = defineModule({
       );
       const hasTileMeasurement = metrics.width > 0 && metrics.height > 0;
       const compact = hasTileMeasurement && (metrics.width < 320 || metrics.height < 150);
-      const inlineMinimumWidth = settings.showSeconds || !settings.use24Hour ? 460 : 360;
-      const shouldStackInlineDateLayout =
-        hasTileMeasurement && (metrics.width < inlineMinimumWidth || metrics.height < 160);
+      const shouldStackInlineDateLayout = shouldStackClockInlineDateLayout({
+        hasTileMeasurement,
+        height: metrics.height,
+        showSeconds: settings.showSeconds,
+        use24Hour: settings.use24Hour,
+        width: metrics.width,
+      });
       const inlineTime = settings.showSeconds
         ? `${timeParts.primary}:${timeParts.second}`
         : timeParts.primary;

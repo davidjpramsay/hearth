@@ -29,6 +29,7 @@ const DISPLAY_SOURCE_KIND_STORAGE_KEY = "hearth:display-source-kind";
 const DISPLAY_CYCLE_SECONDS_STORAGE_KEY = "hearth:display-cycle-seconds";
 const DISPLAY_PHOTO_COLLECTION_ID_STORAGE_KEY = "hearth:display-photo-collection-id";
 const DISPLAY_CYCLE_CONTEXT_EVENT = "hearth:display-cycle-context";
+const PHOTO_LIBRARY_UPDATED_EVENT = "hearth:photos-updated";
 const LEGACY_PHOTO_LIBRARY_ROOT_LABEL = "/photos";
 
 interface DisplayCycleContextEventDetail {
@@ -581,11 +582,18 @@ export const moduleDefinition = defineModule({
           }
         };
 
+        const handlePhotoLibraryUpdated = () => {
+          clearScheduledRefresh();
+          void refreshFrame();
+        };
+
         void refreshFrame();
+        window.addEventListener(PHOTO_LIBRARY_UPDATED_EVENT, handlePhotoLibraryUpdated);
 
         return () => {
           active = false;
           inFlightRefreshRef.current = false;
+          window.removeEventListener(PHOTO_LIBRARY_UPDATED_EVENT, handlePhotoLibraryUpdated);
           clearScheduledRefresh();
         };
       }, [

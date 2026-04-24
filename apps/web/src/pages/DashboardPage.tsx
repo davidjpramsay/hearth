@@ -30,6 +30,7 @@ import {
 } from "./dashboard-device-bootstrap";
 import { getDisplayClientInfo } from "../device/display-client-info";
 import {
+  isAbortError,
   resolveModuleConnectivityState,
   useBrowserOnlineStatus,
 } from "../modules/data/connection-state";
@@ -51,6 +52,8 @@ const DISPLAY_SOURCE_KIND_STORAGE_KEY = "hearth:display-source-kind";
 const DISPLAY_CYCLE_SECONDS_STORAGE_KEY = "hearth:display-cycle-seconds";
 const DISPLAY_PHOTO_COLLECTION_ID_STORAGE_KEY = "hearth:display-photo-collection-id";
 const DISPLAY_CYCLE_CONTEXT_EVENT = "hearth:display-cycle-context";
+const DASHBOARD_PHOTOS_UPDATED_EVENT = "hearth:photos-updated";
+const DASHBOARD_CALENDAR_UPDATED_EVENT = "hearth:calendar-updated";
 
 interface DisplayCycleContextEventDetail {
   sourceKind: "set" | "layout";
@@ -175,6 +178,10 @@ interface PhotosOrientationEventDetail {
 
 interface DisplayDeviceUpdatedEventDetail {
   deviceId: string;
+}
+
+interface DisplaySettingsUpdatedEventDetail {
+  reason: "screen-profiles-updated" | "photo-collections-updated" | "calendar-feeds-updated";
 }
 
 const DeviceIdentityCard = (props: {
@@ -367,6 +374,7 @@ export const DashboardPage = () => {
   const activeLayoutRef = useRef<LayoutRecord | null>(null);
   const photoOrientationRef = useRef<PhotosOrientation | null>(null);
   const latestResolveRequestIdRef = useRef(0);
+  const resolveAbortControllerRef = useRef<AbortController | null>(null);
   const lastPhotoEventKeyRef = useRef<string | null>(null);
   const deviceBootstrapRef = useRef(getInitialDashboardDeviceBootstrapState());
   const lastOrientationSwitchAtRef = useRef(0);
@@ -417,19 +425,25 @@ export const DashboardPage = () => {
       const orientation = input?.orientation ?? photoOrientationRef.current;
       const bootstrapState = deviceBootstrapRef.current;
       const requestStartedAtMs = Date.now();
+      const abortController = new AbortController();
+      resolveAbortControllerRef.current?.abort();
+      resolveAbortControllerRef.current = abortController;
 
       try {
-        const resolution = await reportScreenProfile({
-          targetSelection: bootstrapState.targetSelection,
-          selectedFamily:
-            bootstrapState.targetSelection.kind === "set"
-              ? bootstrapState.targetSelection.setId
-              : null,
-          photoOrientation: orientation,
-          reportedThemeId: bootstrapState.reportedThemeId,
-          screenSessionId: deviceIdRef.current,
-          deviceInfo: getDisplayClientInfo(),
-        });
+        const resolution = await reportScreenProfile(
+          {
+            targetSelection: bootstrapState.targetSelection,
+            selectedFamily:
+              bootstrapState.targetSelection.kind === "set"
+                ? bootstrapState.targetSelection.setId
+                : null,
+            photoOrientation: orientation,
+            reportedThemeId: bootstrapState.reportedThemeId,
+            screenSessionId: deviceIdRef.current,
+            deviceInfo: getDisplayClientInfo(),
+          },
+          { signal: abortController.signal },
+        );
         if (requestId !== latestResolveRequestIdRef.current) {
           return;
         }
@@ -469,6 +483,9 @@ export const DashboardPage = () => {
 
         setError(null);
       } catch (loadError) {
+        if (isAbortError(loadError)) {
+          return;
+        }
         if (requestId !== latestResolveRequestIdRef.current) {
           return;
         }
@@ -489,6 +506,10 @@ export const DashboardPage = () => {
             void resolveLayout({ orientation: photoOrientationRef.current });
           }, 5_000);
         }
+      } finally {
+        if (resolveAbortControllerRef.current === abortController) {
+          resolveAbortControllerRef.current = null;
+        }
       }
     },
     [browserOnline, clearRetryResolve],
@@ -497,6 +518,8 @@ export const DashboardPage = () => {
   useEffect(
     () => () => {
       clearRetryResolve();
+      resolveAbortControllerRef.current?.abort();
+      resolveAbortControllerRef.current = null;
     },
     [clearRetryResolve],
   );
@@ -558,6 +581,25 @@ export const DashboardPage = () => {
       window.dispatchEvent(new CustomEvent("hearth:planner-updated"));
       void resolveLayout({ orientation: photoOrientationRef.current });
     };
+    const handleDisplaySettingsUpdated = (event: Event) => {
+      const detail = parseEventSourcePayload<DisplaySettingsUpdatedEventDetail>(event);
+      if (!detail) {
+        return;
+      }
+
+      if (detail.reason === "photo-collections-updated") {
+        window.dispatchEvent(new CustomEvent(DASHBOARD_PHOTOS_UPDATED_EVENT));
+      }
+      if (detail.reason === "calendar-feeds-updated") {
+        window.dispatchEvent(new CustomEvent(DASHBOARD_CALENDAR_UPDATED_EVENT));
+      }
+      if (
+        detail.reason === "screen-profiles-updated" ||
+        detail.reason === "photo-collections-updated"
+      ) {
+        void resolveLayout({ orientation: photoOrientationRef.current });
+      }
+    };
     const handleDeviceUpdated = (event: Event) => {
       const detail = parseEventSourcePayload<DisplayDeviceUpdatedEventDetail>(event);
       if (!detail || detail.deviceId !== deviceIdRef.current) {
@@ -583,6 +625,7 @@ export const DashboardPage = () => {
     eventSource.addEventListener("chores-updated", handleChoresUpdated);
     eventSource.addEventListener("planner-updated", handlePlannerUpdated);
     eventSource.addEventListener("site-time-updated", handleSiteTimeUpdated);
+    eventSource.addEventListener("display-settings-updated", handleDisplaySettingsUpdated);
     eventSource.addEventListener("display-device-updated", handleDeviceUpdated);
 
     eventSource.onerror = () => {
@@ -604,6 +647,7 @@ export const DashboardPage = () => {
       eventSource.removeEventListener("chores-updated", handleChoresUpdated);
       eventSource.removeEventListener("planner-updated", handlePlannerUpdated);
       eventSource.removeEventListener("site-time-updated", handleSiteTimeUpdated);
+      eventSource.removeEventListener("display-settings-updated", handleDisplaySettingsUpdated);
       eventSource.removeEventListener("display-device-updated", handleDeviceUpdated);
       eventSource.close();
     };
@@ -747,7 +791,7 @@ export const DashboardPage = () => {
     <div className={input.className}>
       <GridLayout
         width={input.metrics.width}
-        className="layout"
+        className="layout dashboard-layout"
         style={{ height: `${input.metrics.height}px` }}
         layout={input.translatedLayoutItems}
         cols={input.metrics.cols}

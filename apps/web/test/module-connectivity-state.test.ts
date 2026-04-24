@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveModuleConnectivityState } from "../src/modules/data/connection-state";
+import { isAbortError, resolveModuleConnectivityState } from "../src/modules/data/connection-state";
 
 test("keeps stale content visible for connectivity errors when a snapshot exists", () => {
   const result = resolveModuleConnectivityState({
@@ -44,4 +44,10 @@ test("keeps non-connectivity errors blocking even with a snapshot", () => {
 
   assert.equal(result.blockingError, "Request failed (500)");
   assert.equal(result.showDisconnected, false);
+});
+
+test("recognizes abort-like errors without requiring an Error instance", () => {
+  assert.equal(isAbortError({ name: "AbortError" }), true);
+  assert.equal(isAbortError(new Error("AbortError")), false);
+  assert.equal(isAbortError("AbortError"), false);
 });

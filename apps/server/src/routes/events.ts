@@ -11,9 +11,26 @@ export const registerEventRoutes = (app: FastifyInstance, services: AppServices)
       "X-Accel-Buffering": "no",
     });
 
-    reply.raw.write("event: ready\ndata: {}\n\n");
+    let closed = false;
+    let unsubscribe: () => void = () => {};
+    let heartbeat: ReturnType<typeof setInterval> | null = null;
+    const closeStream = () => {
+      if (closed) {
+        return;
+      }
 
-    const heartbeat = setInterval(() => {
+      closed = true;
+      if (heartbeat) {
+        clearInterval(heartbeat);
+        heartbeat = null;
+      }
+      unsubscribe();
+      if (!reply.raw.writableEnded && !reply.raw.destroyed) {
+        reply.raw.end();
+      }
+    };
+
+    heartbeat = setInterval(() => {
       if (closed || reply.raw.writableEnded || reply.raw.destroyed) {
         closeStream();
         return;
@@ -25,21 +42,6 @@ export const registerEventRoutes = (app: FastifyInstance, services: AppServices)
         closeStream();
       }
     }, 15000);
-    let closed = false;
-    let unsubscribe: () => void = () => {};
-
-    const closeStream = () => {
-      if (closed) {
-        return;
-      }
-
-      closed = true;
-      clearInterval(heartbeat);
-      unsubscribe();
-      if (!reply.raw.writableEnded && !reply.raw.destroyed) {
-        reply.raw.end();
-      }
-    };
 
     unsubscribe = services.layoutEventBus.subscribe((event) => {
       if (closed || reply.raw.writableEnded || reply.raw.destroyed) {
@@ -58,5 +60,12 @@ export const registerEventRoutes = (app: FastifyInstance, services: AppServices)
     request.raw.on("close", () => {
       closeStream();
     });
+
+    try {
+      reply.raw.write("event: ready\ndata: {}\n\n");
+    } catch {
+      closeStream();
+      return;
+    }
   });
 };

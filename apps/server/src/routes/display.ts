@@ -268,6 +268,12 @@ export const registerDisplayRoutes = (app: FastifyInstance, services: AppService
     }
 
     services.settingsRepository.setScreenProfileLayouts(parsedBody.data);
+    services.layoutEventBus.publish({
+      type: "display-settings-updated",
+      changedAt: new Date().toISOString(),
+      reason: "screen-profiles-updated",
+    });
+
     return reply.send(
       screenProfileLayoutsSchema.parse(services.settingsRepository.getScreenProfileLayouts()),
     );
@@ -297,6 +303,12 @@ export const registerDisplayRoutes = (app: FastifyInstance, services: AppService
     }
 
     services.settingsRepository.setPhotoCollections(parsedBody.data);
+    services.layoutEventBus.publish({
+      type: "display-settings-updated",
+      changedAt: new Date().toISOString(),
+      reason: "photo-collections-updated",
+    });
+
     return reply.send(
       photoCollectionsConfigSchema.parse(services.settingsRepository.getPhotoCollections()),
     );
@@ -328,6 +340,11 @@ export const registerDisplayRoutes = (app: FastifyInstance, services: AppService
     services.settingsRepository.setCalendarFeeds(parsedBody.data);
     void services.calendarFeedService.prefetchConfiguredFeeds(parsedBody.data).catch((error) => {
       request.log.warn({ error }, "Failed to prefetch calendar feeds after settings update");
+    });
+    services.layoutEventBus.publish({
+      type: "display-settings-updated",
+      changedAt: new Date().toISOString(),
+      reason: "calendar-feeds-updated",
     });
 
     return reply.send(

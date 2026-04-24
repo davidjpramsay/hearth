@@ -1,6 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { ModuleEventBus } from "../src/modules/event-bus";
 import { serverStatusResponseSchema } from "../src/modules/adapters/server-status";
+
+test("module event bus keeps publishing when a listener throws", () => {
+  const eventBus = new ModuleEventBus();
+  let delivered = 0;
+
+  eventBus.subscribe("health", () => {
+    throw new Error("broken listener");
+  });
+  eventBus.subscribe("health", () => {
+    delivered += 1;
+  });
+
+  eventBus.publish("health", { ok: true });
+
+  assert.equal(delivered, 1);
+});
 
 test("server status adapter response schema accepts valid payload", () => {
   const parsed = serverStatusResponseSchema.parse({

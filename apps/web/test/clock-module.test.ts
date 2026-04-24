@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
-import { moduleDefinition as clockModule } from "../src/modules/sdk/clock.module";
+import {
+  moduleDefinition as clockModule,
+  shouldStackClockInlineDateLayout,
+} from "../src/modules/sdk/clock.module";
 import { syncDisplayTimeContext } from "../src/runtime/display-time";
 
 type Listener = EventListenerOrEventListenerObject;
@@ -147,6 +150,29 @@ const getParagraphClassNames = (renderer: ReactTestRenderer): string[] =>
   renderer.root
     .findAll((node) => node.type === "p")
     .map((node) => String(node.props.className ?? ""));
+
+test("clock inline date layout remains side by side in short dashboard rows", () => {
+  assert.equal(
+    shouldStackClockInlineDateLayout({
+      hasTileMeasurement: true,
+      height: 156,
+      showSeconds: false,
+      use24Hour: true,
+      width: 720,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldStackClockInlineDateLayout({
+      hasTileMeasurement: true,
+      height: 156,
+      showSeconds: false,
+      use24Hour: true,
+      width: 260,
+    }),
+    true,
+  );
+});
 
 test("clock module can render the date beside the time", async () => {
   installBrowserShims();

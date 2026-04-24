@@ -10,7 +10,11 @@ export class ModuleEventBus {
     }
 
     for (const listener of listeners) {
-      listener(payload);
+      try {
+        listener(payload);
+      } catch {
+        // Keep publishing to other listeners even if one stream fails.
+      }
     }
   }
 

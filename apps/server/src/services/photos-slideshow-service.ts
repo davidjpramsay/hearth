@@ -26,6 +26,7 @@ const FOLDER_CACHE_PRUNE_INTERVAL_MS = 60_000;
 const MAX_FOLDER_CACHES = 64;
 const MAX_WATCH_DIRECTORIES = 256;
 const IMAGE_METADATA_SCAN_BYTES = 256 * 1024;
+const PHOTO_METADATA_CONCURRENCY = 8;
 const PHOTO_LIBRARY_ROOT = resolve(config.dataDir, "photos");
 const LEGACY_PHOTO_LIBRARY_ROOT_LABEL = "/photos";
 
@@ -642,6 +643,28 @@ const scanFolderTree = async (
   return { files, directories };
 };
 
+const mapWithConcurrency = async <TInput, TOutput>(
+  inputs: TInput[],
+  concurrency: number,
+  mapper: (input: TInput) => Promise<TOutput>,
+): Promise<TOutput[]> => {
+  const outputs = new Array<TOutput>(inputs.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), inputs.length);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < inputs.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        outputs[index] = await mapper(inputs[index]);
+      }
+    }),
+  );
+
+  return outputs;
+};
+
 export class PhotosSlideshowService {
   private readonly folderCaches = new Map<string, FolderCache>();
   private readonly photoMetadataCache = new Map<string, PhotoMetadataCacheEntry>();
@@ -922,8 +945,10 @@ export class PhotosSlideshowService {
       return;
     }
 
-    const assets = await Promise.all(
-      scanResult.files.map(async (absolutePath): Promise<PhotoAsset | null> => {
+    const assets = await mapWithConcurrency(
+      scanResult.files,
+      PHOTO_METADATA_CONCURRENCY,
+      async (absolutePath): Promise<PhotoAsset | null> => {
         try {
           const fileStat = await stat(absolutePath);
           const parsedMetadata = await this.getPhotoMetadata(
@@ -961,7 +986,7 @@ export class PhotosSlideshowService {
         } catch {
           return null;
         }
-      }),
+      },
     );
 
     cache.photos = assets

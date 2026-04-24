@@ -9,7 +9,7 @@ import { DeviceRepository } from "../src/repositories/device-repository.js";
 import { LayoutRepository } from "../src/repositories/layout-repository.js";
 import { registerDisplayRoutes } from "../src/routes/display.js";
 import { SettingsRepository } from "../src/repositories/settings-repository.js";
-import { LayoutEventBus } from "../src/services/layout-event-bus.js";
+import { LayoutEventBus, type AppEvent } from "../src/services/layout-event-bus.js";
 import { ScreenProfileService } from "../src/services/screen-profile-service.js";
 import type { AppServices } from "../src/types.js";
 
@@ -27,6 +27,10 @@ const createHarness = async () => {
     deviceRepository,
   );
   const layoutEventBus = new LayoutEventBus();
+  const events: AppEvent[] = [];
+  const unsubscribe = layoutEventBus.subscribe((event) => {
+    events.push(event);
+  });
   const app = Fastify();
 
   app.decorate("authenticate", async () => {});
@@ -49,7 +53,9 @@ const createHarness = async () => {
   return {
     app,
     deviceRepository,
+    events,
     dispose: async () => {
+      unsubscribe();
       await app.close();
       db.close();
       rmSync(directory, { recursive: true, force: true });
@@ -169,6 +175,60 @@ test("delete display device removes the saved device record", async () => {
   }
 });
 
+test("screen profile layout settings publish a display settings update event", async () => {
+  const harness = await createHarness();
+
+  try {
+    const response = await harness.app.inject({
+      method: "PUT",
+      url: "/display/screen-profiles",
+      payload: {
+        switchMode: "auto",
+        autoCycleSeconds: 15,
+        families: {},
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(harness.events.at(-1), {
+      type: "display-settings-updated",
+      changedAt: harness.events.at(-1)?.changedAt,
+      reason: "screen-profiles-updated",
+    });
+  } finally {
+    await harness.dispose();
+  }
+});
+
+test("photo collection settings publish a display settings update event", async () => {
+  const harness = await createHarness();
+
+  try {
+    const response = await harness.app.inject({
+      method: "PUT",
+      url: "/display/photo-collections",
+      payload: {
+        collections: [
+          {
+            id: "family",
+            name: "Family",
+            folders: ["family"],
+          },
+        ],
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(harness.events.at(-1), {
+      type: "display-settings-updated",
+      changedAt: harness.events.at(-1)?.changedAt,
+      reason: "photo-collections-updated",
+    });
+  } finally {
+    await harness.dispose();
+  }
+});
+
 test("calendar feed settings can be saved and loaded through display routes", async () => {
   const harness = await createHarness();
 
@@ -190,6 +250,11 @@ test("calendar feed settings can be saved and loaded through display routes", as
     });
 
     assert.equal(saveResponse.statusCode, 200);
+    assert.deepEqual(harness.events.at(-1), {
+      type: "display-settings-updated",
+      changedAt: harness.events.at(-1)?.changedAt,
+      reason: "calendar-feeds-updated",
+    });
     assert.deepEqual(saveResponse.json(), {
       feeds: [
         {

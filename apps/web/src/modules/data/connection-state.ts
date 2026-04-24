@@ -20,6 +20,14 @@ const readBrowserOnlineStatus = (): boolean =>
     ? true
     : navigator.onLine;
 
+export const isAbortError = (error: unknown): boolean =>
+  Boolean(
+    error &&
+      typeof error === "object" &&
+      "name" in error &&
+      (error as { name?: unknown }).name === "AbortError",
+  );
+
 export const useBrowserOnlineStatus = (): boolean => {
   const [isOnline, setIsOnline] = useState<boolean>(() => readBrowserOnlineStatus());
 
@@ -45,7 +53,7 @@ export const isConnectivityError = (error: unknown): boolean => {
     return true;
   }
 
-  if (error instanceof Error && error.name === "AbortError") {
+  if (isAbortError(error)) {
     return false;
   }
 

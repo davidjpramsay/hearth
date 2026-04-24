@@ -25,29 +25,71 @@ export const registerModuleAdapterRoutes = (app: FastifyInstance, services: AppS
       return reply.code(400).send({ message: parsedQuery.error.message });
     }
 
+    reply.hijack();
     reply.raw.writeHead(200, {
       "Content-Type": "text/event-stream",
       Connection: "keep-alive",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
     });
 
     const eventBus = services.moduleAdapterService.getEventBus();
-    const unsubscribe = eventBus.subscribe(parsedQuery.data.topic, (payload) => {
-      reply.raw.write(`data: ${JSON.stringify({ topic: parsedQuery.data.topic, payload })}\n\n`);
-    });
+    let closed = false;
+    let unsubscribe: () => void = () => {};
+    let heartbeat: ReturnType<typeof setInterval> | null = null;
+    const closeStream = () => {
+      if (closed) {
+        return;
+      }
 
-    const heartbeat = setInterval(() => {
-      reply.raw.write(": heartbeat\n\n");
+      closed = true;
+      if (heartbeat) {
+        clearInterval(heartbeat);
+        heartbeat = null;
+      }
+      unsubscribe();
+      if (!reply.raw.writableEnded && !reply.raw.destroyed) {
+        reply.raw.end();
+      }
+    };
+
+    heartbeat = setInterval(() => {
+      if (closed || reply.raw.writableEnded || reply.raw.destroyed) {
+        closeStream();
+        return;
+      }
+
+      try {
+        reply.raw.write(": heartbeat\n\n");
+      } catch {
+        closeStream();
+      }
     }, 15_000);
 
-    reply.raw.write(
-      `data: ${JSON.stringify({ topic: parsedQuery.data.topic, payload: { connected: true } })}\n\n`,
-    );
+    unsubscribe = eventBus.subscribe(parsedQuery.data.topic, (payload) => {
+      if (closed || reply.raw.writableEnded || reply.raw.destroyed) {
+        closeStream();
+        return;
+      }
+
+      try {
+        reply.raw.write(`data: ${JSON.stringify({ topic: parsedQuery.data.topic, payload })}\n\n`);
+      } catch {
+        closeStream();
+      }
+    });
 
     request.raw.on("close", () => {
-      clearInterval(heartbeat);
-      unsubscribe();
-      reply.raw.end();
+      closeStream();
     });
+
+    try {
+      reply.raw.write(
+        `data: ${JSON.stringify({ topic: parsedQuery.data.topic, payload: { connected: true } })}\n\n`,
+      );
+    } catch {
+      closeStream();
+      return;
+    }
   });
 };

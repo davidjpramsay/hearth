@@ -307,11 +307,13 @@ export const getPhotoLibraryFolders = async (token: string): Promise<PhotoLibrar
 
 export const reportScreenProfile = async (
   payload: ReportScreenProfileRequest,
+  options: { signal?: AbortSignal } = {},
 ): Promise<ReportScreenProfileResponse> =>
   request(
     "/display/screen-profile/report",
     {
       method: "POST",
+      signal: options.signal,
       body: JSON.stringify(reportScreenProfileRequestSchema.parse(payload)),
     },
     (body) => reportScreenProfileResponseSchema.parse(body),

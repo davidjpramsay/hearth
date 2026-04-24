@@ -1,4 +1,5 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
+import { stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import fastifyCors from "@fastify/cors";
 import fastifyJwt from "@fastify/jwt";
@@ -74,7 +75,12 @@ export const createApp = async (services: AppServices) => {
     app.get("/*", async (request, reply) => {
       const rawUrl = request.raw.url ?? "/";
       const [pathname] = rawUrl.split("?");
-      const decodedPath = decodeURIComponent(pathname || "/");
+      let decodedPath: string;
+      try {
+        decodedPath = decodeURIComponent(pathname || "/");
+      } catch {
+        return reply.code(400).send({ message: "Invalid path" });
+      }
       if (decodedPath === "/api" || decodedPath.startsWith("/api/")) {
         return reply.code(404).send({ message: "Not Found" });
       }
@@ -87,7 +93,7 @@ export const createApp = async (services: AppServices) => {
 
       if (relativePath.length > 0 && isInsideRoot) {
         try {
-          if (statSync(candidatePath).isFile()) {
+          if ((await stat(candidatePath)).isFile()) {
             return reply.sendFile(relativePath);
           }
         } catch {

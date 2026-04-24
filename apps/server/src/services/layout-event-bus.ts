@@ -30,6 +30,12 @@ export interface DisplayDeviceUpdatedEvent {
   reason: "device-updated";
 }
 
+export interface DisplaySettingsUpdatedEvent {
+  type: "display-settings-updated";
+  changedAt: string;
+  reason: "screen-profiles-updated" | "photo-collections-updated" | "calendar-feeds-updated";
+}
+
 export interface SiteTimeUpdatedEvent {
   type: "site-time-updated";
   changedAt: string;
@@ -62,6 +68,7 @@ export type AppEvent =
   | LayoutUpdatedEvent
   | ChoresUpdatedEvent
   | DisplayDeviceUpdatedEvent
+  | DisplaySettingsUpdatedEvent
   | SiteTimeUpdatedEvent
   | PlannerUpdatedEvent;
 

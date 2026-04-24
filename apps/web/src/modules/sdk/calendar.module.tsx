@@ -26,7 +26,11 @@ import {
   writePersistedModuleSnapshot,
 } from "../data/persisted-module-snapshot";
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
-import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
+import {
+  isAbortError,
+  resolveModuleConnectivityState,
+  useBrowserOnlineStatus,
+} from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 import { ModuleSkeleton } from "../ui/ModuleSkeleton";
 import {
@@ -39,6 +43,7 @@ import { ThemePalettePicker } from "../../components/admin/ThemePalettePicker";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CALENDAR_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const CALENDAR_CLOCK_TICK_MS = 60 * 1000;
+const CALENDAR_FEEDS_UPDATED_EVENT = "hearth:calendar-updated";
 type CalendarDateKey = `${number}-${number}-${number}`;
 
 type CalendarTileEvent = CalendarModuleEvent & {
@@ -343,7 +348,7 @@ export const moduleDefinition = defineModule({
             setError(null);
             writePersistedModuleSnapshot(snapshotKey, nextPayload, updatedAtMs);
           } catch (loadError) {
-            if (!active || (loadError instanceof Error && loadError.name === "AbortError")) {
+            if (!active || isAbortError(loadError)) {
               return;
             }
 
@@ -387,6 +392,9 @@ export const moduleDefinition = defineModule({
           setDisplayNow(getDisplayNow());
           void refresh();
         };
+        const onCalendarFeedsUpdated = () => {
+          void refresh();
+        };
 
         void refresh();
         const displayClockInterval = window.setInterval(() => {
@@ -398,6 +406,7 @@ export const moduleDefinition = defineModule({
         document.addEventListener("visibilitychange", onVisibilityChange);
         window.addEventListener("pageshow", onPageShow);
         window.addEventListener("focus", onWindowFocus);
+        window.addEventListener(CALENDAR_FEEDS_UPDATED_EVENT, onCalendarFeedsUpdated);
         const refreshMs = Math.max(settings.refreshIntervalSeconds, 30) * 1000;
         const timer = window.setInterval(() => {
           void refresh();
@@ -409,6 +418,7 @@ export const moduleDefinition = defineModule({
           document.removeEventListener("visibilitychange", onVisibilityChange);
           window.removeEventListener("pageshow", onPageShow);
           window.removeEventListener("focus", onWindowFocus);
+          window.removeEventListener(CALENDAR_FEEDS_UPDATED_EVENT, onCalendarFeedsUpdated);
           window.clearInterval(displayClockInterval);
           window.clearInterval(timer);
           abortController?.abort();

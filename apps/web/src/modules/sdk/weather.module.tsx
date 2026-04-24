@@ -13,7 +13,11 @@ import {
   writePersistedModuleSnapshot,
 } from "../data/persisted-module-snapshot";
 import { ModulePresentationControls } from "../ui/ModulePresentationControls";
-import { resolveModuleConnectivityState, useBrowserOnlineStatus } from "../data/connection-state";
+import {
+  isAbortError,
+  resolveModuleConnectivityState,
+  useBrowserOnlineStatus,
+} from "../data/connection-state";
 import { ModuleConnectionBadge } from "../ui/ModuleConnectionBadge";
 import { ModuleSkeleton } from "../ui/ModuleSkeleton";
 import { type TileDensity, useTileDensity } from "../ui/useTileDensity";
@@ -530,7 +534,7 @@ export const moduleDefinition = defineModule({
             setError(null);
             writePersistedModuleSnapshot(snapshotKey, next, updatedAtMs);
           } catch (loadError) {
-            if (!active || (loadError instanceof Error && loadError.name === "AbortError")) {
+            if (!active || isAbortError(loadError)) {
               return;
             }
 
