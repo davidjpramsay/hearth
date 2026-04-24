@@ -1,5 +1,15 @@
 import GridLayout from "react-grid-layout";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  Component,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
 import {
   type DisplayDeviceRuntime,
   type GridItem,
@@ -104,6 +114,49 @@ const getViewportSize = (): { width: number; height: number } => {
     height: Math.max(1, Math.round(window.innerHeight)),
   };
 };
+
+class DashboardModuleErrorBoundary extends Component<
+  { boundaryKey: string; moduleName: string; children: ReactNode },
+  { errorMessage: string | null }
+> {
+  state = { errorMessage: null };
+
+  static getDerivedStateFromError(error: unknown): { errorMessage: string } {
+    return {
+      errorMessage: error instanceof Error ? error.message : "Module failed to render.",
+    };
+  }
+
+  componentDidUpdate(previousProps: { boundaryKey: string }): void {
+    if (previousProps.boundaryKey !== this.props.boundaryKey && this.state.errorMessage !== null) {
+      this.setState({ errorMessage: null });
+    }
+  }
+
+  componentDidCatch(error: unknown, info: ErrorInfo): void {
+    console.error("Dashboard module render failed", {
+      moduleName: this.props.moduleName,
+      error,
+      componentStack: info.componentStack,
+    });
+  }
+
+  render() {
+    if (this.state.errorMessage) {
+      return (
+        <div className="flex h-full w-full flex-col justify-center rounded-lg border border-rose-400/50 bg-rose-950/60 px-4 py-3 text-rose-100">
+          <p className="module-copy-label text-rose-200">Module error</p>
+          <p className="module-copy-title mt-2 text-rose-50">{this.props.moduleName}</p>
+          <p className="module-copy-meta mt-2 line-clamp-4 text-rose-100/80">
+            {this.state.errorMessage}
+          </p>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 interface GridDisplayMetrics {
   cols: number;
@@ -706,13 +759,21 @@ export const DashboardPage = () => {
         compactType={null}
         margin={[0, 0]}
         containerPadding={[0, 0]}
-        useCSSTransforms
+        useCSSTransforms={false}
       >
         {input.renderedModules.map(({ instance, moduleDefinition }) => (
           <div key={instance.id} className="h-full w-full min-h-0">
             {moduleDefinition ? (
               <div className="h-full w-full min-h-0 overflow-hidden rounded-lg">
-                <moduleDefinition.DashboardTile instanceId={instance.id} config={instance.config} />
+                <DashboardModuleErrorBoundary
+                  boundaryKey={`${activeLayout?.id ?? "layout"}:${activeLayout?.version ?? 0}:${instance.id}`}
+                  moduleName={moduleDefinition.displayName}
+                >
+                  <moduleDefinition.DashboardTile
+                    instanceId={instance.id}
+                    config={instance.config}
+                  />
+                </DashboardModuleErrorBoundary>
               </div>
             ) : (
               <div className="flex h-full items-center justify-center rounded bg-slate-800 text-sm text-rose-200">

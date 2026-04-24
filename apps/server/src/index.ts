@@ -123,6 +123,7 @@ const shutdown = async () => {
   await moduleAdapterService.stop();
   await localWarningService.stop();
   await backupService.stop();
+  services.photosSlideshowService.stop();
   await app.close();
   database.close();
 };

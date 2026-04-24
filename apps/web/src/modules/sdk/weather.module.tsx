@@ -411,6 +411,11 @@ export const moduleDefinition = defineModule({
         hasSnapshot: lastUpdatedMs !== null,
         isOnline: browserOnline,
       });
+      const hasTileMeasurement = tileMetrics.width > 0 && tileMetrics.height > 0;
+      const shallowHeroTile =
+        hasTileMeasurement && tileMetrics.height >= 140 && tileMetrics.height < 220;
+      const showForecastInTile =
+        settings.showForecast && (!hasTileMeasurement || tileMetrics.height >= 220);
 
       useEffect(() => {
         if (!initialSnapshot) {
@@ -422,12 +427,12 @@ export const moduleDefinition = defineModule({
         setLoading(false);
       }, [initialSnapshot]);
       const forecastLimit = useMemo(() => {
-        if (!settings.showForecast) {
+        if (!showForecastInTile) {
           return 0;
         }
 
         return Math.min(forecastDaysByDensity(density), forecastCardsByWidth(tileMetrics.width));
-      }, [density, settings.showForecast, tileMetrics.width]);
+      }, [density, showForecastInTile, tileMetrics.width]);
       const forecastDays = useMemo(
         () => payload.forecastDays.slice(1, 1 + forecastLimit),
         [forecastLimit, payload.forecastDays],
@@ -495,8 +500,10 @@ export const moduleDefinition = defineModule({
         (stat): stat is { key: string; label: string; value: string; icon: string } =>
           stat !== null,
       );
-      const showStats = density !== "xs" && todayStats.length > 0;
+      const showStats = density !== "xs" && !shallowHeroTile && todayStats.length > 0;
       const showForecastSectionTitle = density !== "xs";
+      const contentAlignmentClass = showForecast ? "justify-start" : "justify-center";
+      const currentConditionsOffsetClass = shallowHeroTile && !showForecast ? "translate-y-7" : "";
       useEffect(() => {
         if (isEditing) {
           setLoading(false);
@@ -590,7 +597,7 @@ export const moduleDefinition = defineModule({
       return (
         <div
           ref={tileRef}
-          className="module-panel-shell relative isolate flex h-full min-h-0 flex-col p-3 text-[color:var(--color-text-primary)]"
+          className="module-panel-shell relative isolate flex h-full min-h-0 flex-col px-4 py-4 text-[color:var(--color-text-primary)]"
           style={moduleAccentStyle}
         >
           <ModuleConnectionBadge
@@ -607,10 +614,12 @@ export const moduleDefinition = defineModule({
           ) : null}
 
           {!loading && !connectivityState.blockingError ? (
-            <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
+            <div
+              className={`relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto pr-1 ${contentAlignmentClass}`}
+            >
               {useStructuredHero ? (
                 <div
-                  className={`grid items-stretch gap-4 ${
+                  className={`grid items-stretch gap-4 ${currentConditionsOffsetClass} ${
                     showHeroIcon ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1"
                   }`}
                 >
@@ -668,7 +677,7 @@ export const moduleDefinition = defineModule({
                   ) : null}
                 </div>
               ) : (
-                <div className="module-stack-hero">
+                <div className={`module-stack-hero ${currentConditionsOffsetClass}`}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="module-stack-standard min-w-0 flex-1">
                       <div className="flex items-end gap-3.5">

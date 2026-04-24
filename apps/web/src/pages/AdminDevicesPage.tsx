@@ -426,6 +426,7 @@ export const AdminDevicesPage = () => {
 
     return baseMs + Math.max(0, clockTickMs - serverStatusReceivedAtMs);
   }, [clockTickMs, serverStatus, serverStatusReceivedAtMs]);
+  const deviceHealthNowMs = effectiveServerNowMs ?? clockTickMs;
   const latestDeviceSeenAt = useMemo(
     () =>
       devices.reduce<string | null>(
@@ -438,7 +439,6 @@ export const AdminDevicesPage = () => {
     [devices],
   );
   const deviceHealthSummary = useMemo(() => {
-    const nowMs = Date.now();
     let recentCount = 0;
     let staleCount = 0;
 
@@ -449,7 +449,7 @@ export const AdminDevicesPage = () => {
         continue;
       }
 
-      const ageMs = nowMs - seenAtMs;
+      const ageMs = deviceHealthNowMs - seenAtMs;
       if (ageMs <= RECENT_DEVICE_THRESHOLD_MS) {
         recentCount += 1;
       }
@@ -464,7 +464,7 @@ export const AdminDevicesPage = () => {
       staleCount,
       latestSeenAt: latestDeviceSeenAt,
     };
-  }, [devices, latestDeviceSeenAt]);
+  }, [deviceHealthNowMs, devices, latestDeviceSeenAt]);
   const calendarFeedsDirty = useMemo(
     () => JSON.stringify(normalizedCalendarFeedsDraft) !== JSON.stringify(savedCalendarFeedsConfig),
     [normalizedCalendarFeedsDraft, savedCalendarFeedsConfig],

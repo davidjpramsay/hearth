@@ -9,7 +9,34 @@ import "./index.css";
 import { App } from "./App";
 import { initializeTheme, startThemeSync } from "./theme/theme";
 
-registerSW({ immediate: true });
+const clearDevelopmentServiceWorkers = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if ("serviceWorker" in navigator) {
+    void navigator.serviceWorker
+      .getRegistrations()
+      .then((registrations) =>
+        Promise.all(registrations.map((registration) => registration.unregister())),
+      )
+      .catch(() => undefined);
+  }
+
+  if ("caches" in window) {
+    void window.caches
+      .keys()
+      .then((keys) => Promise.all(keys.map((key) => window.caches.delete(key))))
+      .catch(() => undefined);
+  }
+};
+
+if (import.meta.env.PROD) {
+  registerSW({ immediate: true });
+} else {
+  clearDevelopmentServiceWorkers();
+}
+
 initializeTheme();
 startThemeSync();
 

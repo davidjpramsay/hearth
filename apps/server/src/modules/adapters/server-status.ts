@@ -9,6 +9,7 @@ import { config } from "../../config.js";
 import type { ModuleAdapterContext, ModuleServerAdapter } from "../types.js";
 
 const processStartedAtMs = Date.now();
+const SERVER_STATUS_TOPIC = "server-status.updates";
 let statusTicker: NodeJS.Timeout | null = null;
 
 const resolveExistingFile = (...candidates: string[]): string | null => {
@@ -66,14 +67,18 @@ const readHtmlBuildAsset = (html: string, kind: "script" | "stylesheet"): string
   return match?.[1] ?? match?.[2] ?? null;
 };
 
-const readBuildMetadata = (): {
+interface BuildMetadata {
   serverEntrySha1: string | null;
   serverEntryBuiltAt: string | null;
   webIndexSha1: string | null;
   webIndexBuiltAt: string | null;
   webMainScript: string | null;
   webMainStylesheet: string | null;
-} => {
+}
+
+let buildMetadataCache: BuildMetadata | null = null;
+
+const readBuildMetadata = (): BuildMetadata => {
   const serverEntryPath = resolveExistingFile(
     fileURLToPath(new URL("../../index.js", import.meta.url)),
     fileURLToPath(new URL("../../index.ts", import.meta.url)),
@@ -92,6 +97,11 @@ const readBuildMetadata = (): {
     webMainScript: webIndexHtml ? readHtmlBuildAsset(webIndexHtml, "script") : null,
     webMainStylesheet: webIndexHtml ? readHtmlBuildAsset(webIndexHtml, "stylesheet") : null,
   };
+};
+
+const getBuildMetadata = (): BuildMetadata => {
+  buildMetadataCache ??= readBuildMetadata();
+  return buildMetadataCache;
 };
 
 export const serverStatusResponseSchema = z.object({
@@ -193,12 +203,12 @@ const toStatusPayload = (context: ModuleAdapterContext) =>
       calendar: context.getCalendarDiagnostics?.() ?? defaultCalendarDiagnostics,
       storage: readStorageDiagnostics(),
     },
-    build: readBuildMetadata(),
+    build: getBuildMetadata(),
   });
 
 export const serverStatusAdapter: ModuleServerAdapter = {
   id: "server-status",
-  streamTopics: ["server-status.updates"],
+  streamTopics: [SERVER_STATUS_TOPIC],
   registerRoutes: (app, context) => {
     app.get("/", async (_request, reply) => {
       return reply.send(toStatusPayload(context));
@@ -210,7 +220,11 @@ export const serverStatusAdapter: ModuleServerAdapter = {
     }
 
     statusTicker = setInterval(() => {
-      context.eventBus.publish("server-status.updates", toStatusPayload(context));
+      if (context.eventBus.listenerCount(SERVER_STATUS_TOPIC) === 0) {
+        return;
+      }
+
+      context.eventBus.publish(SERVER_STATUS_TOPIC, toStatusPayload(context));
     }, 15_000);
   },
   stop: () => {

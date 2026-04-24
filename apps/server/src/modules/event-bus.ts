@@ -31,4 +31,8 @@ export class ModuleEventBus {
       }
     };
   }
+
+  listenerCount(topic: string): number {
+    return this.listeners.get(topic)?.size ?? 0;
+  }
 }

@@ -4,6 +4,9 @@ interface ModuleStateRow {
   value: string;
 }
 
+const escapeSqlLikePattern = (value: string): string =>
+  value.replace(/[\\%_]/g, (match) => `\\${match}`);
+
 export class ModuleStateRepository {
   constructor(private readonly db: Database.Database) {}
 
@@ -37,5 +40,28 @@ export class ModuleStateRepository {
         key,
         value: JSON.stringify(value),
       });
+  }
+
+  deleteExpiredStatesByPrefix(prefix: string, maxAgeMs: number): number {
+    const trimmedPrefix = prefix.trim();
+    if (!trimmedPrefix || !Number.isFinite(maxAgeMs) || maxAgeMs <= 0) {
+      return 0;
+    }
+
+    const maxAgeSeconds = Math.max(1, Math.floor(maxAgeMs / 1000));
+    const result = this.db
+      .prepare<{ keyPattern: string; maxAgeModifier: string }>(
+        `
+        DELETE FROM module_state
+        WHERE key LIKE @keyPattern ESCAPE '\\'
+          AND updated_at < datetime('now', @maxAgeModifier)
+        `,
+      )
+      .run({
+        keyPattern: `${escapeSqlLikePattern(trimmedPrefix)}%`,
+        maxAgeModifier: `-${maxAgeSeconds} seconds`,
+      });
+
+    return result.changes;
   }
 }

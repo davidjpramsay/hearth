@@ -33,6 +33,9 @@ const FETCH_TIMEOUT_MS = 10_000;
 const CALENDAR_SOURCE_CONCURRENCY = 4;
 const CALENDAR_PERSISTED_RESPONSE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const CALENDAR_PERSISTED_SOURCE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const CALENDAR_PERSISTED_PRUNE_INTERVAL_MS = 30 * 60 * 1000;
+const CALENDAR_MEMORY_CACHE_IDLE_MS = 6 * 60 * 60 * 1000;
+const MAX_CALENDAR_SOURCE_CACHE_ENTRIES = 64;
 const REMOTE_PROTOCOL_REGEX = /^(https?|webcals?):\/\//i;
 const WEB_CAL_DOUBLE_SLASH_REGEX = /^webcals?:\/\//i;
 const WEB_CAL_SINGLE_SLASH_REGEX = /^webcals?:\/(?!\/)/i;
@@ -54,6 +57,7 @@ type CachedCalendarSourceEvent = z.infer<typeof cachedCalendarSourceEventSchema>
 
 interface SourceCacheEntry {
   fetchedAtMs: number;
+  lastAccessedAtMs: number;
   events: CachedCalendarSourceEvent[];
 }
 
@@ -193,6 +197,7 @@ export class CalendarFeedService {
   private readonly inFlightSourceLoads = new Map<string, Promise<SourceLoadResult>>();
   private lastPrefetchAttemptAtMs: number | null = null;
   private lastPrefetchCompletedAtMs: number | null = null;
+  private lastPersistedPruneAtMs = 0;
 
   constructor(
     private readonly moduleStateRepository: ModuleStateRepository | null = null,
@@ -201,6 +206,7 @@ export class CalendarFeedService {
 
   async prefetchConfiguredFeeds(calendarFeedsConfig?: CalendarFeedsConfig): Promise<void> {
     this.lastPrefetchAttemptAtMs = Date.now();
+    this.pruneCaches();
     const configuredFeeds =
       calendarFeedsConfig ??
       this.settingsRepository?.getCalendarFeeds() ??
@@ -222,6 +228,7 @@ export class CalendarFeedService {
   }
 
   async getUpcomingEvents(rawConfig: unknown): Promise<CalendarModuleEventsResponse> {
+    this.pruneCaches();
     const parsedConfig = calendarModuleConfigSchema.parse(rawConfig);
     const resolved = this.resolveConfiguredSources(parsedConfig);
 
@@ -385,6 +392,7 @@ export class CalendarFeedService {
     const cached = this.sourceCache.get(source.source);
 
     if (cached && now - cached.fetchedAtMs < refreshMs) {
+      cached.lastAccessedAtMs = now;
       return {
         events: materializeSourceEvents(cached.events, source),
         warning: null,
@@ -403,6 +411,7 @@ export class CalendarFeedService {
 
         this.sourceCache.set(source.source, {
           fetchedAtMs: now,
+          lastAccessedAtMs: now,
           events,
         });
         writePersistedModuleResponse(
@@ -584,6 +593,54 @@ export class CalendarFeedService {
       allDay: input.allDay,
       location: input.location,
     });
+  }
+
+  private pruneCaches(nowMs = Date.now()): void {
+    this.pruneMemorySourceCache(nowMs);
+    this.prunePersistedSnapshots(nowMs);
+  }
+
+  private pruneMemorySourceCache(nowMs: number): void {
+    for (const [source, cacheEntry] of this.sourceCache) {
+      if (nowMs - cacheEntry.lastAccessedAtMs > CALENDAR_MEMORY_CACHE_IDLE_MS) {
+        this.sourceCache.delete(source);
+      }
+    }
+
+    if (this.sourceCache.size <= MAX_CALENDAR_SOURCE_CACHE_ENTRIES) {
+      return;
+    }
+
+    const removableEntries = [...this.sourceCache.entries()]
+      .filter(([source]) => !this.inFlightSourceLoads.has(source))
+      .sort((left, right) => left[1].lastAccessedAtMs - right[1].lastAccessedAtMs);
+
+    for (const [source] of removableEntries) {
+      if (this.sourceCache.size <= MAX_CALENDAR_SOURCE_CACHE_ENTRIES) {
+        break;
+      }
+      this.sourceCache.delete(source);
+    }
+  }
+
+  private prunePersistedSnapshots(nowMs: number): void {
+    if (
+      !this.moduleStateRepository ||
+      typeof this.moduleStateRepository.deleteExpiredStatesByPrefix !== "function" ||
+      nowMs - this.lastPersistedPruneAtMs < CALENDAR_PERSISTED_PRUNE_INTERVAL_MS
+    ) {
+      return;
+    }
+
+    this.lastPersistedPruneAtMs = nowMs;
+    this.moduleStateRepository.deleteExpiredStatesByPrefix(
+      "calendar-source:",
+      CALENDAR_PERSISTED_SOURCE_MAX_AGE_MS,
+    );
+    this.moduleStateRepository.deleteExpiredStatesByPrefix(
+      "calendar-response:",
+      CALENDAR_PERSISTED_RESPONSE_MAX_AGE_MS,
+    );
   }
 
   getDiagnostics(): {

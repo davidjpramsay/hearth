@@ -23,6 +23,8 @@ import { ModuleSkeleton } from "../ui/ModuleSkeleton";
 
 const LAYOUT_CROSSFADE_DATA_ATTRIBUTE = "data-hearth-layout-crossfade";
 const PHOTO_SNAPSHOT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const PHOTO_CROSSFADE_DURATION_MS = 700;
+const PHOTO_CROSSFADE_CLEANUP_BUFFER_MS = 120;
 const DISPLAY_SOURCE_KIND_STORAGE_KEY = "hearth:display-source-kind";
 const DISPLAY_CYCLE_SECONDS_STORAGE_KEY = "hearth:display-cycle-seconds";
 const DISPLAY_PHOTO_COLLECTION_ID_STORAGE_KEY = "hearth:display-photo-collection-id";
@@ -40,17 +42,21 @@ const preloadImage = async (src: string): Promise<void> => {
     return;
   }
 
-  await new Promise<void>((resolve, reject) => {
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
     image.decoding = "async";
     image.onload = () => {
-      resolve();
+      resolve(image);
     };
     image.onerror = () => {
       reject(new Error("Failed to preload photo"));
     };
     image.src = src;
   });
+
+  if (typeof image.decode === "function") {
+    await image.decode().catch(() => undefined);
+  }
 };
 
 const clampIntervalSeconds = (value: number): number =>
@@ -312,7 +318,14 @@ export const moduleDefinition = defineModule({
       const [displayFrame, setDisplayFrame] = useState<PhotosModuleFrame | null>(
         () => initialSnapshot?.data.frame ?? null,
       );
+      const [previousFrame, setPreviousFrame] = useState<PhotosModuleFrame | null>(null);
       const displayFrameRef = useRef<PhotosModuleFrame | null>(null);
+      const inFlightRefreshRef = useRef(false);
+      const nextRefreshTimerRef = useRef<number | null>(null);
+      const lastDisplaySwapAtMsRef = useRef<number | null>(initialSnapshot?.updatedAtMs ?? null);
+      const lastPublishedOrientationEventKeyRef = useRef<string | null>(null);
+      const crossfadeRafRef = useRef<number | null>(null);
+      const crossfadeCleanupTimerRef = useRef<number | null>(null);
       const [imageVisible, setImageVisible] = useState(() => initialSnapshot?.data.frame !== null);
       const [error, setError] = useState<string | null>(null);
       const [loading, setLoading] = useState(() => initialSnapshot === null);
@@ -326,16 +339,99 @@ export const moduleDefinition = defineModule({
         isOnline: browserOnline,
       });
 
+      const clearPhotoCrossfadeTimers = () => {
+        if (crossfadeRafRef.current !== null) {
+          window.cancelAnimationFrame(crossfadeRafRef.current);
+          crossfadeRafRef.current = null;
+        }
+        if (crossfadeCleanupTimerRef.current !== null) {
+          window.clearTimeout(crossfadeCleanupTimerRef.current);
+          crossfadeCleanupTimerRef.current = null;
+        }
+      };
+
+      const presentFrame = (nextFrame: PhotosModuleFrame, disableCrossfade: boolean) => {
+        const currentFrame = displayFrameRef.current;
+        clearPhotoCrossfadeTimers();
+
+        if (
+          disableCrossfade ||
+          currentFrame === null ||
+          currentFrame.imageId === nextFrame.imageId
+        ) {
+          setPreviousFrame(null);
+          setDisplayFrame(nextFrame);
+          displayFrameRef.current = nextFrame;
+          setImageVisible(true);
+          return;
+        }
+
+        setPreviousFrame(currentFrame);
+        setImageVisible(false);
+        setDisplayFrame(nextFrame);
+        displayFrameRef.current = nextFrame;
+        crossfadeRafRef.current = window.requestAnimationFrame(() => {
+          crossfadeRafRef.current = null;
+          setImageVisible(true);
+          crossfadeCleanupTimerRef.current = window.setTimeout(() => {
+            crossfadeCleanupTimerRef.current = null;
+            setPreviousFrame(null);
+          }, PHOTO_CROSSFADE_DURATION_MS + PHOTO_CROSSFADE_CLEANUP_BUFFER_MS);
+        });
+      };
+
+      const publishConfirmedOrientation = (
+        next: ReturnType<typeof photosModuleNextResponseSchema.parse>,
+      ) => {
+        if (isEditing || typeof window === "undefined" || !next.frame) {
+          return;
+        }
+
+        const orientation = next.stableOrientation ?? next.frame.orientation;
+        if (orientation !== "portrait" && orientation !== "landscape") {
+          return;
+        }
+
+        const eventKey = `${next.frame.imageId}:${orientation}`;
+        if (lastPublishedOrientationEventKeyRef.current === eventKey) {
+          return;
+        }
+        lastPublishedOrientationEventKeyRef.current = eventKey;
+
+        window.dispatchEvent(
+          new CustomEvent("hearth:photos-orientation", {
+            detail: {
+              instanceId,
+              orientation,
+              frameId: next.frame.imageId,
+              eventToken: next.frame.imageId,
+            },
+          }),
+        );
+      };
+
       useEffect(() => {
         displayFrameRef.current = displayFrame;
       }, [displayFrame]);
 
+      useEffect(
+        () => () => {
+          clearPhotoCrossfadeTimers();
+        },
+        [],
+      );
+
       useEffect(() => {
         if (initialSnapshot) {
           setFrameData(initialSnapshot.data);
+          clearPhotoCrossfadeTimers();
+          setPreviousFrame(null);
           setDisplayFrame(initialSnapshot.data.frame);
+          displayFrameRef.current = initialSnapshot.data.frame;
           setImageVisible(initialSnapshot.data.frame !== null);
           setLastUpdatedMs(initialSnapshot.updatedAtMs);
+          lastDisplaySwapAtMsRef.current = initialSnapshot.updatedAtMs;
+          lastPublishedOrientationEventKeyRef.current = null;
           setLoading(false);
           return;
         }
@@ -348,9 +444,14 @@ export const moduleDefinition = defineModule({
             warning: null,
           }),
         );
+        clearPhotoCrossfadeTimers();
+        setPreviousFrame(null);
         setDisplayFrame(null);
+        displayFrameRef.current = null;
         setImageVisible(false);
         setLastUpdatedMs(null);
+        lastDisplaySwapAtMsRef.current = null;
+        lastPublishedOrientationEventKeyRef.current = null;
         setLoading(true);
       }, [initialSnapshot, snapshotKey]);
 
@@ -387,8 +488,29 @@ export const moduleDefinition = defineModule({
         }
 
         let active = true;
+        const clearScheduledRefresh = () => {
+          if (nextRefreshTimerRef.current !== null) {
+            window.clearTimeout(nextRefreshTimerRef.current);
+            nextRefreshTimerRef.current = null;
+          }
+        };
+
+        const scheduleRefresh = (delayMs: number) => {
+          clearScheduledRefresh();
+          nextRefreshTimerRef.current = window.setTimeout(
+            () => {
+              void refreshFrame();
+            },
+            Math.max(250, delayMs),
+          );
+        };
 
         const refreshFrame = async () => {
+          if (inFlightRefreshRef.current) {
+            return;
+          }
+          inFlightRefreshRef.current = true;
+
           try {
             const next = await loadNextFrame(
               instanceId,
@@ -405,12 +527,23 @@ export const moduleDefinition = defineModule({
             setError(null);
 
             if (!next.frame) {
+              clearPhotoCrossfadeTimers();
+              setPreviousFrame(null);
               setDisplayFrame(null);
+              displayFrameRef.current = null;
+              setImageVisible(false);
+              lastDisplaySwapAtMsRef.current = updatedAtMs;
+              lastPublishedOrientationEventKeyRef.current = null;
+              scheduleRefresh(effectiveIntervalSeconds * 1000);
               return;
             }
 
             if (displayFrameRef.current?.imageId === next.frame.imageId) {
               writePersistedModuleSnapshot(snapshotKey, next, updatedAtMs);
+              publishConfirmedOrientation(next);
+              const lastSwapAtMs = lastDisplaySwapAtMsRef.current ?? updatedAtMs;
+              const remainingMs = lastSwapAtMs + effectiveIntervalSeconds * 1000 - updatedAtMs;
+              scheduleRefresh(remainingMs > 250 ? remainingMs : effectiveIntervalSeconds * 1000);
               return;
             }
 
@@ -420,6 +553,7 @@ export const moduleDefinition = defineModule({
               if (displayFrameRef.current === null) {
                 setError("Failed to load photos");
               }
+              scheduleRefresh(Math.min(5000, effectiveIntervalSeconds * 1000));
               return;
             }
 
@@ -428,14 +562,19 @@ export const moduleDefinition = defineModule({
             }
 
             writePersistedModuleSnapshot(snapshotKey, next, updatedAtMs);
-            setDisplayFrame(next.frame);
+            presentFrame(next.frame, isLayoutCrossfading);
+            publishConfirmedOrientation(next);
+            lastDisplaySwapAtMsRef.current = updatedAtMs;
+            scheduleRefresh(effectiveIntervalSeconds * 1000);
           } catch (loadError) {
             if (!active) {
               return;
             }
 
             setError(loadError instanceof Error ? loadError.message : "Failed to load photos");
+            scheduleRefresh(Math.min(5000, effectiveIntervalSeconds * 1000));
           } finally {
+            inFlightRefreshRef.current = false;
             if (active) {
               setLoading(false);
             }
@@ -443,59 +582,21 @@ export const moduleDefinition = defineModule({
         };
 
         void refreshFrame();
-        const timer = window.setInterval(() => {
-          void refreshFrame();
-        }, effectiveIntervalSeconds * 1000);
 
         return () => {
           active = false;
-          window.clearInterval(timer);
+          inFlightRefreshRef.current = false;
+          clearScheduledRefresh();
         };
       }, [
         effectiveIntervalSeconds,
         effectiveSetCollectionId,
         instanceId,
+        isLayoutCrossfading,
         isEditing,
         requestedSourceKind,
         snapshotKey,
       ]);
-
-      useEffect(() => {
-        if (!displayFrame) {
-          return;
-        }
-
-        setImageVisible(false);
-        const raf = window.requestAnimationFrame(() => {
-          setImageVisible(true);
-        });
-
-        return () => {
-          window.cancelAnimationFrame(raf);
-        };
-      }, [displayFrame?.imageId]);
-
-      useEffect(() => {
-        if (isEditing || typeof window === "undefined" || !displayFrame) {
-          return;
-        }
-
-        const frameOrientation = displayFrame.orientation;
-        if (frameOrientation !== "portrait" && frameOrientation !== "landscape") {
-          return;
-        }
-
-        window.dispatchEvent(
-          new CustomEvent("hearth:photos-orientation", {
-            detail: {
-              instanceId,
-              orientation: frameOrientation,
-              frameId: displayFrame.imageId,
-              eventToken: displayFrame.imageId,
-            },
-          }),
-        );
-      }, [displayFrame?.imageId, displayFrame?.orientation, instanceId, isEditing]);
 
       const previewSourceLabel =
         settings.collectionId && settings.collectionId.trim().length > 0
@@ -534,17 +635,32 @@ export const moduleDefinition = defineModule({
             </div>
           ) : null}
 
+          {!loading && !connectivityState.blockingError && previousFrame && displayFrame ? (
+            <img
+              key={`previous-${previousFrame.imageId}`}
+              src={previousFrame.imageUrl}
+              alt=""
+              aria-hidden
+              className={`absolute inset-0 h-full w-full ${imageFitClass} opacity-100 transition-none`}
+              loading="eager"
+              decoding="async"
+              draggable={false}
+            />
+          ) : null}
+
           {!loading && !connectivityState.blockingError && displayFrame ? (
             <img
               key={displayFrame.imageId}
               src={displayFrame.imageUrl}
               alt={displayFrame.filename}
-              className={`h-full w-full ${imageFitClass} ${
+              className={`absolute inset-0 h-full w-full ${imageFitClass} ${
                 isLayoutCrossfading
                   ? "opacity-100 transition-none"
-                  : `transition-opacity duration-700 ${imageVisible ? "opacity-100" : "opacity-0"}`
+                  : `transition-opacity duration-700 ease-out [will-change:opacity] ${imageVisible ? "opacity-100" : "opacity-0"}`
               }`}
               loading="eager"
+              decoding="async"
+              draggable={false}
             />
           ) : null}
 

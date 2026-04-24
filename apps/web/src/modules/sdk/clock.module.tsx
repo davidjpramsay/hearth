@@ -297,32 +297,65 @@ export const moduleDefinition = defineModule({
       }, [isEditing]);
 
       const resolvedTimeZone = resolveClockTimeZone(settings, siteTimeZone);
-      const dateFormatter = new Intl.DateTimeFormat(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        timeZone: resolvedTimeZone,
-      });
-      const dayFormatter = new Intl.DateTimeFormat(undefined, {
-        weekday: "long",
-        timeZone: resolvedTimeZone,
-      });
+      const dateFormatter = useMemo(
+        () =>
+          new Intl.DateTimeFormat(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            timeZone: resolvedTimeZone,
+          }),
+        [resolvedTimeZone],
+      );
+      const compactDateFormatter = useMemo(
+        () =>
+          new Intl.DateTimeFormat(undefined, {
+            month: "short",
+            day: "numeric",
+            timeZone: resolvedTimeZone,
+          }),
+        [resolvedTimeZone],
+      );
+      const dayFormatter = useMemo(
+        () =>
+          new Intl.DateTimeFormat(undefined, {
+            weekday: "long",
+            timeZone: resolvedTimeZone,
+          }),
+        [resolvedTimeZone],
+      );
+      const compactDayFormatter = useMemo(
+        () =>
+          new Intl.DateTimeFormat(undefined, {
+            weekday: "short",
+            timeZone: resolvedTimeZone,
+          }),
+        [resolvedTimeZone],
+      );
       const timeParts = useMemo(
         () => buildClockParts(now, settings.use24Hour, resolvedTimeZone),
         [now, resolvedTimeZone, settings.use24Hour],
       );
-      const compact = metrics.width < 320 || metrics.height < 150;
-      const showTimeMeta = settings.showSeconds || (!settings.use24Hour && timeParts.dayPeriod);
+      const hasTileMeasurement = metrics.width > 0 && metrics.height > 0;
+      const compact = hasTileMeasurement && (metrics.width < 320 || metrics.height < 150);
+      const inlineMinimumWidth = settings.showSeconds || !settings.use24Hour ? 460 : 360;
+      const shouldStackInlineDateLayout =
+        hasTileMeasurement && (metrics.width < inlineMinimumWidth || metrics.height < 160);
       const inlineTime = settings.showSeconds
         ? `${timeParts.primary}:${timeParts.second}`
         : timeParts.primary;
       const inlineDayPeriod =
         !settings.use24Hour && timeParts.dayPeriod ? timeParts.dayPeriod : null;
-      const timeRowClass = compact ? "items-end gap-2.5" : "items-end gap-3";
-      const timeInlineMetaClass = "module-copy-meta";
-      const showInlineDateLayout = settings.showDate && settings.dateLayout === "inline";
+      const timeRowClass = compact ? "items-baseline gap-2" : "items-baseline gap-2.5";
+      const useInlineDateLayout =
+        settings.showDate && settings.dateLayout === "inline" && !shouldStackInlineDateLayout;
+      const dateText = compact ? compactDateFormatter.format(now) : dateFormatter.format(now);
+      const weekdayText = compact ? compactDayFormatter.format(now) : dayFormatter.format(now);
       const orderedContentKeys: Array<"date" | "time"> =
         settings.showDate && settings.reverseOrder ? ["time", "date"] : ["date", "time"];
+      const contentShellClass = `relative z-10 flex h-full w-full flex-col ${
+        !settings.showDate || useInlineDateLayout ? "justify-center" : "justify-between"
+      } gap-5 px-4 py-4`;
 
       if (isEditing) {
         return (
@@ -354,12 +387,19 @@ export const moduleDefinition = defineModule({
       }
 
       const dateBlock = settings.showDate ? (
-        <div key="date" className="module-stack-compact min-w-0">
-          <p className="module-copy-label text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
-            {dayFormatter.format(now)}
+        <div
+          key="date"
+          className={
+            useInlineDateLayout
+              ? "module-stack-compact min-w-0 shrink-0 self-end pb-1 text-left"
+              : "module-stack-compact min-w-0 shrink-0"
+          }
+        >
+          <p className="module-copy-label truncate text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
+            {weekdayText}
           </p>
-          <p className="module-copy-body text-[color:var(--color-text-primary)]">
-            {dateFormatter.format(now)}
+          <p className="module-copy-body truncate text-[color:var(--color-text-primary)]">
+            {dateText}
           </p>
         </div>
       ) : null;
@@ -367,19 +407,21 @@ export const moduleDefinition = defineModule({
         <div
           key="time"
           className={
-            showInlineDateLayout ? `flex min-w-0 ${timeRowClass}` : `flex w-full ${timeRowClass}`
+            useInlineDateLayout
+              ? `flex min-w-0 shrink-0 ${timeRowClass}`
+              : `flex w-full ${timeRowClass}`
           }
         >
-          <p className="module-copy-hero leading-none text-[color:var(--color-text-accent)]">
-            {inlineTime}
+          <div className="flex min-w-0 items-baseline gap-2.5">
+            <p className="module-copy-hero leading-none text-[color:var(--color-text-accent)]">
+              {inlineTime}
+            </p>
             {inlineDayPeriod ? (
-              <span
-                className={`${timeInlineMetaClass} ml-2 align-baseline text-[color:var(--color-text-secondary)]`}
-              >
+              <span className="module-copy-label mb-[0.2em] shrink-0 text-[color:var(--color-text-secondary)]">
                 {inlineDayPeriod}
               </span>
             ) : null}
-          </p>
+          </div>
         </div>
       );
       const contentByKey = {
@@ -392,9 +434,9 @@ export const moduleDefinition = defineModule({
           ref={ref}
           className="module-panel-shell relative isolate flex h-full w-full text-[color:var(--color-text-primary)]"
         >
-          <div className="relative z-10 flex h-full w-full flex-col justify-between gap-5 px-4 py-4">
-            {showInlineDateLayout ? (
-              <div className="flex w-full flex-wrap items-end justify-between gap-4">
+          <div className={contentShellClass}>
+            {useInlineDateLayout ? (
+              <div className="flex w-fit max-w-full flex-wrap items-end justify-start gap-x-8 gap-y-3">
                 {orderedContentKeys.map((key) => contentByKey[key])}
               </div>
             ) : (

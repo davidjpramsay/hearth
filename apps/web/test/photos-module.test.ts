@@ -31,7 +31,7 @@ const callListener = (listener: Listener, event: Event): void => {
   listener.handleEvent(event);
 };
 
-const installBrowserShims = () => {
+const installBrowserShims = (fetchImpl?: typeof fetch) => {
   const windowListeners = new Map<string, Set<Listener>>();
   const localStorageEntries = new Map<string, string>();
 
@@ -87,9 +87,11 @@ const installBrowserShims = () => {
   });
   Object.defineProperty(globalThis, "fetch", {
     configurable: true,
-    value: async () => {
-      throw new Error("Failed to fetch");
-    },
+    value:
+      fetchImpl ??
+      (async () => {
+        throw new Error("Failed to fetch");
+      }),
   });
   Object.defineProperty(globalThis, "requestAnimationFrame", {
     configurable: true,
@@ -150,6 +152,25 @@ const renderModule = () => {
   });
 };
 
+const createFramePayload = (
+  imageId: string,
+  filename = `${imageId}.jpg`,
+  orientation: "portrait" | "landscape" = "landscape",
+) =>
+  photosModuleNextResponseSchema.parse({
+    generatedAt: "2026-03-29T00:00:00.000Z",
+    frame: {
+      imageId,
+      imageUrl: `/api/modules/photos/photos-test/image/${imageId}`,
+      filename,
+      width: orientation === "landscape" ? 1200 : 900,
+      height: orientation === "landscape" ? 900 : 1200,
+      orientation,
+    },
+    stableOrientation: orientation,
+    warning: null,
+  });
+
 test("photos module uses the persisted frame on a cold boot fetch failure", async () => {
   installBrowserShims();
   writePersistedModuleSnapshot(
@@ -181,6 +202,87 @@ test("photos module uses the persisted frame on a cold boot fetch failure", asyn
     const tree = JSON.stringify(renderer?.toJSON());
     assert.match(tree, /cached-photo\.jpg/);
     assert.doesNotMatch(tree, /Failed to fetch/);
+  } finally {
+    await act(async () => {
+      renderer?.unmount();
+      await flushMicrotasks();
+    });
+    restoreBrowserShims();
+  }
+});
+
+test("photos module keeps the previous frame mounted while the next frame fades in", async () => {
+  const nextFrame = createFramePayload("next-photo");
+  installBrowserShims(
+    (async () =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => nextFrame,
+      }) as Response) as typeof fetch,
+  );
+  writePersistedModuleSnapshot(
+    'photos:photos-test:{"requestedSourceKind":"layout","setCollectionId":null,"moduleCollectionId":null,"folderPath":"/photos"}',
+    createFramePayload("cached-photo", "cached-photo.jpg"),
+    Date.now(),
+  );
+
+  let renderer: ReactTestRenderer | null = null;
+
+  try {
+    await act(async () => {
+      renderer = create(renderModule());
+      await flushMicrotasks();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+
+    const images = renderer!.root.findAll((node) => node.type === "img");
+    assert.equal(images.length, 2);
+    assert.equal(images[0]?.props["aria-hidden"], true);
+    assert.match(String(images[0]?.props.src), /cached-photo/);
+    assert.match(String(images[1]?.props.src), /next-photo/);
+  } finally {
+    await act(async () => {
+      renderer?.unmount();
+      await flushMicrotasks();
+    });
+    restoreBrowserShims();
+  }
+});
+
+test("photos module does not publish stale snapshot orientation before server confirmation", async () => {
+  const nextFrame = createFramePayload("server-photo", "server-photo.jpg", "landscape");
+  installBrowserShims(
+    (async () =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => nextFrame,
+      }) as Response) as typeof fetch,
+  );
+  const orientations: string[] = [];
+  window.addEventListener("hearth:photos-orientation", (event) => {
+    const detail = (event as CustomEvent<{ orientation?: string }>).detail;
+    if (detail?.orientation) {
+      orientations.push(detail.orientation);
+    }
+  });
+  writePersistedModuleSnapshot(
+    'photos:photos-test:{"requestedSourceKind":"layout","setCollectionId":null,"moduleCollectionId":null,"folderPath":"/photos"}',
+    createFramePayload("cached-photo", "cached-photo.jpg", "portrait"),
+    Date.now(),
+  );
+
+  let renderer: ReactTestRenderer | null = null;
+
+  try {
+    await act(async () => {
+      renderer = create(renderModule());
+      await flushMicrotasks();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+
+    assert.deepEqual(orientations, ["landscape"]);
   } finally {
     await act(async () => {
       renderer?.unmount();

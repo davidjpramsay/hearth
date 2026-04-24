@@ -24,6 +24,27 @@ const toContrastRatio = (left: number, right: number): number => {
   return (lighter + 0.05) / (darker + 0.05);
 };
 
+const colorDistance = (left: string, right: string): number => {
+  const leftRgb = hexToRgb(left);
+  const rightRgb = hexToRgb(right);
+
+  return Math.sqrt(
+    leftRgb.reduce((sum, channel, index) => sum + (channel - (rightRgb[index] ?? channel)) ** 2, 0),
+  );
+};
+
+const previewPaletteDistance = (leftThemeId: ThemeId, rightThemeId: ThemeId): number => {
+  const leftPalette = buildThemePaletteEntriesForTheme(leftThemeId).slice(0, 6);
+  const rightPalette = buildThemePaletteEntriesForTheme(rightThemeId).slice(0, 6);
+
+  return (
+    leftPalette.reduce(
+      (sum, entry, index) => sum + colorDistance(entry.hex, rightPalette[index]?.hex ?? entry.hex),
+      0,
+    ) / leftPalette.length
+  );
+};
+
 test("every theme exposes a full 12-slot palette", () => {
   for (const theme of THEME_OPTIONS) {
     const entries = buildThemePaletteEntriesForTheme(theme.id as ThemeId);
@@ -45,6 +66,23 @@ test("theme palette slots maintain readable foreground contrast", () => {
       assert.ok(
         contrast >= 4.5,
         `${theme.id} ${entry.slot} contrast ${contrast.toFixed(2)} is below 4.5`,
+      );
+    }
+  }
+});
+
+test("theme preview palettes stay visually distinct", () => {
+  const minimumAverageDistance = 55;
+
+  for (let leftIndex = 0; leftIndex < THEME_OPTIONS.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < THEME_OPTIONS.length; rightIndex += 1) {
+      const leftTheme = THEME_OPTIONS[leftIndex]!;
+      const rightTheme = THEME_OPTIONS[rightIndex]!;
+      const distance = previewPaletteDistance(leftTheme.id as ThemeId, rightTheme.id as ThemeId);
+
+      assert.ok(
+        distance >= minimumAverageDistance,
+        `${leftTheme.id} and ${rightTheme.id} preview palettes are too similar (${distance.toFixed(2)})`,
       );
     }
   }

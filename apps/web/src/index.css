@@ -310,18 +310,18 @@
   --font-display: "Avenir Next", "Segoe UI", "Space Grotesk", sans-serif;
   --font-body: "Inter", "Avenir Next", "IBM Plex Sans", sans-serif;
 
-  --color-bg-app: #091523;
-  --color-bg-surface: rgba(9, 21, 35, 0.82);
-  --color-bg-surface-strong: rgba(18, 34, 54, 0.76);
+  --color-bg-app: #07151d;
+  --color-bg-surface: rgba(7, 21, 29, 0.82);
+  --color-bg-surface-strong: rgba(12, 36, 45, 0.76);
   --color-bg-danger: rgba(255, 122, 122, 0.18);
-  --color-border-subtle: rgba(92, 126, 170, 0.5);
+  --color-border-subtle: rgba(78, 177, 190, 0.48);
   --color-border-danger: rgba(255, 122, 122, 0.62);
 
   --color-text-primary: #edf7ff;
   --color-text-secondary: #d6e8f7;
   --color-text-muted: #99b4cf;
-  --color-text-accent: #58c9f3;
-  --color-text-accent-rgb: 88 201 243;
+  --color-text-accent: #22d3ee;
+  --color-text-accent-rgb: 34 211 238;
   --color-text-danger: #ffd1d1;
   --color-text-danger-rgb: 255 209 209;
 
@@ -332,18 +332,21 @@
   --color-status-error: #ff7a7a;
   --color-status-error-rgb: 255 122 122;
 
-  --app-bg-gradient: radial-gradient(circle at 18% 0%, #19395d 0%, #091523 48%, #050b15 100%);
+  --app-bg-gradient:
+    radial-gradient(circle at 16% 0%, rgba(74, 222, 128, 0.28), transparent 34%),
+    radial-gradient(circle at 74% 6%, rgba(192, 132, 252, 0.24), transparent 32%),
+    linear-gradient(135deg, #07151d 0%, #0b2230 48%, #040a12 100%);
 
   --tone-slate-100-rgb: 237 247 255;
   --tone-slate-200-rgb: 214 232 247;
   --tone-slate-300-rgb: 182 205 228;
   --tone-slate-400-rgb: 153 180 207;
   --tone-slate-500-rgb: 113 143 176;
-  --tone-slate-600-rgb: 76 105 141;
-  --tone-slate-700-rgb: 40 65 94;
-  --tone-slate-800-rgb: 18 34 54;
-  --tone-slate-900-rgb: 9 21 35;
-  --tone-slate-950-rgb: 5 11 21;
+  --tone-slate-600-rgb: 68 122 143;
+  --tone-slate-700-rgb: 32 78 91;
+  --tone-slate-800-rgb: 12 36 45;
+  --tone-slate-900-rgb: 7 21 29;
+  --tone-slate-950-rgb: 4 10 18;
 }
 
 :root.theme-dusk {

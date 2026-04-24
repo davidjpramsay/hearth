@@ -21,6 +21,9 @@ const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".bm
 
 const ORIENTATION_DEBOUNCE_MS = 0;
 const FOLDER_RESCAN_INTERVAL_MS = 15_000;
+const FOLDER_CACHE_IDLE_TTL_MS = 2 * 60 * 60 * 1000;
+const FOLDER_CACHE_PRUNE_INTERVAL_MS = 60_000;
+const MAX_FOLDER_CACHES = 64;
 const MAX_WATCH_DIRECTORIES = 256;
 const IMAGE_METADATA_SCAN_BYTES = 256 * 1024;
 const PHOTO_LIBRARY_ROOT = resolve(config.dataDir, "photos");
@@ -48,6 +51,7 @@ interface PhotoAsset {
 
 interface FolderCache {
   loadedAtMs: number;
+  lastAccessedAtMs: number;
   dirty: boolean;
   photos: PhotoAsset[];
   watchers: Map<string, FSWatcher>;
@@ -641,8 +645,17 @@ const scanFolderTree = async (
 export class PhotosSlideshowService {
   private readonly folderCaches = new Map<string, FolderCache>();
   private readonly photoMetadataCache = new Map<string, PhotoMetadataCacheEntry>();
+  private lastFolderCachePruneAtMs = 0;
 
   constructor(private readonly moduleStateRepository: ModuleStateRepository) {}
+
+  stop(): void {
+    for (const cache of this.folderCaches.values()) {
+      this.closeFolderCache(cache);
+    }
+    this.folderCaches.clear();
+    this.photoMetadataCache.clear();
+  }
 
   async getNextFrame(input: {
     instanceId: string;
@@ -830,6 +843,8 @@ export class PhotosSlideshowService {
 
   private async getPhotosForFolders(folderPaths: string[]): Promise<PhotoAsset[]> {
     const merged = new Map<string, PhotoAsset>();
+    const requestedFolders = new Set(folderPaths);
+    this.pruneFolderCaches(Date.now(), requestedFolders);
 
     for (const folderPath of folderPaths) {
       const cache = await this.getFolderCache(folderPath);
@@ -873,10 +888,12 @@ export class PhotosSlideshowService {
       this.folderCaches.get(folderPath) ??
       ({
         loadedAtMs: 0,
+        lastAccessedAtMs: nowMs,
         dirty: true,
         photos: [],
         watchers: new Map(),
       } satisfies FolderCache);
+    existing.lastAccessedAtMs = nowMs;
 
     if (
       existing.dirty ||
@@ -947,13 +964,12 @@ export class PhotosSlideshowService {
       }),
     );
 
-    this.prunePhotoMetadataCache(new Set(scanResult.files));
-
     cache.photos = assets
       .filter((asset): asset is PhotoAsset => asset !== null)
       .sort((left, right) => left.filename.localeCompare(right.filename));
     cache.loadedAtMs = Date.now();
     cache.dirty = false;
+    this.prunePhotoMetadataCache();
 
     const watchedDirectories = scanResult.directories.slice(0, MAX_WATCH_DIRECTORIES);
     const nextDirectories = new Set(watchedDirectories);
@@ -1008,7 +1024,60 @@ export class PhotosSlideshowService {
     return metadata;
   }
 
-  private prunePhotoMetadataCache(validFiles: Set<string>): void {
+  private closeFolderCache(cache: FolderCache): void {
+    for (const watcher of cache.watchers.values()) {
+      watcher.close();
+    }
+    cache.watchers.clear();
+  }
+
+  private pruneFolderCaches(nowMs: number, protectedFolders: Set<string>): void {
+    const shouldPruneByInterval =
+      nowMs - this.lastFolderCachePruneAtMs >= FOLDER_CACHE_PRUNE_INTERVAL_MS;
+    const shouldPruneBySize = this.folderCaches.size > MAX_FOLDER_CACHES;
+
+    if (!shouldPruneByInterval && !shouldPruneBySize) {
+      return;
+    }
+
+    this.lastFolderCachePruneAtMs = nowMs;
+
+    for (const [folderPath, cache] of this.folderCaches) {
+      if (protectedFolders.has(folderPath)) {
+        continue;
+      }
+
+      if (nowMs - cache.lastAccessedAtMs > FOLDER_CACHE_IDLE_TTL_MS) {
+        this.closeFolderCache(cache);
+        this.folderCaches.delete(folderPath);
+      }
+    }
+
+    if (this.folderCaches.size > MAX_FOLDER_CACHES) {
+      const removableEntries = [...this.folderCaches.entries()]
+        .filter(([folderPath]) => !protectedFolders.has(folderPath))
+        .sort((left, right) => left[1].lastAccessedAtMs - right[1].lastAccessedAtMs);
+
+      for (const [folderPath, cache] of removableEntries) {
+        if (this.folderCaches.size <= MAX_FOLDER_CACHES) {
+          break;
+        }
+        this.closeFolderCache(cache);
+        this.folderCaches.delete(folderPath);
+      }
+    }
+
+    this.prunePhotoMetadataCache();
+  }
+
+  private prunePhotoMetadataCache(): void {
+    const validFiles = new Set<string>();
+    for (const cache of this.folderCaches.values()) {
+      for (const photo of cache.photos) {
+        validFiles.add(photo.absolutePath);
+      }
+    }
+
     for (const cachedPath of this.photoMetadataCache.keys()) {
       if (!validFiles.has(cachedPath)) {
         this.photoMetadataCache.delete(cachedPath);

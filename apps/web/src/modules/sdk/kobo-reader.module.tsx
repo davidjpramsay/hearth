@@ -297,6 +297,15 @@ export const moduleDefinition = defineModule({
           ? { key: "remaining", label: "Remaining", value: remainingLabel }
           : null,
       ].filter((entry): entry is { key: string; label: string; value: string } => Boolean(entry));
+      const coverDisplayHeight =
+        compact || coverColumnWidth === null ? null : Math.round(coverColumnWidth * 1.5);
+      const gridClass = `grid h-full gap-4 ${compact ? "grid-cols-1" : ""} items-start`;
+      const detailsColumnClass = compact
+        ? "flex min-w-0 flex-col gap-4"
+        : "flex min-w-0 flex-col justify-between gap-6";
+      const detailsColumnStyle =
+        coverDisplayHeight === null ? undefined : { minHeight: `${coverDisplayHeight}px` };
+      const progressSectionClass = compact ? "space-y-2" : "space-y-3";
 
       useEffect(() => {
         setCoverLoadFailed(false);
@@ -335,7 +344,7 @@ export const moduleDefinition = defineModule({
               className="module-panel-shell relative z-10 flex h-full flex-col gap-3 p-4 text-[color:var(--color-text-primary)]"
             >
               <div
-                className={`grid h-full items-start gap-4 ${compact ? "grid-cols-1" : ""}`}
+                className={gridClass}
                 style={
                   compact || coverColumnWidth === null
                     ? undefined
@@ -374,7 +383,7 @@ export const moduleDefinition = defineModule({
                   )}
                 </div>
 
-                <div className="flex min-w-0 flex-col gap-4">
+                <div className={detailsColumnClass} style={detailsColumnStyle}>
                   <div className="space-y-2">
                     <p className="module-copy-label text-[color:rgb(var(--tone-slate-200-rgb)/0.68)]">
                       Most recently read
@@ -400,7 +409,7 @@ export const moduleDefinition = defineModule({
                     </div>
                   ) : null}
 
-                  <div className={compact ? "space-y-2" : "space-y-2 pt-1"}>
+                  <div className={progressSectionClass}>
                     <div className="flex items-center justify-between gap-3">
                       <span className="module-copy-meta text-[color:var(--color-text-secondary)]">
                         Reading progress

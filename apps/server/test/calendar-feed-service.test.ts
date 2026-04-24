@@ -3,7 +3,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import type { ModuleStateRepository } from "../src/repositories/module-state-repository.js";
+import { createDatabase } from "../src/db.js";
+import { ModuleStateRepository } from "../src/repositories/module-state-repository.js";
 import type { SettingsRepository } from "../src/repositories/settings-repository.js";
 import { CalendarFeedService } from "../src/services/calendar-feed-service.js";
 
@@ -240,4 +241,36 @@ test("CalendarFeedService resolves saved feed ids through the global registry", 
   assert.equal(result.events[0]?.source, "school");
   assert.equal(result.events[0]?.sourceLabel, "Kids School");
   assert.equal(result.events[0]?.sourceColor, "color-7");
+});
+
+test("CalendarFeedService prunes expired persisted calendar snapshots", async (t) => {
+  const tempDir = await mkdtemp(join(tmpdir(), "hearth-calendar-state-"));
+  const db = createDatabase(join(tempDir, "hearth.sqlite"));
+  t.after(async () => {
+    db.close();
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  const moduleStateRepository = new ModuleStateRepository(db);
+  moduleStateRepository.setState("calendar-source:old", { stale: true });
+  moduleStateRepository.setState("calendar-response:old", { stale: true });
+  moduleStateRepository.setState("calendar-source:fresh", { stale: false });
+
+  db.prepare(
+    `
+    UPDATE module_state
+    SET updated_at = datetime('now', '-2 days')
+    WHERE key IN ('calendar-source:old', 'calendar-response:old')
+    `,
+  ).run();
+
+  const service = new CalendarFeedService(moduleStateRepository);
+  await service.getUpcomingEvents({
+    legacyCalendars: [],
+    refreshIntervalSeconds: 300,
+  });
+
+  assert.equal(moduleStateRepository.getState("calendar-source:old"), null);
+  assert.equal(moduleStateRepository.getState("calendar-response:old"), null);
+  assert.deepEqual(moduleStateRepository.getState("calendar-source:fresh"), { stale: false });
 });
