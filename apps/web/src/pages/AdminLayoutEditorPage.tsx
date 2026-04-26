@@ -34,10 +34,12 @@ import {
   sanitizeGridItems,
 } from "../layout/grid-math";
 import {
+  areLayoutTypographyEqual,
   buildLayoutTypographyStyle,
   DEFAULT_LAYOUT_TYPOGRAPHY,
   formatLayoutTypographyValue,
   LAYOUT_TYPOGRAPHY_CONTROLS,
+  LAYOUT_TYPOGRAPHY_DENSITY_OPTIONS,
   normalizeLayoutTypography,
   snapLayoutTypographyValue,
 } from "../layout/layout-typography";
@@ -124,7 +126,10 @@ interface LayoutTypographyPanelProps {
 }
 
 const LayoutTypographyPanel = ({ value, onChange, onReset }: LayoutTypographyPanelProps) => {
-  const updateValue = (key: keyof LayoutTypography, nextValue: number) => {
+  const updateValue = (
+    key: (typeof LAYOUT_TYPOGRAPHY_CONTROLS)[number]["key"],
+    nextValue: number,
+  ) => {
     if (!Number.isFinite(nextValue)) {
       return;
     }
@@ -145,9 +150,13 @@ const LayoutTypographyPanel = ({ value, onChange, onReset }: LayoutTypographyPan
   return (
     <section className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs text-slate-400">
-          Layout-wide text sizing for every module in this layout.
-        </p>
+        <div>
+          <h3 className="text-sm font-semibold text-slate-100">Responsive typography</h3>
+          <p className="mt-1 text-xs text-slate-400">
+            Auto mode scales each module from its tile size while keeping shared label, body, title,
+            and hero ratios.
+          </p>
+        </div>
         <button
           type="button"
           onClick={onReset}
@@ -160,47 +169,113 @@ const LayoutTypographyPanel = ({ value, onChange, onReset }: LayoutTypographyPan
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(520px,0.95fr)] xl:items-start">
         <div
           style={buildLayoutTypographyStyle(value)}
-          className="rounded-xl border border-slate-700 bg-slate-950/75 p-4"
+          className="module-tile-host h-48 rounded-xl border border-slate-700 bg-slate-950/75"
         >
-          <p className="module-copy-label text-cyan-200">Label</p>
-          <p className="module-copy-body mt-3 text-slate-200">Body copy preview.</p>
-          <p className="module-copy-title mt-4 text-slate-100">Title</p>
-          <div className="mt-4">
-            <span className="module-copy-hero text-slate-100">25°C</span>
+          <div className="module-panel-shell h-full p-4">
+            <p className="module-copy-label text-cyan-200">Label</p>
+            <p className="module-copy-body mt-3 text-slate-200">Body copy preview.</p>
+            <p className="module-copy-title mt-4 text-slate-100">Title</p>
+            <div className="mt-4">
+              <span className="module-copy-hero text-slate-100">25°C</span>
+            </div>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          {LAYOUT_TYPOGRAPHY_CONTROLS.map((control) => (
-            <label
-              key={control.key}
-              className="block rounded-xl border border-slate-700 bg-slate-950/60 p-3"
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => onChange(normalizeLayoutTypography({ ...value, mode: "auto" }))}
+              className={`rounded-xl border p-3 text-left ${
+                value.mode === "auto"
+                  ? "border-cyan-400 bg-cyan-500/10 text-cyan-100"
+                  : "border-slate-700 bg-slate-950/60 text-slate-300 hover:border-slate-500"
+              }`}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <span className="block text-sm font-semibold text-slate-100">
-                    {control.label}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-slate-400">{control.description}</span>
-                </div>
-                <span className="w-[6.25rem] rounded border border-slate-700 bg-slate-900/80 px-2 py-1 text-right text-xs tabular-nums text-slate-300">
-                  {formatLayoutTypographyValue(value[control.key])}
-                </span>
-              </div>
+              <span className="block text-sm font-semibold">Auto</span>
+              <span className="mt-1 block text-xs text-slate-400">
+                Recommended. Adapts to module size and screen ratio.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange(normalizeLayoutTypography({ ...value, mode: "custom" }))}
+              className={`rounded-xl border p-3 text-left ${
+                value.mode === "custom"
+                  ? "border-cyan-400 bg-cyan-500/10 text-cyan-100"
+                  : "border-slate-700 bg-slate-950/60 text-slate-300 hover:border-slate-500"
+              }`}
+            >
+              <span className="block text-sm font-semibold">Custom</span>
+              <span className="mt-1 block text-xs text-slate-400">
+                Uses fixed rem sizes from the legacy sliders.
+              </span>
+            </button>
+          </div>
 
-              <div className="mt-3 space-y-3">
-                <input
-                  type="range"
-                  min={control.min}
-                  max={control.max}
-                  step={control.step}
-                  value={value[control.key]}
-                  onChange={(event) => updateValue(control.key, Number(event.target.value))}
-                  className="w-full accent-cyan-500"
-                />
-              </div>
-            </label>
-          ))}
+          {value.mode === "auto" ? (
+            <div className="grid gap-3 md:grid-cols-3">
+              {LAYOUT_TYPOGRAPHY_DENSITY_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() =>
+                    onChange(normalizeLayoutTypography({ ...value, density: option.value }))
+                  }
+                  className={`rounded-xl border p-3 text-left ${
+                    value.density === option.value
+                      ? "border-cyan-400 bg-cyan-500/10 text-cyan-100"
+                      : "border-slate-700 bg-slate-950/60 text-slate-300 hover:border-slate-500"
+                  }`}
+                >
+                  <span className="block text-sm font-semibold">{option.label}</span>
+                  <span className="mt-1 block text-xs text-slate-400">{option.description}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {LAYOUT_TYPOGRAPHY_CONTROLS.map((control) => (
+                <label
+                  key={control.key}
+                  className="block rounded-xl border border-slate-700 bg-slate-950/60 p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <span className="block text-sm font-semibold text-slate-100">
+                        {control.label}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-slate-400">
+                        {control.description}
+                      </span>
+                    </div>
+                    <span className="w-[6.25rem] rounded border border-slate-700 bg-slate-900/80 px-2 py-1 text-right text-xs tabular-nums text-slate-300">
+                      {formatLayoutTypographyValue(value[control.key])}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 space-y-3">
+                    <input
+                      type="range"
+                      min={control.min}
+                      max={control.max}
+                      step={control.step}
+                      value={value[control.key]}
+                      onChange={(event) => updateValue(control.key, Number(event.target.value))}
+                      className="w-full accent-cyan-500"
+                    />
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+
+          {value.mode === "auto" ? (
+            <p className="rounded-lg border border-slate-700 bg-slate-950/50 px-3 py-2 text-xs text-slate-400">
+              Auto mode still uses the same semantic classes across every module. The only thing
+              that changes is the tile-derived scale.
+            </p>
+          ) : null}
         </div>
       </div>
     </section>
@@ -702,17 +777,15 @@ export const AdminLayoutEditorPage = () => {
   );
   const [draftTypography, setDraftTypography] =
     useState<LayoutTypography>(DEFAULT_LAYOUT_TYPOGRAPHY);
-  const isDraftTypographySynced =
-    draftTypography.smallRem === layoutTypography.smallRem &&
-    draftTypography.bodyRem === layoutTypography.bodyRem &&
-    draftTypography.titleRem === layoutTypography.titleRem &&
-    draftTypography.displayRem === layoutTypography.displayRem;
+  const isDraftTypographySynced = areLayoutTypographyEqual(draftTypography, layoutTypography);
 
   useEffect(() => {
     setDraftTypography(layoutTypography);
   }, [
     layoutTypography.bodyRem,
+    layoutTypography.density,
     layoutTypography.displayRem,
+    layoutTypography.mode,
     layoutTypography.smallRem,
     layoutTypography.titleRem,
   ]);
@@ -1052,7 +1125,7 @@ export const AdminLayoutEditorPage = () => {
                       return (
                         <div
                           key={instance.id}
-                          className={`h-full ${
+                          className={`module-tile-host h-full ${
                             selectedInstanceId === instance.id ? "ring-2 ring-cyan-400" : ""
                           }`}
                         >

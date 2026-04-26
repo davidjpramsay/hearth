@@ -15,6 +15,22 @@ export const moduleInstanceSchema = z.object({
 });
 
 const layoutTypographySizeSchema = z.number().min(0.5).max(4);
+export const layoutTypographyModeSchema = z.enum(["auto", "custom"]);
+export const layoutTypographyDensitySchema = z.enum(["compact", "standard", "comfortable"]);
+const defaultLayoutTypographyValues = {
+  smallRem: 0.75,
+  bodyRem: 0.875,
+  titleRem: 1.125,
+  displayRem: 2.25,
+} as const;
+const fourRoleLayoutTypographySchema = z
+  .object({
+    smallRem: layoutTypographySizeSchema.optional(),
+    bodyRem: layoutTypographySizeSchema.optional(),
+    titleRem: layoutTypographySizeSchema.optional(),
+    displayRem: layoutTypographySizeSchema.optional(),
+  })
+  .partial();
 const legacyLayoutTypographySchema = z
   .object({
     labelRem: layoutTypographySizeSchema.optional(),
@@ -33,40 +49,70 @@ export const layoutTypographySchema = z.preprocess(
     }
 
     const record = input as Record<string, unknown>;
-    if (
-      "smallRem" in record ||
-      "bodyRem" in record ||
-      "titleRem" in record ||
-      "displayRem" in record
-    ) {
+    if ("mode" in record || "density" in record) {
       return record;
     }
 
-    const legacy = legacyLayoutTypographySchema.safeParse(record);
-    if (!legacy.success) {
-      return record;
+    const hasLegacyTypographyKeys =
+      "labelRem" in record || "metaRem" in record || "metricRem" in record;
+    if (hasLegacyTypographyKeys) {
+      const legacy = legacyLayoutTypographySchema.safeParse(record);
+      if (!legacy.success) {
+        return record;
+      }
+
+      return {
+        mode: "custom",
+        density: "standard",
+        smallRem:
+          legacy.data.metaRem ??
+          (typeof legacy.data.labelRem === "number"
+            ? legacy.data.labelRem / 0.9166666667
+            : undefined),
+        bodyRem: legacy.data.bodyRem,
+        titleRem:
+          legacy.data.titleRem ??
+          (typeof legacy.data.metricRem === "number"
+            ? legacy.data.metricRem / 1.1111111111
+            : undefined),
+        displayRem: legacy.data.displayRem,
+      };
     }
 
-    return {
-      smallRem:
-        legacy.data.metaRem ??
-        (typeof legacy.data.labelRem === "number"
-          ? legacy.data.labelRem / 0.9166666667
-          : undefined),
-      bodyRem: legacy.data.bodyRem,
-      titleRem:
-        legacy.data.titleRem ??
-        (typeof legacy.data.metricRem === "number"
-          ? legacy.data.metricRem / 1.1111111111
-          : undefined),
-      displayRem: legacy.data.displayRem,
-    };
+    const hasFourRoleTypographyKeys =
+      "smallRem" in record || "bodyRem" in record || "titleRem" in record || "displayRem" in record;
+    if (hasFourRoleTypographyKeys) {
+      const fourRole = fourRoleLayoutTypographySchema.safeParse(record);
+      if (!fourRole.success) {
+        return record;
+      }
+
+      const hasNonDefaultValue =
+        (typeof fourRole.data.smallRem === "number" &&
+          fourRole.data.smallRem !== defaultLayoutTypographyValues.smallRem) ||
+        (typeof fourRole.data.bodyRem === "number" &&
+          fourRole.data.bodyRem !== defaultLayoutTypographyValues.bodyRem) ||
+        (typeof fourRole.data.titleRem === "number" &&
+          fourRole.data.titleRem !== defaultLayoutTypographyValues.titleRem) ||
+        (typeof fourRole.data.displayRem === "number" &&
+          fourRole.data.displayRem !== defaultLayoutTypographyValues.displayRem);
+
+      return {
+        ...record,
+        mode: hasNonDefaultValue ? "custom" : "auto",
+        density: "standard",
+      };
+    }
+
+    return record;
   },
   z.object({
-    smallRem: layoutTypographySizeSchema.default(0.75),
-    bodyRem: layoutTypographySizeSchema.default(0.875),
-    titleRem: layoutTypographySizeSchema.default(1.125),
-    displayRem: layoutTypographySizeSchema.default(2.25),
+    mode: layoutTypographyModeSchema.default("auto"),
+    density: layoutTypographyDensitySchema.default("standard"),
+    smallRem: layoutTypographySizeSchema.default(defaultLayoutTypographyValues.smallRem),
+    bodyRem: layoutTypographySizeSchema.default(defaultLayoutTypographyValues.bodyRem),
+    titleRem: layoutTypographySizeSchema.default(defaultLayoutTypographyValues.titleRem),
+    displayRem: layoutTypographySizeSchema.default(defaultLayoutTypographyValues.displayRem),
   }),
 );
 

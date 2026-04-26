@@ -806,7 +806,7 @@ export const DashboardPage = () => {
         useCSSTransforms={false}
       >
         {input.renderedModules.map(({ instance, moduleDefinition }) => (
-          <div key={instance.id} className="h-full w-full min-h-0">
+          <div key={instance.id} className="module-tile-host h-full w-full min-h-0">
             {moduleDefinition ? (
               <div className="h-full w-full min-h-0 overflow-hidden rounded-lg">
                 <DashboardModuleErrorBoundary
