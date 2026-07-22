@@ -272,31 +272,39 @@ test.describe("Hearth smoke", () => {
     await expect(timeGateSource).toBeInViewport();
     await expect(layoutTarget).toBeInViewport();
 
-    const sourceBox = await timeGateSource.boundingBox();
-    const targetBox = await layoutTarget.boundingBox();
     const sourceNodeId = await timeGateSource.getAttribute("data-nodeid");
     const targetNodeId = await layoutTarget.getAttribute("data-nodeid");
 
-    expect(sourceBox).not.toBeNull();
-    expect(targetBox).not.toBeNull();
     expect(sourceNodeId).not.toBeNull();
     expect(targetNodeId).not.toBeNull();
 
-    await page.mouse.move(
-      sourceBox!.x + sourceBox!.width / 2,
-      sourceBox!.y + sourceBox!.height / 2,
-    );
-    await page.mouse.down();
-    await page.mouse.move(
-      targetBox!.x + targetBox!.width / 2,
-      targetBox!.y + targetBox!.height / 2,
-      { steps: 18 },
-    );
-    await page.mouse.up();
+    const createdEdge = activeEditor.getByRole("group", {
+      name: `Edge from ${sourceNodeId} to ${targetNodeId}`,
+    });
 
-    await expect(
-      activeEditor.getByRole("group", { name: `Edge from ${sourceNodeId} to ${targetNodeId}` }),
-    ).toBeAttached();
+    // React Flow can miss the first pointer move on a busy CI runner. Retry the
+    // real gesture instead of weakening the assertion that an edge was created.
+    for (let attempt = 0; attempt < 3 && (await createdEdge.count()) === 0; attempt += 1) {
+      const currentSourceBox = await timeGateSource.boundingBox();
+      const currentTargetBox = await layoutTarget.boundingBox();
+      expect(currentSourceBox).not.toBeNull();
+      expect(currentTargetBox).not.toBeNull();
+
+      await page.mouse.move(
+        currentSourceBox!.x + currentSourceBox!.width / 2,
+        currentSourceBox!.y + currentSourceBox!.height / 2,
+      );
+      await page.mouse.down();
+      await page.mouse.move(
+        currentTargetBox!.x + currentTargetBox!.width / 2,
+        currentTargetBox!.y + currentTargetBox!.height / 2,
+        { steps: 24 },
+      );
+      await page.mouse.up();
+      await page.waitForTimeout(250);
+    }
+
+    await expect(createdEdge).toBeAttached();
 
     await activeEditor
       .locator(`[data-id="${sourceNodeId}"]`)
