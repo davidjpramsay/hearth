@@ -192,7 +192,7 @@ test.describe("Hearth smoke", () => {
       .toBe(true);
 
     await loginAsAdmin(page);
-    await page.getByRole("button", { name: "Devices" }).click();
+    await page.getByRole("button", { name: "Displays" }).click();
     await page.waitForURL("**/devices");
     await expect(page.getByRole("heading", { name: "Connected displays" })).toBeVisible();
 
@@ -246,6 +246,29 @@ test.describe("Hearth smoke", () => {
 
     await expect(page.getByRole("textbox", { name: `Layout name: ${layoutName}` })).toHaveValue(
       layoutName,
+    );
+  });
+
+  test("admin exposes smart starter designs and clearly grouped settings", async ({ page }) => {
+    await loginAsAdmin(page);
+
+    await expect(page.getByRole("heading", { name: "Starter designs" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Edit home view" }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Edit photo view" }).first()).toBeVisible();
+
+    await page.getByRole("button", { name: "Settings" }).click();
+    await page.waitForURL("**/connections");
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Household time" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Calendars" }).click();
+    await expect(page.getByRole("heading", { name: "Calendar feeds" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Photos" }).click();
+    await page.waitForURL("**/admin/layouts?tab=photos");
+    await expect(page.getByRole("tab", { name: "Photo sources" })).toHaveAttribute(
+      "aria-selected",
+      "true",
     );
   });
 

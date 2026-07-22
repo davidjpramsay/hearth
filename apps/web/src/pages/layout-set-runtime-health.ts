@@ -134,6 +134,7 @@ const getReachableNodeIds = (input: {
 export const analyzeSetRuntimeHealth = (input: {
   graph: LayoutSetLogicGraph;
   knownLayoutNames: Set<string>;
+  staticLayoutName?: string | null;
   edgeOverrides?: Record<string, LayoutSetLogicEdgeOverride> | null;
   disconnectedEdgeIds?: string[] | null;
 }): RuntimeHealthReport => {
@@ -160,6 +161,33 @@ export const analyzeSetRuntimeHealth = (input: {
         label: caseItem.label,
         sequence: [],
         summary: sequenceSummary([]),
+      })),
+    };
+  }
+
+  const staticLayoutName = input.staticLayoutName?.trim() ?? "";
+  const hasDisplayNodes = graph.nodes.some((node) => node.type === "display");
+  if (!hasDisplayNodes && staticLayoutName) {
+    const staticTarget: AutoLayoutTarget = {
+      layoutName: staticLayoutName,
+      trigger: "always",
+      cycleSeconds: 20,
+      actionType: "layout.display",
+      actionParams: {},
+      conditionType: null,
+      conditionParams: {},
+    };
+    const staticLayoutExists = input.knownLayoutNames.has(staticLayoutName);
+    return {
+      status: staticLayoutExists ? "ok" : "warning",
+      issues: staticLayoutExists
+        ? []
+        : [{ severity: "warning", message: `Static layout "${staticLayoutName}" was not found.` }],
+      paths: ORIENTATION_CASES.map((caseItem) => ({
+        key: caseItem.key,
+        label: caseItem.label,
+        sequence: [staticTarget],
+        summary: sequenceSummary([staticTarget]),
       })),
     };
   }

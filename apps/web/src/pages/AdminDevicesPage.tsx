@@ -29,7 +29,16 @@ import { getServerStatus, type ServerStatusResponse } from "../api/server-status
 import { logoutAdminSession } from "../auth/session";
 import { getAuthToken } from "../auth/storage";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
-import { AdminSection, AdminSectionHeader } from "../components/admin/AdminSection";
+import {
+  AdminSection,
+  AdminSectionHeader,
+  ADMIN_BUTTON_PRIMARY_CLASS,
+  ADMIN_BUTTON_SECONDARY_CLASS,
+  ADMIN_EMPTY_STATE_CLASS,
+  ADMIN_FIELD_LABEL_CLASS,
+  ADMIN_INPUT_CLASS,
+  ADMIN_PANEL_CLASS,
+} from "../components/admin/AdminSection";
 import { ThemePalettePicker } from "../components/admin/ThemePalettePicker";
 import { PageShell } from "../components/PageShell";
 import { ThemePreviewStrip } from "../components/ThemePreviewStrip";
@@ -352,10 +361,12 @@ const autosaveStatusText = (input: {
 };
 
 type SettingsSection = "devices" | "connections";
+type SettingsView = "household" | "calendars" | "system";
 
 const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
   const token = getAuthToken();
   const navigate = useNavigate();
+  const [settingsView, setSettingsView] = useState<SettingsView>("household");
   const [devices, setDevices] = useState<DisplayDevice[]>([]);
   const [screenProfileLayouts, setScreenProfileLayouts] =
     useState<ScreenProfileLayouts>(defaultProfileLayouts);
@@ -971,11 +982,11 @@ const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
 
   return (
     <PageShell
-      title={section === "devices" ? "Displays" : "Connections"}
+      title={section === "devices" ? "Displays" : "Settings"}
       subtitle={
         section === "devices"
           ? "Identify each wall display and choose what it should show."
-          : "Manage household time, calendar sources, storage, and runtime health."
+          : "Manage the shared services and preferences that keep your household display running."
       }
       rightActions={<AdminNavActions current={section} onLogout={onLogout} />}
     >
@@ -986,7 +997,41 @@ const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
       ) : null}
 
       <div className={section === "connections" ? "contents" : "hidden"}>
-        <AdminSection className="mb-6">
+        <nav
+          className="mb-6 flex flex-wrap gap-2 rounded-2xl border border-stone-200 bg-white p-2 shadow-[0_8px_28px_rgba(40,52,50,0.04)]"
+          aria-label="Settings sections"
+        >
+          {(
+            [
+              ["household", "Household"],
+              ["calendars", "Calendars"],
+              ["system", "System"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setSettingsView(value)}
+              className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                settingsView === value
+                  ? "bg-teal-700 text-white shadow-sm"
+                  : "text-stone-600 hover:bg-stone-100 hover:text-stone-900"
+              }`}
+              aria-current={settingsView === value ? "page" : undefined}
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => navigate("/admin/layouts?tab=photos")}
+            className="rounded-xl px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-100 hover:text-stone-900"
+          >
+            Photos
+          </button>
+        </nav>
+
+        <AdminSection className={settingsView === "household" ? "mb-6" : "hidden"}>
           <AdminSectionHeader
             title="Household time"
             description="This timezone controls chores, clocks, time gates, and verse-of-the-day."
@@ -1006,14 +1051,14 @@ const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
           />
 
           <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-            <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-              <h3 className="text-sm font-semibold text-slate-100">Timezone</h3>
-              <div className="mt-3 space-y-3 text-sm text-slate-300">
-                <label className="block space-y-2 text-sm text-slate-300">
+            <article className={ADMIN_PANEL_CLASS}>
+              <h3 className="text-sm font-semibold text-stone-900">Timezone</h3>
+              <div className="mt-3 space-y-3 text-sm text-stone-600">
+                <label className={ADMIN_FIELD_LABEL_CLASS}>
                   <span>Household timezone</span>
                   <input
                     list={ADMIN_TIME_ZONE_DATALIST_ID}
-                    className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
+                    className={ADMIN_INPUT_CLASS}
                     value={siteTimeZoneDraft}
                     onChange={(event) => setSiteTimeZoneDraft(event.target.value)}
                     placeholder="Australia/Perth"
@@ -1029,14 +1074,14 @@ const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
                   <button
                     type="button"
                     onClick={() => setSiteTimeZoneDraft(getRuntimeTimeZone())}
-                    className="rounded border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-300"
+                    className={ADMIN_BUTTON_SECONDARY_CLASS}
                   >
                     Use browser timezone
                   </button>
                 </div>
 
-                <p className="text-xs text-slate-400">
-                  Use an IANA timezone like `Australia/Perth` or `America/New_York`.
+                <p className="text-xs text-stone-500">
+                  Use an IANA timezone such as Australia/Perth or America/New_York.
                 </p>
                 <p
                   className={`text-xs ${
@@ -1060,9 +1105,9 @@ const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
               </div>
             </article>
 
-            <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-              <h3 className="text-sm font-semibold text-slate-100">Status</h3>
-              <dl className="mt-3 space-y-3 text-sm text-slate-300">
+            <article className={ADMIN_PANEL_CLASS}>
+              <h3 className="text-sm font-semibold text-stone-900">Status</h3>
+              <dl className="mt-3 space-y-3 text-sm text-stone-600">
                 <div>
                   <dt className="text-slate-500">Household timezone</dt>
                   <dd className="font-mono text-slate-200">{siteTimeConfig.siteTimezone}</dd>
@@ -1080,7 +1125,7 @@ const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
           </div>
         </AdminSection>
 
-        <AdminSection className="mb-6">
+        <AdminSection className={settingsView === "calendars" ? "mb-6" : "hidden"}>
           <AdminSectionHeader
             title="Calendar feeds"
             description="Store ICS feed URLs once here, then choose them from each calendar module by ID. Feed URLs stay admin-only; layouts and displays only reference saved feed IDs plus optional label and colour overrides."
@@ -1088,7 +1133,7 @@ const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
               <button
                 type="button"
                 onClick={addCalendarFeedDraft}
-                className="rounded border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-slate-300"
+                className={ADMIN_BUTTON_PRIMARY_CLASS}
               >
                 Add feed
               </button>
@@ -1113,21 +1158,28 @@ const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
           </p>
 
           {calendarFeedsConfig.feeds.length === 0 ? (
-            <p className="mt-4 rounded border border-slate-700/80 bg-slate-950/60 px-3 py-3 text-sm text-slate-400">
-              No saved feeds yet.
-            </p>
+            <div className={`mt-4 ${ADMIN_EMPTY_STATE_CLASS}`}>
+              <p className="font-semibold text-stone-800">Connect your first calendar</p>
+              <p className="mt-1">
+                Add an ICS feed to bring family, work, or school events into Hearth.
+              </p>
+              <button
+                type="button"
+                onClick={addCalendarFeedDraft}
+                className={`mt-3 ${ADMIN_BUTTON_PRIMARY_CLASS}`}
+              >
+                Add calendar feed
+              </button>
+            </div>
           ) : (
             <div className="mt-4 space-y-3">
               {calendarFeedsConfig.feeds.map((feed, index) => (
-                <article
-                  key={`${feed.id || "draft"}-${index}`}
-                  className="rounded-lg border border-slate-800 bg-slate-950/60 p-4"
-                >
+                <article key={`${feed.id || "draft"}-${index}`} className={ADMIN_PANEL_CLASS}>
                   <div className="grid gap-3 xl:grid-cols-[minmax(0,0.75fr)_minmax(0,0.85fr)_minmax(0,1.7fr)]">
                     <label className="block space-y-1">
                       <span className="text-xs font-medium text-slate-300">Name</span>
                       <input
-                        className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                        className={ADMIN_INPUT_CLASS}
                         type="text"
                         value={feed.name}
                         onChange={(event) =>
@@ -1143,7 +1195,7 @@ const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
                     <label className="block space-y-1">
                       <span className="text-xs font-medium text-slate-300">Stable ID</span>
                       <input
-                        className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 font-mono text-sm text-slate-100"
+                        className={`${ADMIN_INPUT_CLASS} font-mono`}
                         type="text"
                         value={feed.id}
                         onChange={(event) =>
@@ -1161,7 +1213,7 @@ const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
                         ICS feed URL or path
                       </span>
                       <input
-                        className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                        className={ADMIN_INPUT_CLASS}
                         type="text"
                         value={feed.url}
                         onChange={(event) =>
@@ -1231,7 +1283,7 @@ const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
               <button
                 type="button"
                 onClick={() => void loadData()}
-                className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
+                className={ADMIN_BUTTON_SECONDARY_CLASS}
               >
                 Refresh
               </button>
@@ -1250,8 +1302,12 @@ const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
             </div>
           ) : null}
           {devices.length === 0 ? (
-            <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-6 text-slate-300">
-              No displays have checked in yet.
+            <div className={`mt-4 ${ADMIN_EMPTY_STATE_CLASS}`}>
+              <p className="font-semibold text-stone-800">Connect your first display</p>
+              <p className="mx-auto mt-1 max-w-xl">
+                Open Hearth on the tablet or screen you want to use. It will appear here
+                automatically, ready to name and assign to a smart layout.
+              </p>
             </div>
           ) : (
             <div className="mt-4 grid gap-4">
@@ -1521,7 +1577,9 @@ const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
         </AdminSection>
       </div>
 
-      <div className={section === "connections" ? "contents" : "hidden"}>
+      <div
+        className={section === "connections" && settingsView === "system" ? "contents" : "hidden"}
+      >
         <AdminSection className="mb-6">
           <AdminSectionHeader
             title="Operational health"

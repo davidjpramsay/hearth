@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
+import { createLayoutSetLogicGraphFromBranches, type AutoLayoutTarget } from "@hearth/shared";
 import {
   buildDefaultDeviceName,
   normalizeDeviceName,
@@ -729,6 +730,14 @@ const DEFAULT_LAYOUT_SEEDS: DefaultLayoutSeed[] = [
   },
 ];
 
+type StarterLayoutItem = {
+  i: "clock" | "weather" | "calendar" | "chores" | "photos";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
 type StarterLayoutDefinition = {
   id: string;
   name: string;
@@ -737,13 +746,8 @@ type StarterLayoutDefinition = {
   rows: number;
   calendarView: "week" | "list";
   daysToShow: number;
-  items: Array<{
-    i: "clock" | "weather" | "calendar" | "chores" | "photos";
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-  }>;
+  items: StarterLayoutItem[];
+  portraitPhotoItems: StarterLayoutItem[];
 };
 
 const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
@@ -762,6 +766,13 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
       { i: "photos", x: 24, y: 0, w: 8, h: 9 },
       { i: "chores", x: 24, y: 9, w: 8, h: 9 },
     ],
+    portraitPhotoItems: [
+      { i: "clock", x: 0, y: 0, w: 7, h: 3 },
+      { i: "weather", x: 7, y: 0, w: 6, h: 3 },
+      { i: "calendar", x: 0, y: 3, w: 19, h: 11 },
+      { i: "chores", x: 0, y: 14, w: 19, h: 4 },
+      { i: "photos", x: 19, y: 0, w: 13, h: 18 },
+    ],
   },
   {
     id: "classic-4-3",
@@ -777,6 +788,13 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
       { i: "calendar", x: 0, y: 3, w: 14, h: 12 },
       { i: "photos", x: 14, y: 0, w: 6, h: 8 },
       { i: "chores", x: 14, y: 8, w: 6, h: 7 },
+    ],
+    portraitPhotoItems: [
+      { i: "clock", x: 0, y: 0, w: 5, h: 3 },
+      { i: "weather", x: 5, y: 0, w: 4, h: 3 },
+      { i: "calendar", x: 0, y: 3, w: 12, h: 9 },
+      { i: "chores", x: 0, y: 12, w: 12, h: 3 },
+      { i: "photos", x: 12, y: 0, w: 8, h: 15 },
     ],
   },
   {
@@ -794,6 +812,13 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
       { i: "photos", x: 15, y: 0, w: 6, h: 7 },
       { i: "chores", x: 15, y: 7, w: 6, h: 7 },
     ],
+    portraitPhotoItems: [
+      { i: "clock", x: 0, y: 0, w: 5, h: 3 },
+      { i: "weather", x: 5, y: 0, w: 4, h: 3 },
+      { i: "calendar", x: 0, y: 3, w: 13, h: 8 },
+      { i: "chores", x: 0, y: 11, w: 13, h: 3 },
+      { i: "photos", x: 13, y: 0, w: 8, h: 14 },
+    ],
   },
   {
     id: "portrait-9-16",
@@ -809,6 +834,13 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
       { i: "photos", x: 0, y: 4, w: 18, h: 10 },
       { i: "calendar", x: 0, y: 14, w: 18, h: 10 },
       { i: "chores", x: 0, y: 24, w: 18, h: 8 },
+    ],
+    portraitPhotoItems: [
+      { i: "clock", x: 0, y: 0, w: 10, h: 4 },
+      { i: "weather", x: 10, y: 0, w: 8, h: 4 },
+      { i: "photos", x: 3, y: 4, w: 12, h: 16 },
+      { i: "calendar", x: 0, y: 20, w: 18, h: 7 },
+      { i: "chores", x: 0, y: 27, w: 18, h: 5 },
     ],
   },
   {
@@ -826,6 +858,13 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
       { i: "calendar", x: 0, y: 9, w: 15, h: 6 },
       { i: "chores", x: 0, y: 15, w: 15, h: 5 },
     ],
+    portraitPhotoItems: [
+      { i: "clock", x: 0, y: 0, w: 8, h: 3 },
+      { i: "weather", x: 8, y: 0, w: 7, h: 3 },
+      { i: "photos", x: 3, y: 3, w: 9, h: 12 },
+      { i: "calendar", x: 0, y: 15, w: 10, h: 5 },
+      { i: "chores", x: 10, y: 15, w: 5, h: 5 },
+    ],
   },
   {
     id: "square-1-1",
@@ -842,21 +881,37 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
       { i: "chores", x: 0, y: 10, w: 8, h: 6 },
       { i: "photos", x: 8, y: 10, w: 8, h: 6 },
     ],
+    portraitPhotoItems: [
+      { i: "clock", x: 0, y: 0, w: 9, h: 3 },
+      { i: "weather", x: 9, y: 0, w: 7, h: 3 },
+      { i: "photos", x: 0, y: 3, w: 7, h: 13 },
+      { i: "calendar", x: 7, y: 3, w: 9, h: 8 },
+      { i: "chores", x: 7, y: 11, w: 9, h: 5 },
+    ],
   },
 ];
 
-const STARTER_LAYOUT_SEEDS: DefaultLayoutSeed[] = STARTER_LAYOUT_DEFINITIONS.map((definition) => {
-  const instanceId = (module: StarterLayoutDefinition["items"][number]["i"]) =>
-    `starter-${definition.id}-${module}`;
+const buildStarterLayoutSeed = (
+  definition: StarterLayoutDefinition,
+  variant: "home" | "portrait-photo",
+): DefaultLayoutSeed => {
+  const instanceId = (module: StarterLayoutItem["i"]) =>
+    variant === "home"
+      ? `starter-${definition.id}-${module}`
+      : `starter-${definition.id}-portrait-photo-${module}`;
+  const isPhotoVariant = variant === "portrait-photo";
 
   return {
-    name: definition.name,
+    name: isPhotoVariant ? `Hearth Photo · ${definition.ratioLabel}` : definition.name,
     active: 0,
     config: {
       cols: definition.cols,
       rows: definition.rows,
       rowHeight: 54,
-      items: definition.items.map((item) => ({ ...item, i: instanceId(item.i) })),
+      items: (isPhotoVariant ? definition.portraitPhotoItems : definition.items).map((item) => ({
+        ...item,
+        i: instanceId(item.i),
+      })),
       modules: [
         {
           id: instanceId("clock"),
@@ -910,17 +965,56 @@ const STARTER_LAYOUT_SEEDS: DefaultLayoutSeed[] = STARTER_LAYOUT_DEFINITIONS.map
       ],
     },
   };
+};
+
+const STARTER_LAYOUT_SEEDS: DefaultLayoutSeed[] = STARTER_LAYOUT_DEFINITIONS.flatMap(
+  (definition) => [
+    buildStarterLayoutSeed(definition, "home"),
+    buildStarterLayoutSeed(definition, "portrait-photo"),
+  ],
+);
+
+const toStarterRule = (
+  layoutName: string,
+  trigger: AutoLayoutTarget["trigger"],
+): AutoLayoutTarget => ({
+  layoutName,
+  trigger,
+  cycleSeconds: 20,
+  actionType: "layout.display",
+  actionParams: {},
+  conditionType: trigger === "portrait-photo" ? "photo.orientation.portrait" : null,
+  conditionParams: {},
 });
 
 const STARTER_SCREEN_SETS = Object.fromEntries(
-  STARTER_LAYOUT_DEFINITIONS.map((definition) => [
-    `starter-${definition.id}`,
-    {
-      name: `Auto · ${definition.ratioLabel}`,
-      targetAspectRatio: definition.cols / definition.rows,
-      staticLayoutName: definition.name,
-    },
-  ]),
+  STARTER_LAYOUT_DEFINITIONS.map((definition) => {
+    const portraitPhotoLayoutName = `Hearth Photo · ${definition.ratioLabel}`;
+    const alwaysRules = [toStarterRule(definition.name, "always")];
+    const portraitRules = [toStarterRule(portraitPhotoLayoutName, "portrait-photo")];
+    const logicGraph = createLayoutSetLogicGraphFromBranches({
+      alwaysRules,
+      portraitRules,
+      landscapeRules: [],
+    });
+
+    return [
+      `starter-${definition.id}`,
+      {
+        name: `Smart · ${definition.ratioLabel}`,
+        targetAspectRatio: definition.cols / definition.rows,
+        staticLayoutName: definition.name,
+        logicGraph,
+        logicEdgeOverrides: {},
+        logicDisconnectedEdgeIds: [],
+        autoLayoutTargets: [...alwaysRules, ...portraitRules],
+        portraitPhotoLayoutName,
+        landscapePhotoLayoutName: definition.name,
+        portraitPhotoLayoutNames: [portraitPhotoLayoutName],
+        landscapePhotoLayoutNames: [definition.name],
+      },
+    ];
+  }),
 );
 
 const DEFAULT_SCREEN_PROFILE_LAYOUTS = {
@@ -1149,11 +1243,35 @@ const seedDefaultLayoutsAndSettings = (db: Database.Database): void => {
           parsed.families && typeof parsed.families === "object" && !Array.isArray(parsed.families)
             ? (parsed.families as Record<string, unknown>)
             : {};
+        const upgradedFamilies = Object.fromEntries(
+          Object.entries(currentFamilies).map(([id, value]) => {
+            const starter = STARTER_SCREEN_SETS[id];
+            if (!starter || !value || typeof value !== "object" || Array.isArray(value)) {
+              return [id, value];
+            }
+            const current = value as Record<string, unknown>;
+            const nodes =
+              current.logicGraph &&
+              typeof current.logicGraph === "object" &&
+              !Array.isArray(current.logicGraph) &&
+              Array.isArray((current.logicGraph as { nodes?: unknown }).nodes)
+                ? ((current.logicGraph as { nodes: Array<{ type?: unknown }> }).nodes ?? [])
+                : [];
+            const hasDisplayNodes = nodes.some((node) => node?.type === "display");
+            const hasAuthoredTargets =
+              Array.isArray(current.autoLayoutTargets) && current.autoLayoutTargets.length > 0;
+            const isUntouchedStarter =
+              current.staticLayoutName === starter.staticLayoutName &&
+              !hasDisplayNodes &&
+              !hasAuthoredTargets;
+            return [id, isUntouchedStarter ? starter : value];
+          }),
+        );
         screenProfileLayoutsValue = JSON.stringify({
           ...parsed,
           families: {
             ...STARTER_SCREEN_SETS,
-            ...currentFamilies,
+            ...upgradedFamilies,
           },
         });
       } catch {

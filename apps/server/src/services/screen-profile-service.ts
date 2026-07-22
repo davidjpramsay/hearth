@@ -56,6 +56,33 @@ const toAvailableSets = (mapping: ScreenProfileLayouts) =>
 const toAvailableLayouts = (names: string[]): ReportScreenProfileLayoutOption[] =>
   names.map((name) => ({ name }));
 
+const findClosestAspectSet = (input: {
+  mapping: ScreenProfileLayouts;
+  viewportWidth?: number | null;
+  viewportHeight?: number | null;
+}): string | null => {
+  const width = input.viewportWidth ?? 0;
+  const height = input.viewportHeight ?? 0;
+  if (width <= 0 || height <= 0) {
+    return null;
+  }
+
+  const viewportRatio = width / height;
+  let closest: { id: string; distance: number } | null = null;
+
+  for (const [id, family] of Object.entries(input.mapping.families)) {
+    if (family.targetAspectRatio === null) {
+      continue;
+    }
+    const distance = Math.abs(Math.log(viewportRatio / family.targetAspectRatio));
+    if (!closest || distance < closest.distance) {
+      closest = { id, distance };
+    }
+  }
+
+  return closest?.id ?? null;
+};
+
 const createAutomaticWarningLayout = (
   actionParams: Record<string, unknown> | null | undefined,
 ): LayoutRecord =>
@@ -297,8 +324,17 @@ export class ScreenProfileService {
       });
     const requestedSetId =
       effectiveTargetSelection.kind === "set" ? effectiveTargetSelection.setId : null;
+    const closestAspectSetId =
+      effectiveTargetSelection.kind === "set" && requestedSetId === null
+        ? findClosestAspectSet({
+            mapping,
+            viewportWidth: payload.deviceInfo?.viewportWidth,
+            viewportHeight: payload.deviceInfo?.viewportHeight,
+          })
+        : null;
     const selectedSet =
       (requestedSetId ? availableSets.find((set) => set.id === requestedSetId) : null) ??
+      (closestAspectSetId ? availableSets.find((set) => set.id === closestAspectSetId) : null) ??
       availableSets.find((set) => mapping.families[set.id]?.targetAspectRatio === null) ??
       availableSets[0] ??
       null;

@@ -154,12 +154,41 @@ test("reportScreenProfile stores coarse device info and uses it for new default 
 
     assert.equal(first.device.name, "iPad");
     assert.equal(second.device.name, "iPad (2)");
+    assert.equal(first.resolvedTargetSelection.kind, "set");
+    assert.equal(first.resolvedTargetSelection.setId, "starter-portrait-3-4");
+    assert.equal(first.layout?.name, "Hearth Agenda · 3:4");
 
     const storedDevice = harness.deviceRepository.getDevice("device-ipad-1");
     assert.ok(storedDevice);
     assert.equal(storedDevice.deviceInfo?.label, "iPad");
     assert.equal(storedDevice.deviceInfo?.browser, "Safari");
     assert.equal(storedDevice.deviceInfo?.standalone, true);
+  } finally {
+    harness.dispose();
+  }
+});
+
+test("unassigned displays choose the closest starter aspect ratio", () => {
+  const harness = createHarness();
+
+  try {
+    const landscape = harness.screenProfileService.reportScreenProfile({
+      screenSessionId: "device-wide-auto",
+      reportedThemeId: "default",
+      deviceInfo: { viewportWidth: 1920, viewportHeight: 1080 },
+    });
+    const portrait = harness.screenProfileService.reportScreenProfile({
+      screenSessionId: "device-tall-auto",
+      reportedThemeId: "default",
+      deviceInfo: { viewportWidth: 1080, viewportHeight: 1920 },
+    });
+
+    assert.equal(landscape.resolvedTargetSelection.kind, "set");
+    assert.equal(landscape.resolvedTargetSelection.setId, "starter-wide-16-9");
+    assert.equal(landscape.layout?.name, "Hearth Week · 16:9");
+    assert.equal(portrait.resolvedTargetSelection.kind, "set");
+    assert.equal(portrait.resolvedTargetSelection.setId, "starter-portrait-9-16");
+    assert.equal(portrait.layout?.name, "Hearth Agenda · 9:16");
   } finally {
     harness.dispose();
   }

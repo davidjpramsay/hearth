@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   createLayout,
   deleteLayout,
@@ -29,6 +29,7 @@ import {
   ADMIN_BUTTON_DANGER_CLASS,
   ADMIN_BUTTON_PRIMARY_CLASS,
   ADMIN_BUTTON_SECONDARY_CLASS,
+  ADMIN_EMPTY_STATE_CLASS,
   ADMIN_INPUT_CLASS,
   ADMIN_PANEL_CLASS,
 } from "../components/admin/AdminSection";
@@ -70,6 +71,24 @@ const GraphEditorLoading = () => (
 );
 
 const LAYOUT_PREVIEW_COLORS = ["#f6d8d1", "#e4ecdf", "#e3daf0", "#dbe8f1", "#f7e4b8"];
+const STARTER_LAYOUT_PREFIXES = ["Hearth Week · ", "Hearth Agenda · ", "Hearth Focus · "];
+const PHOTO_LAYOUT_PREFIX = "Hearth Photo · ";
+const STARTER_RATIO_ORDER = ["16:9", "4:3", "3:2", "1:1", "3:4", "9:16"];
+const LEGACY_LAYOUT_NAMES = new Set(["16:9 Standard Landscape", "16:9 Standard Portrait"]);
+
+const getStarterRatio = (name: string): string | null => {
+  const prefix = [...STARTER_LAYOUT_PREFIXES, PHOTO_LAYOUT_PREFIX].find((entry) =>
+    name.startsWith(entry),
+  );
+  return prefix ? name.slice(prefix.length) : null;
+};
+
+const getStarterExperienceName = (name: string): string => {
+  if (name.startsWith("Hearth Week · ")) return "Family Week";
+  if (name.startsWith("Hearth Agenda · ")) return "Today & Agenda";
+  if (name.startsWith("Hearth Focus · ")) return "Family Focus";
+  return "Photo Focus";
+};
 
 const LayoutPreview = ({ layout }: { layout: LayoutRecord }) => {
   const rows = Math.max(
@@ -462,6 +481,7 @@ const normalizeSetNodePositions = (
 export const AdminLayoutsPage = () => {
   const navigate = useNavigate();
   const token = getAuthToken();
+  const [searchParams] = useSearchParams();
   const [layouts, setLayouts] = useState<LayoutRecord[]>([]);
   const [newLayoutName, setNewLayoutName] = useState("Home layout");
   const [screenProfileLayouts, setScreenProfileLayouts] =
@@ -488,6 +508,13 @@ export const AdminLayoutsPage = () => {
   useEffect(() => {
     photoCollectionsRef.current = photoCollections;
   }, [photoCollections]);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get("tab");
+    if (requestedTab === "layouts" || requestedTab === "switching" || requestedTab === "photos") {
+      setWorkspace(requestedTab);
+    }
+  }, [searchParams]);
 
   const loadLayouts = useCallback(async () => {
     if (!token) {
@@ -1066,6 +1093,34 @@ export const AdminLayoutsPage = () => {
     [sortedLayouts],
   );
 
+  const starterLayoutGroups = useMemo(() => {
+    const groups = new Map<string, { home?: LayoutRecord; photo?: LayoutRecord }>();
+    for (const layout of sortedLayouts) {
+      const ratio = getStarterRatio(layout.name);
+      if (!ratio) continue;
+      const group = groups.get(ratio) ?? {};
+      if (layout.name.startsWith(PHOTO_LAYOUT_PREFIX)) group.photo = layout;
+      else group.home = layout;
+      groups.set(ratio, group);
+    }
+    return [...groups.entries()].sort(([left], [right]) => {
+      const leftIndex = STARTER_RATIO_ORDER.indexOf(left);
+      const rightIndex = STARTER_RATIO_ORDER.indexOf(right);
+      if (leftIndex >= 0 && rightIndex >= 0) return leftIndex - rightIndex;
+      if (leftIndex >= 0) return -1;
+      if (rightIndex >= 0) return 1;
+      return left.localeCompare(right, undefined, { numeric: true });
+    });
+  }, [sortedLayouts]);
+
+  const personalLayouts = useMemo(
+    () => sortedLayouts.filter((layout) => getStarterRatio(layout.name) === null),
+    [sortedLayouts],
+  );
+  const hasCustomPersonalLayouts = personalLayouts.some(
+    (layout) => !LEGACY_LAYOUT_NAMES.has(layout.name),
+  );
+
   const sortedPhotoCollections = useMemo(
     () =>
       [...photoCollections.collections].sort((left, right) =>
@@ -1121,6 +1176,7 @@ export const AdminLayoutsPage = () => {
           analyzeSetRuntimeHealth({
             graph: setConfig.logicGraph,
             knownLayoutNames,
+            staticLayoutName: setConfig.staticLayoutName,
             edgeOverrides: setConfig.logicEdgeOverrides,
             disconnectedEdgeIds: setConfig.logicDisconnectedEdgeIds,
           }),
@@ -1222,74 +1278,148 @@ export const AdminLayoutsPage = () => {
             </form>
           ) : null}
 
-          <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white">
-            {sortedLayouts.map((layout, index) => (
-              <article
-                key={layout.id}
-                className="grid gap-5 border-b border-stone-200 p-5 last:border-b-0 md:grid-cols-[minmax(260px,440px)_1fr_auto] md:items-center"
-              >
-                <button
-                  type="button"
-                  onClick={() => navigate(`/admin/layouts/${layout.id}`)}
-                  className="text-left transition hover:opacity-90"
+          <div className="mb-8">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold text-stone-900">Starter designs</h2>
+              <p className="mt-1 text-sm text-stone-600">
+                Each design includes a balanced home view and a photo-focused view selected
+                automatically for portrait photos.
+              </p>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+              {starterLayoutGroups.map(([ratio, variants]) => {
+                const primary = variants.home ?? variants.photo;
+                if (!primary) return null;
+                return (
+                  <article
+                    key={ratio}
+                    className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-[0_8px_28px_rgba(40,52,50,0.04)]"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/admin/layouts/${primary.id}`)}
+                      className="block w-full text-left transition hover:opacity-90"
+                    >
+                      <LayoutPreview layout={primary} />
+                    </button>
+                    <div className="p-5 pt-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold text-stone-900">
+                            {getStarterExperienceName(primary.name)}
+                          </h3>
+                          <p className="mt-1 text-sm text-stone-500">Best for {ratio} screens</p>
+                        </div>
+                        <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">
+                          Smart
+                        </span>
+                      </div>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        {variants.home ? (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/admin/layouts/${variants.home?.id}`)}
+                            className={ADMIN_BUTTON_PRIMARY_CLASS}
+                          >
+                            Edit home view
+                          </button>
+                        ) : null}
+                        {variants.photo ? (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/admin/layouts/${variants.photo?.id}`)}
+                            className={ADMIN_BUTTON_SECONDARY_CLASS}
+                          >
+                            Edit photo view
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+
+          <details
+            className="overflow-hidden rounded-2xl border border-stone-200 bg-white"
+            open={hasCustomPersonalLayouts}
+          >
+            <summary className="cursor-pointer list-none px-5 py-4 text-lg font-semibold text-stone-900">
+              Custom &amp; legacy layouts{" "}
+              <span className="ml-2 text-sm font-normal text-stone-500">
+                {personalLayouts.length}
+              </span>
+            </summary>
+            <div className="border-t border-stone-200">
+              {personalLayouts.length === 0 ? (
+                <p className={`m-5 ${ADMIN_EMPTY_STATE_CLASS}`}>
+                  Create a layout when you want something beyond the starter designs.
+                </p>
+              ) : null}
+              {personalLayouts.map((layout) => (
+                <article
+                  key={layout.id}
+                  className="grid gap-5 border-b border-stone-200 p-5 last:border-b-0 md:grid-cols-[minmax(260px,440px)_1fr_auto] md:items-center"
                 >
-                  <LayoutPreview layout={layout} />
-                </button>
-                <div className="min-w-0">
-                  <input
-                    defaultValue={layout.name}
-                    aria-label={`Layout name: ${layout.name}`}
-                    className="w-full border-0 bg-transparent p-0 text-xl font-semibold text-stone-900 outline-none focus:text-teal-800"
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        event.currentTarget.blur();
-                      }
-                    }}
-                    onBlur={(event) => {
-                      if (event.target.value !== layout.name)
-                        void onRenameLayout(layout, event.target.value);
-                    }}
-                  />
-                  <p className="mt-2 text-sm text-stone-500">
-                    {layout.config.cols}:{layout.config.rows ?? "auto"} grid ·{" "}
-                    {layout.config.modules.length} modules
-                  </p>
-                  {layout.name.startsWith("Hearth ") ? (
-                    <p className="mt-3 inline-flex rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">
-                      Adaptive starter · fully editable
-                    </p>
-                  ) : null}
-                  {index === 0 ? (
-                    <p className="mt-3 text-sm italic text-stone-500">Default fallback</p>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap gap-2 md:justify-end">
                   <button
                     type="button"
                     onClick={() => navigate(`/admin/layouts/${layout.id}`)}
-                    className={ADMIN_BUTTON_PRIMARY_CLASS}
+                    className="text-left transition hover:opacity-90"
                   >
-                    Edit
+                    <LayoutPreview layout={layout} />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void onDuplicateLayout(layout)}
-                    className={ADMIN_BUTTON_SECONDARY_CLASS}
-                  >
-                    Duplicate
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void onDeleteLayout(layout)}
-                    className={ADMIN_BUTTON_DANGER_CLASS}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
+                  <div className="min-w-0">
+                    <input
+                      defaultValue={layout.name}
+                      aria-label={`Layout name: ${layout.name}`}
+                      className="w-full border-0 bg-transparent p-0 text-xl font-semibold text-stone-900 outline-none focus:text-teal-800"
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          event.currentTarget.blur();
+                        }
+                      }}
+                      onBlur={(event) => {
+                        if (event.target.value !== layout.name)
+                          void onRenameLayout(layout, event.target.value);
+                      }}
+                    />
+                    <p className="mt-2 text-sm text-stone-500">
+                      {layout.config.cols}:{layout.config.rows ?? "auto"} grid ·{" "}
+                      {layout.config.modules.length} modules
+                    </p>
+                    {layout.active ? (
+                      <p className="mt-3 text-sm font-medium text-teal-700">Default fallback</p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2 md:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/admin/layouts/${layout.id}`)}
+                      className={ADMIN_BUTTON_PRIMARY_CLASS}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void onDuplicateLayout(layout)}
+                      className={ADMIN_BUTTON_SECONDARY_CLASS}
+                    >
+                      Duplicate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void onDeleteLayout(layout)}
+                      className={ADMIN_BUTTON_DANGER_CLASS}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </details>
         </section>
       ) : null}
 
@@ -1325,7 +1455,12 @@ export const AdminLayoutsPage = () => {
           ) : null}
           <div className="mt-5 grid gap-3">
             {photoCollectionOptions.length === 0 ? (
-              <p className={ADMIN_PANEL_CLASS}>No photo sources yet.</p>
+              <div className={ADMIN_EMPTY_STATE_CLASS}>
+                <p className="font-semibold text-stone-800">Create your first photo source</p>
+                <p className="mt-1">
+                  Choose one or more folders below, then use the source in any Photos module.
+                </p>
+              </div>
             ) : null}
             {sortedPhotoCollections.map((collection) => (
               <article key={collection.id} className={ADMIN_PANEL_CLASS}>
@@ -1441,11 +1576,14 @@ export const AdminLayoutsPage = () => {
             const portrait =
               setConfig.portraitPhotoLayoutNames[0] ??
               setConfig.portraitPhotoLayoutName ??
-              "fallback layout";
+              setConfig.staticLayoutName ??
+              "Not configured";
             const landscape =
               setConfig.landscapePhotoLayoutNames[0] ??
               setConfig.landscapePhotoLayoutName ??
-              "fallback layout";
+              setConfig.staticLayoutName ??
+              "Not configured";
+            const isStarterSet = setId.startsWith("starter-");
             return (
               <article
                 key={setId}
@@ -1457,14 +1595,20 @@ export const AdminLayoutsPage = () => {
                     className="min-w-[220px] flex-1 border-0 bg-transparent p-0 text-xl font-semibold text-stone-900 outline-none focus:text-teal-800"
                     onBlur={(event) => void onRenameSet(setId, event.target.value)}
                   />
-                  <button
-                    type="button"
-                    disabled={setEntries.length <= 1}
-                    className={ADMIN_BUTTON_DANGER_CLASS}
-                    onClick={() => void onRemoveSet(setId)}
-                  >
-                    Remove set
-                  </button>
+                  {isStarterSet ? (
+                    <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800">
+                      Built-in smart layout
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={setEntries.length <= 1}
+                      className={ADMIN_BUTTON_DANGER_CLASS}
+                      onClick={() => void onRemoveSet(setId)}
+                    >
+                      Remove set
+                    </button>
+                  )}
                 </div>
                 <div className="grid gap-4 bg-[#fbfaf7] px-5 py-4 text-sm text-stone-700 md:grid-cols-3">
                   <p>
@@ -1478,7 +1622,7 @@ export const AdminLayoutsPage = () => {
                   <p>
                     <strong className="block text-stone-900">Runtime</strong>
                     {runtimeHealth.status === "ok"
-                      ? "Ready"
+                      ? "Ready to use"
                       : `${runtimeHealth.issues.length} items need attention`}
                   </p>
                 </div>

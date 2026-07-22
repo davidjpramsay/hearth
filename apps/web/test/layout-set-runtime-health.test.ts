@@ -93,6 +93,26 @@ test("warns when one orientation has no display path", () => {
   );
 });
 
+test("treats a valid static layout set as healthy", () => {
+  const health = analyzeSetRuntimeHealth({
+    graph: {
+      version: 1,
+      entryNodeId: "start",
+      nodes: [
+        { id: "start", type: "start" },
+        { id: "return", type: "return" },
+      ],
+      edges: [],
+    },
+    knownLayoutNames: new Set(["Family Week"]),
+    staticLayoutName: "Family Week",
+  });
+
+  assert.equal(health.status, "ok");
+  assert.equal(health.issues.length, 0);
+  assert.ok(health.paths.every((path) => path.sequence[0]?.layoutName === "Family Week"));
+});
+
 test("applies disconnected edge state in runtime simulation", () => {
   const graph = createLayoutSetLogicGraphFromBranches({
     alwaysRules: [toRule("Fallback", "always")],

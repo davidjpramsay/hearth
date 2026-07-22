@@ -320,6 +320,8 @@ export const AdminLayoutEditorPage = () => {
   const queuedSaveRef = useRef<LayoutRecord | null>(null);
   const saveInFlightRef = useRef(false);
   const previewHostRef = useRef<HTMLDivElement | null>(null);
+  const undoStackRef = useRef<LayoutRecord[]>([]);
+  const redoStackRef = useRef<LayoutRecord[]>([]);
 
   const loadData = useCallback(async () => {
     if (!token) {
@@ -341,6 +343,8 @@ export const AdminLayoutEditorPage = () => {
     }
 
     setLayout(matchedLayout);
+    undoStackRef.current = [];
+    redoStackRef.current = [];
     setCatalog(moduleRegistry.listModules());
     setError(null);
   }, [layoutId, navigate, token]);
@@ -696,11 +700,36 @@ export const AdminLayoutEditorPage = () => {
           return currentLayout;
         }
 
+        undoStackRef.current = [...undoStackRef.current.slice(-49), currentLayout];
+        redoStackRef.current = [];
         queueSave(nextLayout);
         return nextLayout;
       });
     },
     [normalizeLayoutConfigToPreviewGrid, queueSave],
+  );
+
+  const restoreHistoryLayout = useCallback(
+    (direction: "undo" | "redo") => {
+      const source = direction === "undo" ? undoStackRef.current : redoStackRef.current;
+      const target = source.at(-1);
+      if (!target) return;
+
+      setLayout((current) => {
+        if (!current) return current;
+        if (direction === "undo") {
+          undoStackRef.current = source.slice(0, -1);
+          redoStackRef.current = [...redoStackRef.current.slice(-49), current];
+        } else {
+          redoStackRef.current = source.slice(0, -1);
+          undoStackRef.current = [...undoStackRef.current.slice(-49), current];
+        }
+        const restored = { ...target, version: current.version, updatedAt: current.updatedAt };
+        queueSave(restored);
+        return restored;
+      });
+    },
+    [queueSave],
   );
 
   const editorGridItems = useMemo(() => {
@@ -902,6 +931,15 @@ export const AdminLayoutEditorPage = () => {
   const hasSelectedModuleSettings =
     Boolean(selectedInstance) && Boolean(selectedModuleDefinition) && Boolean(selectedModuleConfig);
   const inspectorTitle = selectedModuleDefinition?.displayName ?? "Module settings";
+  const moduleCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const instance of layout?.config.modules ?? []) {
+      counts.set(instance.moduleId, (counts.get(instance.moduleId) ?? 0) + 1);
+    }
+    return counts;
+  }, [layout?.config.modules]);
+  const canUndo = undoStackRef.current.length > 0;
+  const canRedo = redoStackRef.current.length > 0;
 
   if (!layout) {
     return (
@@ -920,7 +958,15 @@ export const AdminLayoutEditorPage = () => {
             className="hearth-studio-icon-button"
             aria-label="Back to layouts"
           >
-            ←
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none">
+              <path
+                d="M19 12H5m6-6-6 6 6 6"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </Link>
           <input
             value={layout.name}
@@ -936,10 +982,28 @@ export const AdminLayoutEditorPage = () => {
                 ? "✓ Saved"
                 : saveState === "error"
                   ? "Save failed"
-                  : "Ready"}
+                  : "Saved"}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="flex overflow-hidden rounded-xl border border-stone-300 bg-white">
+            <button
+              type="button"
+              onClick={() => restoreHistoryLayout("undo")}
+              disabled={!canUndo}
+              className="px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300"
+            >
+              Undo
+            </button>
+            <button
+              type="button"
+              onClick={() => restoreHistoryLayout("redo")}
+              disabled={!canRedo}
+              className="border-l border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300"
+            >
+              Redo
+            </button>
+          </div>
           <details className="relative">
             <summary className="list-none cursor-pointer rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 hover:border-teal-600">
               Layout settings
@@ -1047,62 +1111,72 @@ export const AdminLayoutEditorPage = () => {
           </label>
 
           <div className="mt-3 space-y-2 overflow-y-auto pr-1">
-            {visibleModules.map((moduleManifest, moduleIndex) => (
-              <div
-                key={moduleManifest.id}
-                draggable
-                onDragStart={(event) => {
-                  event.dataTransfer.effectAllowed = "copyMove";
-                  event.dataTransfer.setData("application/x-hearth-module", moduleManifest.id);
-                  event.dataTransfer.setData("text/plain", moduleManifest.id);
-                  setDraggingModuleId(moduleManifest.id);
-                }}
-                onDragEnd={() => setDraggingModuleId(null)}
-                className="cursor-grab rounded-xl border border-transparent px-2 py-2 text-sm text-stone-800 transition hover:border-stone-200 hover:bg-white"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 gap-3">
-                    <span
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-base font-semibold text-stone-700"
-                      style={{ background: MODULE_SWATCHES[moduleIndex % MODULE_SWATCHES.length] }}
-                    >
-                      {moduleManifest.displayName.slice(0, 1)}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="font-semibold">{moduleManifest.displayName}</p>
-                      <p className="text-xs text-stone-500">
-                        Default size: {moduleManifest.defaultSize.w} x{" "}
-                        {moduleManifest.defaultSize.h}
-                      </p>
-                      {moduleManifest.id === "photos" || moduleManifest.id === "chores" ? (
-                        <p className="mt-1 text-xs font-semibold text-teal-700">
-                          Interactive on the live display
+            {visibleModules.map((moduleManifest, moduleIndex) => {
+              const existingCount = moduleCounts.get(moduleManifest.id) ?? 0;
+              return (
+                <div
+                  key={moduleManifest.id}
+                  draggable
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = "copyMove";
+                    event.dataTransfer.setData("application/x-hearth-module", moduleManifest.id);
+                    event.dataTransfer.setData("text/plain", moduleManifest.id);
+                    setDraggingModuleId(moduleManifest.id);
+                  }}
+                  onDragEnd={() => setDraggingModuleId(null)}
+                  className="cursor-grab rounded-xl border border-transparent px-2 py-2 text-sm text-stone-800 transition hover:border-stone-200 hover:bg-white"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 gap-3">
+                      <span
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-base font-semibold text-stone-700"
+                        style={{
+                          background: MODULE_SWATCHES[moduleIndex % MODULE_SWATCHES.length],
+                        }}
+                      >
+                        {moduleManifest.displayName.slice(0, 1)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-semibold">{moduleManifest.displayName}</p>
+                        <p className="text-xs text-stone-500">
+                          Default size: {moduleManifest.defaultSize.w} x{" "}
+                          {moduleManifest.defaultSize.h}
                         </p>
-                      ) : null}
+                        {existingCount > 0 ? (
+                          <p className="mt-1 text-xs font-medium text-stone-500">
+                            {existingCount} already in this layout
+                          </p>
+                        ) : null}
+                        {moduleManifest.id === "photos" || moduleManifest.id === "chores" ? (
+                          <p className="mt-1 text-xs font-semibold text-teal-700">
+                            Interactive on the live display
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
+                      onTouchStart={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void addModuleFromPalette(moduleManifest.id);
+                      }}
+                      className="module-no-drag min-h-9 rounded-lg border border-teal-700/40 px-2.5 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-50"
+                    >
+                      {existingCount > 0 ? "Add another" : "Add"}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onMouseDown={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                    }}
-                    onTouchStart={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                    }}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      void addModuleFromPalette(moduleManifest.id);
-                    }}
-                    className="module-no-drag min-h-9 rounded-lg border border-teal-700/40 px-2.5 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-50"
-                  >
-                    Add
-                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </aside>
 

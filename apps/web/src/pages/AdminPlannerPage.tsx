@@ -30,7 +30,13 @@ import { getAuthToken } from "../auth/storage";
 import { logoutAdminSession } from "../auth/session";
 import { PageShell } from "../components/PageShell";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
-import { AdminSection, AdminSectionHeader } from "../components/admin/AdminSection";
+import {
+  AdminSection,
+  AdminSectionHeader,
+  ADMIN_BUTTON_SECONDARY_CLASS,
+  ADMIN_EMPTY_STATE_CLASS,
+  ADMIN_INPUT_CLASS,
+} from "../components/admin/AdminSection";
 import {
   PlannerTimetableEditor,
   type PlannerEditorBlock,
@@ -725,14 +731,14 @@ export const AdminPlannerPage = () => {
           <AdminSection>
             <AdminSectionHeader
               title="Shared children"
-              description="School columns are pulled from the shared children list in Admin > Children."
+              description="School columns are pulled from the shared family list."
               actions={
                 <button
                   type="button"
                   onClick={() => navigate("/children")}
-                  className="rounded-lg border border-cyan-400/60 px-3 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300"
+                  className={ADMIN_BUTTON_SECONDARY_CLASS}
                 >
-                  Open Children
+                  Open Family
                 </button>
               }
             />
@@ -751,8 +757,8 @@ export const AdminPlannerPage = () => {
                 </div>
               ))}
               {users.length === 0 ? (
-                <p className="rounded-lg border border-slate-700 bg-slate-950/50 px-3 py-3 text-sm text-slate-300">
-                  Add a child in Admin &gt; Children before building a school timetable.
+                <p className={ADMIN_EMPTY_STATE_CLASS}>
+                  Add a child in Family before building a school timetable.
                 </p>
               ) : null}
             </div>
@@ -880,7 +886,7 @@ export const AdminPlannerPage = () => {
             ))}
 
             {templates.length === 0 ? (
-              <p className="rounded-lg border border-slate-700 bg-slate-950/50 px-3 py-3 text-sm text-slate-300">
+              <p className={ADMIN_EMPTY_STATE_CLASS}>
                 Create a plan to start building a weekly school schedule.
               </p>
             ) : null}
@@ -893,12 +899,12 @@ export const AdminPlannerPage = () => {
               <input
                 value={templateNameDraft}
                 onChange={(event) => setTemplateNameDraft(event.target.value)}
-                className="min-w-[18rem] flex-1 rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
+                className={`min-w-[18rem] flex-1 ${ADMIN_INPUT_CLASS}`}
               />
               <button
                 type="submit"
                 disabled={busyKey === "template-rename"}
-                className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className={ADMIN_BUTTON_SECONDARY_CLASS}
               >
                 Rename plan
               </button>
@@ -913,7 +919,7 @@ export const AdminPlannerPage = () => {
                 type="button"
                 onClick={onRevertBlocks}
                 disabled={!blocksDirty || isAutosavingBlocks}
-                className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className={ADMIN_BUTTON_SECONDARY_CLASS}
               >
                 Revert
               </button>
@@ -938,12 +944,12 @@ export const AdminPlannerPage = () => {
           ) : null}
 
           {!selectedTemplate ? (
-            <p className="mt-4 rounded-lg border border-slate-700 bg-slate-950/50 px-3 py-3 text-sm text-slate-300">
+            <p className={`mt-4 ${ADMIN_EMPTY_STATE_CLASS}`}>
               Select or create a saved plan to edit its timetable.
             </p>
           ) : users.length === 0 ? (
-            <p className="mt-4 rounded-lg border border-slate-700 bg-slate-950/50 px-3 py-3 text-sm text-slate-300">
-              Add a child in Admin &gt; Children before creating timetable activities.
+            <p className={`mt-4 ${ADMIN_EMPTY_STATE_CLASS}`}>
+              Add a child in Family before creating timetable activities.
             </p>
           ) : (
             <div className="mt-4 space-y-4">
@@ -1139,9 +1145,7 @@ export const AdminPlannerPage = () => {
               </div>
             </div>
           ) : (
-            <p className="mt-4 rounded-lg border border-slate-700 bg-slate-950/50 px-3 py-3 text-sm text-slate-300">
-              No weekly PDF summary yet.
-            </p>
+            <p className={`mt-4 ${ADMIN_EMPTY_STATE_CLASS}`}>No weekly PDF summary yet.</p>
           )}
 
           <div className="mt-6 rounded-xl border border-slate-700 bg-slate-950/40 p-4">
@@ -1169,7 +1173,7 @@ export const AdminPlannerPage = () => {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-slate-300">No archived PDFs yet.</p>
+                <p className={ADMIN_EMPTY_STATE_CLASS}>No archived PDFs yet.</p>
               )}
             </div>
           </div>

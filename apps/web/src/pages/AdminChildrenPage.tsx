@@ -10,7 +10,16 @@ import { logoutAdminSession } from "../auth/session";
 import { getAuthToken } from "../auth/storage";
 import { PageShell } from "../components/PageShell";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
-import { AdminSection, AdminSectionHeader } from "../components/admin/AdminSection";
+import {
+  AdminSection,
+  AdminSectionHeader,
+  ADMIN_BUTTON_DANGER_CLASS,
+  ADMIN_BUTTON_PRIMARY_CLASS,
+  ADMIN_BUTTON_SECONDARY_CLASS,
+  ADMIN_EMPTY_STATE_CLASS,
+  ADMIN_FIELD_LABEL_CLASS,
+  ADMIN_INPUT_CLASS,
+} from "../components/admin/AdminSection";
 import type { ChoreMember } from "@hearth/shared";
 import { useModuleQuery } from "../modules/data/useModuleQuery";
 
@@ -110,13 +119,13 @@ export const AdminChildrenPage = () => {
 
   return (
     <PageShell
-      title="Children"
-      subtitle="Manage the shared children list used by chores and school plans."
+      title="Family"
+      subtitle="Add the children who use chores, allowances, and school plans."
       rightActions={<AdminNavActions current="children" onLogout={logoutAdminSession} />}
     >
       <div className="space-y-6">
         {activeError ? (
-          <p className="rounded-xl border border-rose-500/70 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
             {activeError}
           </p>
         ) : null}
@@ -130,11 +139,11 @@ export const AdminChildrenPage = () => {
             />
 
             <form onSubmit={onSubmitChild} className="mt-4 space-y-3">
-              <label className="block space-y-1">
-                <span className="text-sm text-slate-300">Name</span>
+              <label className={ADMIN_FIELD_LABEL_CLASS}>
+                <span>Name</span>
                 <input
                   required
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                  className={ADMIN_INPUT_CLASS}
                   value={childForm.name}
                   onChange={(event) =>
                     setChildForm((current) => ({ ...current, name: event.target.value }))
@@ -142,10 +151,10 @@ export const AdminChildrenPage = () => {
                 />
               </label>
 
-              <label className="block space-y-1">
-                <span className="text-sm text-slate-300">Avatar URL (optional)</span>
+              <label className={ADMIN_FIELD_LABEL_CLASS}>
+                <span>Avatar URL (optional)</span>
                 <input
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                  className={ADMIN_INPUT_CLASS}
                   value={childForm.avatarUrl}
                   onChange={(event) =>
                     setChildForm((current) => ({ ...current, avatarUrl: event.target.value }))
@@ -153,13 +162,13 @@ export const AdminChildrenPage = () => {
                 />
               </label>
 
-              <label className="block space-y-1">
-                <span className="text-sm text-slate-300">Weekly allowance ($)</span>
+              <label className={ADMIN_FIELD_LABEL_CLASS}>
+                <span>Weekly allowance ($)</span>
                 <input
                   type="number"
                   min={0}
                   step="0.01"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                  className={ADMIN_INPUT_CLASS}
                   value={childForm.weeklyAllowance}
                   onChange={(event) =>
                     setChildForm((current) => ({
@@ -174,7 +183,7 @@ export const AdminChildrenPage = () => {
                 <button
                   type="submit"
                   disabled={busyKey === "save-child"}
-                  className="rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  className={ADMIN_BUTTON_PRIMARY_CLASS}
                 >
                   {childForm.id === null ? "Create child" : "Save child"}
                 </button>
@@ -182,7 +191,7 @@ export const AdminChildrenPage = () => {
                   <button
                     type="button"
                     onClick={() => setChildForm(emptyChildForm())}
-                    className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
+                    className={ADMIN_BUTTON_SECONDARY_CLASS}
                   >
                     Cancel edit
                   </button>
@@ -205,15 +214,15 @@ export const AdminChildrenPage = () => {
               {children.map((child) => (
                 <div
                   key={child.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-3"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3"
                 >
                   <div>
-                    <p className="font-semibold text-slate-100">{child.name}</p>
-                    <p className="text-sm text-slate-300">
+                    <p className="font-semibold text-stone-900">{child.name}</p>
+                    <p className="text-sm text-stone-600">
                       Weekly allowance: ${child.weeklyAllowance.toFixed(2)}
                     </p>
                     {child.avatarUrl ? (
-                      <p className="text-xs text-slate-400">{child.avatarUrl}</p>
+                      <p className="text-xs text-stone-500">{child.avatarUrl}</p>
                     ) : null}
                   </div>
                   <div className="flex gap-2">
@@ -227,7 +236,7 @@ export const AdminChildrenPage = () => {
                           weeklyAllowance: String(child.weeklyAllowance),
                         })
                       }
-                      className="rounded-lg border border-slate-600 px-3 py-1.5 text-sm font-semibold text-slate-200 hover:border-slate-400"
+                      className={ADMIN_BUTTON_SECONDARY_CLASS}
                     >
                       Edit
                     </button>
@@ -235,7 +244,7 @@ export const AdminChildrenPage = () => {
                       type="button"
                       onClick={() => void onDeleteChild(child.id)}
                       disabled={busyKey === `delete-child-${child.id}`}
-                      className="rounded-lg border border-rose-500/60 px-3 py-1.5 text-sm font-semibold text-rose-100 hover:border-rose-400 disabled:cursor-not-allowed disabled:opacity-60"
+                      className={ADMIN_BUTTON_DANGER_CLASS}
                     >
                       Delete
                     </button>
@@ -244,9 +253,12 @@ export const AdminChildrenPage = () => {
               ))}
 
               {!loading && children.length === 0 ? (
-                <p className="rounded-lg border border-slate-700 bg-slate-950/50 px-3 py-3 text-sm text-slate-300">
-                  Add a child to start assigning chores and building school plans.
-                </p>
+                <div className={ADMIN_EMPTY_STATE_CLASS}>
+                  <p className="font-semibold text-stone-800">Start with your family</p>
+                  <p className="mt-1">
+                    Add a child here, then assign chores or build a school plan.
+                  </p>
+                </div>
               ) : null}
             </div>
           </AdminSection>
