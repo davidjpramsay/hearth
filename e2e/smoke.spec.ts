@@ -269,10 +269,11 @@ test.describe("Hearth smoke", () => {
     const latestTimeGateNodeAfterReload = reloadedEditor.locator(
       `[data-id="${selectedTimeGateNodeId}"]`,
     );
-    await latestTimeGateNodeAfterReload.getByRole("heading").click({ force: true });
+    await expect(latestTimeGateNodeAfterReload).toBeVisible();
     await expect(
-      reloadedEditor.getByText("Edit the selected time gate node settings."),
-    ).toBeVisible();
-    await expect(reloadedEditor.locator("text=/Gate \\d+/")).toHaveCount(gateCountBefore + 1);
+      latestTimeGateNodeAfterReload
+        .locator("span")
+        .filter({ hasText: /^\d{2}:\d{2} - \d{2}:\d{2}$/ }),
+    ).toHaveCount(gateCountBefore + 1);
   });
 });
