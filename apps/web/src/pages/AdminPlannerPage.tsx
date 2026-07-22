@@ -25,7 +25,7 @@ import {
   getPlannerSummaryArchives,
   updatePlannerDayWindow,
   updatePlannerTemplate,
-} from "../api/client";
+} from "../api/planner-client";
 import { getAuthToken } from "../auth/storage";
 import { logoutAdminSession } from "../auth/session";
 import { PageShell } from "../components/PageShell";

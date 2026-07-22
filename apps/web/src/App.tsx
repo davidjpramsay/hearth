@@ -2,8 +2,12 @@ import { Suspense, lazy, useEffect, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { RequireAuth } from "./auth/RequireAuth";
 import { PUBLIC_DOCS_URL } from "./config/public-links";
-import { DashboardPage } from "./pages/DashboardPage";
 import { useBuildUpdateMonitor } from "./update/build-updates";
+
+const DashboardPage = lazy(async () => {
+  const module = await import("./pages/DashboardPage");
+  return { default: module.DashboardPage };
+});
 
 const AdminChoresPage = lazy(async () => {
   const module = await import("./pages/AdminChoresPage");
@@ -87,7 +91,7 @@ export const App = () => {
       ) : null}
 
       <Routes>
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/" element={withRouteSuspense(<DashboardPage />)} />
         <Route path="/docs" element={<ExternalDocsRedirect />} />
         <Route path="/admin" element={<Navigate to="/admin/layouts" replace />} />
         <Route path="/admin/login" element={withRouteSuspense(<AdminLoginPage />)} />

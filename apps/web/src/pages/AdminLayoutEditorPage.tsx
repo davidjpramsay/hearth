@@ -25,7 +25,6 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { getLayouts, updateLayout } from "../api/client";
 import { logoutAdminSession } from "../auth/session";
 import { getAuthToken } from "../auth/storage";
-import { AdminNavActions } from "../components/admin/AdminNavActions";
 import { ModuleFrame } from "../components/ModuleFrame";
 import {
   getAdaptiveGridMetrics,
@@ -43,11 +42,17 @@ import {
   normalizeLayoutTypography,
   snapLayoutTypographyValue,
 } from "../layout/layout-typography";
-import { moduleRegistry } from "../registry/module-registry";
+import {
+  ModuleDashboardTile,
+  ModuleSettingsPanel,
+  moduleRegistry,
+} from "../registry/module-registry";
+import type { RegisteredModuleDefinition } from "../registry/unified-module-registry";
 
 const PREVIEW_CANVAS_BASE_WIDTH = 1920;
 const GRID_MARGIN_PX = 0;
 const PREVIEW_GRID_MAJOR_STEP = 4;
+const MODULE_SWATCHES = ["#f6d8d1", "#e4ecdf", "#e3daf0", "#dbe8f1", "#f7e4b8"];
 
 const toPositiveNumberOr = (value: string, fallback: number): number => {
   const parsed = Number(value);
@@ -148,7 +153,7 @@ const LayoutTypographyPanel = ({ value, onChange, onReset }: LayoutTypographyPan
   };
 
   return (
-    <section className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+    <section className="min-w-0 rounded-xl border border-slate-700 bg-slate-900/70 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-slate-100">Responsive typography</h3>
@@ -166,7 +171,7 @@ const LayoutTypographyPanel = ({ value, onChange, onReset }: LayoutTypographyPan
         </button>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(520px,0.95fr)] xl:items-start">
+      <div className="mt-4 grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(520px,0.95fr)] xl:items-start">
         <div
           style={buildLayoutTypographyStyle(value)}
           className="module-tile-host h-48 rounded-xl border border-slate-700 bg-slate-950/75"
@@ -181,7 +186,7 @@ const LayoutTypographyPanel = ({ value, onChange, onReset }: LayoutTypographyPan
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
             <button
               type="button"
@@ -290,6 +295,9 @@ export const AdminLayoutEditorPage = () => {
 
   const [layout, setLayout] = useState<LayoutRecord | null>(null);
   const [catalog, setCatalog] = useState<ModuleManifest[]>([]);
+  const [loadedModules, setLoadedModules] = useState<
+    Record<string, RegisteredModuleDefinition<any>>
+  >({});
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [draggingModuleId, setDraggingModuleId] = useState<string | null>(null);
   const [customAspectWidth, setCustomAspectWidth] = useState("16");
@@ -298,13 +306,12 @@ export const AdminLayoutEditorPage = () => {
   const [draftGridItems, setDraftGridItems] = useState<GridItem[] | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [moduleSearch, setModuleSearch] = useState("");
 
   const saveTimeoutRef = useRef<number | null>(null);
-  const latestQueuedSaveSeqRef = useRef(0);
+  const queuedSaveRef = useRef<LayoutRecord | null>(null);
+  const saveInFlightRef = useRef(false);
   const previewHostRef = useRef<HTMLDivElement | null>(null);
-  const onLogout = useCallback(() => {
-    logoutAdminSession();
-  }, []);
 
   const loadData = useCallback(async () => {
     if (!token) {
@@ -326,13 +333,7 @@ export const AdminLayoutEditorPage = () => {
     }
 
     setLayout(matchedLayout);
-    setCatalog(
-      moduleRegistry.listModules().map((moduleDefinition) => ({
-        id: moduleDefinition.id,
-        displayName: moduleDefinition.displayName,
-        defaultSize: moduleDefinition.defaultSize,
-      })),
-    );
+    setCatalog(moduleRegistry.listModules());
     setError(null);
   }, [layoutId, navigate, token]);
 
@@ -375,6 +376,67 @@ export const AdminLayoutEditorPage = () => {
     };
   }, [layout?.id]);
 
+  const flushQueuedSave = useCallback(async () => {
+    if (!token || saveInFlightRef.current) {
+      return;
+    }
+
+    const nextLayout = queuedSaveRef.current;
+    if (!nextLayout) {
+      return;
+    }
+
+    queuedSaveRef.current = null;
+    saveInFlightRef.current = true;
+    setSaveState("saving");
+
+    try {
+      const savedLayout = await updateLayout(token, nextLayout.id, {
+        name: nextLayout.name,
+        config: nextLayout.config,
+        expectedVersion: nextLayout.version,
+      });
+
+      setError(null);
+
+      const queuedLayout = queuedSaveRef.current as LayoutRecord | null;
+      if (queuedLayout) {
+        queuedSaveRef.current = {
+          ...queuedLayout,
+          version: savedLayout.version,
+          updatedAt: savedLayout.updatedAt,
+        };
+        setLayout((currentLayout) =>
+          currentLayout && currentLayout.id === savedLayout.id
+            ? {
+                ...currentLayout,
+                version: savedLayout.version,
+                updatedAt: savedLayout.updatedAt,
+              }
+            : currentLayout,
+        );
+      } else {
+        setLayout(savedLayout);
+        setSaveState("saved");
+      }
+    } catch (saveError) {
+      const message =
+        saveError instanceof Error ? saveError.message : "Failed to persist layout changes.";
+      setError(message);
+      setSaveState("error");
+      queuedSaveRef.current = null;
+
+      if (typeof message === "string" && message.toLowerCase().includes("unauthorized")) {
+        logoutAdminSession();
+      }
+    } finally {
+      saveInFlightRef.current = false;
+      if (queuedSaveRef.current) {
+        void flushQueuedSave();
+      }
+    }
+  }, [token]);
+
   const queueSave = useCallback(
     (nextLayout: LayoutRecord) => {
       if (!token) {
@@ -385,55 +447,67 @@ export const AdminLayoutEditorPage = () => {
         window.clearTimeout(saveTimeoutRef.current);
       }
 
-      const saveSeq = latestQueuedSaveSeqRef.current + 1;
-      latestQueuedSaveSeqRef.current = saveSeq;
+      queuedSaveRef.current = nextLayout;
       setSaveState("saving");
-      saveTimeoutRef.current = window.setTimeout(async () => {
+      saveTimeoutRef.current = window.setTimeout(() => {
         saveTimeoutRef.current = null;
-        try {
-          const savedLayout = await updateLayout(token, nextLayout.id, {
-            name: nextLayout.name,
-            config: nextLayout.config,
-          });
-
-          if (saveSeq !== latestQueuedSaveSeqRef.current) {
-            return;
-          }
-
-          setLayout(savedLayout);
-          setError(null);
-          setSaveState("saved");
-        } catch (saveError) {
-          if (saveSeq !== latestQueuedSaveSeqRef.current) {
-            return;
-          }
-
-          const message =
-            saveError instanceof Error ? saveError.message : "Failed to persist layout changes.";
-          setError(message);
-          setSaveState("error");
-
-          if (typeof message === "string" && message.toLowerCase().includes("unauthorized")) {
-            logoutAdminSession();
-          }
-        }
+        void flushQueuedSave();
       }, 500);
     },
-    [navigate, token],
+    [flushQueuedSave, token],
   );
 
   const availableModules = useMemo(
-    () => catalog.filter((entry) => moduleRegistry.getModule(entry.id)),
+    () => catalog.filter((entry) => moduleRegistry.getModuleManifest(entry.id)),
     [catalog],
   );
+  const visibleModules = useMemo(() => {
+    const query = moduleSearch.trim().toLowerCase();
+    return query.length === 0
+      ? availableModules
+      : availableModules.filter((entry) => entry.displayName.toLowerCase().includes(query));
+  }, [availableModules, moduleSearch]);
 
   const selectedInstance = layout?.config.modules.find(
     (instance) => instance.id === selectedInstanceId,
   );
 
   const selectedModuleDefinition = selectedInstance
-    ? moduleRegistry.getModule(selectedInstance.moduleId)
+    ? loadedModules[selectedInstance.moduleId]
     : undefined;
+
+  useEffect(() => {
+    if (!selectedInstance) {
+      return;
+    }
+
+    const moduleId = selectedInstance.moduleId;
+    if (loadedModules[moduleId]) {
+      return;
+    }
+
+    let cancelled = false;
+    void moduleRegistry
+      .loadModule(moduleId)
+      .then((definition) => {
+        if (cancelled) {
+          return;
+        }
+        setLoadedModules((current) => ({
+          ...current,
+          [moduleId]: definition,
+        }));
+      })
+      .catch((loadError) => {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : "Failed to load module");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadedModules, selectedInstance]);
 
   const selectedModuleConfig = useMemo(() => {
     if (!selectedInstance || !selectedModuleDefinition) {
@@ -729,9 +803,16 @@ export const AdminLayoutEditorPage = () => {
   );
 
   const addModuleFromPalette = useCallback(
-    (moduleId: string) => {
-      const moduleDefinition = moduleRegistry.getModule(moduleId);
-      if (!moduleDefinition) {
+    async (moduleId: string) => {
+      let moduleDefinition: RegisteredModuleDefinition<any>;
+      try {
+        moduleDefinition = await moduleRegistry.loadModule(moduleId);
+        setLoadedModules((current) => ({
+          ...current,
+          [moduleId]: moduleDefinition,
+        }));
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : "Failed to load module");
         return;
       }
 
@@ -812,7 +893,7 @@ export const AdminLayoutEditorPage = () => {
 
   const hasSelectedModuleSettings =
     Boolean(selectedInstance) && Boolean(selectedModuleDefinition) && Boolean(selectedModuleConfig);
-  const inspectorTitle = hasSelectedModuleSettings ? "Module settings" : "Layout settings";
+  const inspectorTitle = selectedModuleDefinition?.displayName ?? "Module settings";
 
   if (!layout) {
     return (
@@ -823,37 +904,75 @@ export const AdminLayoutEditorPage = () => {
   }
 
   return (
-    <main className="mx-auto flex h-screen w-full max-w-[1800px] flex-col overflow-hidden px-4 py-5">
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-3">
-        <div className="flex items-center gap-3">
+    <main className="hearth-layout-studio">
+      <header className="hearth-layout-studio__toolbar">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
           <Link
             to="/admin/layouts"
-            className="rounded border border-slate-600 px-3 py-2 text-sm text-slate-200 hover:border-slate-400"
+            className="hearth-studio-icon-button"
+            aria-label="Back to layouts"
           >
-            Back
+            ←
           </Link>
           <input
             value={layout.name}
             onChange={(event) =>
               applyLayoutPatch((current) => ({ ...current, name: event.target.value }))
             }
-            className="min-w-[260px] rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
+            className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2 text-xl font-semibold text-stone-900 outline-none focus:text-teal-800 sm:min-w-[240px]"
           />
-          <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
-            Version {layout.version}
-          </span>
-          <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
+          <span className="text-sm text-stone-500" aria-live="polite">
             {saveState === "saving"
-              ? "Saving..."
+              ? "Saving…"
               : saveState === "saved"
-                ? "Saved"
+                ? "✓ Saved"
                 : saveState === "error"
                   ? "Save failed"
-                  : "Idle"}
+                  : "Ready"}
           </span>
         </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <AdminNavActions current="layouts" onLogout={onLogout} />
+        <div className="flex flex-wrap items-center gap-2">
+          <details className="relative">
+            <summary className="list-none cursor-pointer rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 hover:border-teal-600">
+              Layout settings
+            </summary>
+            <div className="absolute right-0 top-12 z-50 w-[min(760px,90vw)] rounded-2xl border border-stone-200 bg-white p-3 shadow-xl">
+              <LayoutTypographyPanel
+                value={draftTypography}
+                onChange={setDraftTypography}
+                onReset={() => setDraftTypography(DEFAULT_LAYOUT_TYPOGRAPHY)}
+              />
+            </div>
+          </details>
+          <div className="flex items-center gap-1 rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700">
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={customAspectWidth}
+              onChange={(event) => setCustomAspectWidth(event.target.value)}
+              className="w-8 bg-transparent text-center outline-none"
+              aria-label="Custom ratio width"
+            />
+            <span>:</span>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={customAspectHeight}
+              onChange={(event) => setCustomAspectHeight(event.target.value)}
+              className="w-8 bg-transparent text-center outline-none"
+              aria-label="Custom ratio height"
+            />
+          </div>
+          <a
+            href="/"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:border-teal-600"
+          >
+            Preview
+          </a>
         </div>
       </header>
 
@@ -863,13 +982,24 @@ export const AdminLayoutEditorPage = () => {
         </p>
       ) : null}
 
-      <section className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)_320px]">
-        <aside className="flex min-h-0 flex-col rounded-xl border border-slate-700 bg-slate-900/80 p-4">
-          <h2 className="font-display text-lg font-semibold text-slate-100">Module palette</h2>
-          <p className="mt-1 text-xs text-slate-400">Drag modules into the grid, or tap Add.</p>
+      <section
+        className={`grid min-w-0 flex-1 lg:min-h-0 ${selectedInstance ? "lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)_340px]" : "lg:grid-cols-[280px_minmax(0,1fr)]"}`}
+      >
+        <aside className="hearth-layout-studio__library">
+          <h2 className="text-xl font-semibold text-stone-900">Add to layout</h2>
+          <p className="mt-1 text-sm text-stone-500">Drag a module onto the canvas.</p>
+          <label className="mt-4 block">
+            <span className="sr-only">Search modules</span>
+            <input
+              value={moduleSearch}
+              onChange={(event) => setModuleSearch(event.target.value)}
+              placeholder="Search modules"
+              className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-800 outline-none focus:border-teal-600"
+            />
+          </label>
 
           <div className="mt-3 space-y-2 overflow-y-auto pr-1">
-            {availableModules.map((moduleManifest) => (
+            {visibleModules.map((moduleManifest, moduleIndex) => (
               <div
                 key={moduleManifest.id}
                 draggable
@@ -880,14 +1010,23 @@ export const AdminLayoutEditorPage = () => {
                   setDraggingModuleId(moduleManifest.id);
                 }}
                 onDragEnd={() => setDraggingModuleId(null)}
-                className="cursor-grab rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 hover:border-cyan-500"
+                className="cursor-grab rounded-xl border border-transparent px-2 py-2 text-sm text-stone-800 transition hover:border-stone-200 hover:bg-white"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-medium">{moduleManifest.displayName}</p>
-                    <p className="text-xs text-slate-400">
-                      Default size: {moduleManifest.defaultSize.w} x {moduleManifest.defaultSize.h}
-                    </p>
+                  <div className="flex min-w-0 gap-3">
+                    <span
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-base font-semibold text-stone-700"
+                      style={{ background: MODULE_SWATCHES[moduleIndex % MODULE_SWATCHES.length] }}
+                    >
+                      {moduleManifest.displayName.slice(0, 1)}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="font-semibold">{moduleManifest.displayName}</p>
+                      <p className="text-xs text-stone-500">
+                        Default size: {moduleManifest.defaultSize.w} x{" "}
+                        {moduleManifest.defaultSize.h}
+                      </p>
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -902,9 +1041,9 @@ export const AdminLayoutEditorPage = () => {
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      addModuleFromPalette(moduleManifest.id);
+                      void addModuleFromPalette(moduleManifest.id);
                     }}
-                    className="module-no-drag min-h-9 rounded border border-cyan-500/70 px-2.5 py-1 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/20"
+                    className="module-no-drag min-h-9 rounded-lg border border-teal-700/40 px-2.5 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-50"
                   >
                     Add
                   </button>
@@ -914,44 +1053,19 @@ export const AdminLayoutEditorPage = () => {
           </div>
         </aside>
 
-        <div className="flex min-h-0 flex-col rounded-xl border border-slate-700 bg-slate-950/70 p-3">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+        <div className="hearth-layout-studio__canvas-region">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-500">
             <span>
-              Fixed preview canvas: {previewCanvasBaseSize.width} x {previewCanvasBaseSize.height}
+              Canvas {previewCanvasBaseSize.width} × {previewCanvasBaseSize.height}
             </span>
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="flex items-center gap-2">
-                <span>Preview aspect</span>
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={customAspectWidth}
-                  onChange={(event) => setCustomAspectWidth(event.target.value)}
-                  className="w-16 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100"
-                  aria-label="Custom ratio width"
-                />
-                <span>x</span>
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={customAspectHeight}
-                  onChange={(event) => setCustomAspectHeight(event.target.value)}
-                  className="w-16 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100"
-                  aria-label="Custom ratio height"
-                />
-              </label>
-              <span>
-                Preview ratio: {previewRatioLabel} | Grid {previewGridMetrics.cols} x{" "}
-                {previewGridMetrics.rows} (divisible)
-              </span>
-            </div>
+            <span>
+              {previewRatioLabel} · {previewGridMetrics.cols} × {previewGridMetrics.rows} grid
+            </span>
           </div>
 
           <div
             ref={previewHostRef}
-            className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg border border-slate-800 bg-slate-950/60 p-3"
+            className="flex min-w-0 min-h-[18rem] flex-1 items-center justify-center overflow-hidden rounded-2xl border border-stone-200 bg-[#eeeae2] p-6 lg:min-h-0"
           >
             {previewScale > 0 ? (
               <div
@@ -1046,18 +1160,18 @@ export const AdminLayoutEditorPage = () => {
                         return false;
                       }
 
-                      const moduleDefinition = moduleRegistry.getModule(moduleId);
-                      if (!moduleDefinition) {
+                      const moduleManifest = moduleRegistry.getModuleManifest(moduleId);
+                      if (!moduleManifest) {
                         return false;
                       }
 
                       const dropWidth = clamp(
-                        moduleDefinition.defaultSize.w,
+                        moduleManifest.defaultSize.w,
                         1,
                         previewGridMetrics.cols,
                       );
                       const dropHeight = clamp(
-                        moduleDefinition.defaultSize.h,
+                        moduleManifest.defaultSize.h,
                         1,
                         previewGridMetrics.rows,
                       );
@@ -1081,36 +1195,47 @@ export const AdminLayoutEditorPage = () => {
                         return;
                       }
 
-                      const moduleDefinition = moduleRegistry.getModule(moduleId);
+                      void moduleRegistry
+                        .loadModule(moduleId)
+                        .then((moduleDefinition) => {
+                          setLoadedModules((current) => ({
+                            ...current,
+                            [moduleId]: moduleDefinition,
+                          }));
 
-                      if (!moduleDefinition) {
-                        return;
-                      }
+                          applyLayoutPatch((current) => {
+                            const created = addModuleToLayoutAtPosition(
+                              {
+                                ...current.config,
+                                cols: previewGridMetrics.cols,
+                                rows: previewGridMetrics.rows,
+                                rowHeight: Math.max(10, Math.round(previewGridMetrics.rowHeight)),
+                              },
+                              moduleDefinition,
+                              { x: item.x, y: item.y },
+                            );
 
-                      applyLayoutPatch((current) => {
-                        const created = addModuleToLayoutAtPosition(
-                          {
-                            ...current.config,
-                            cols: previewGridMetrics.cols,
-                            rows: previewGridMetrics.rows,
-                            rowHeight: Math.max(10, Math.round(previewGridMetrics.rowHeight)),
-                          },
-                          moduleDefinition,
-                          { x: item.x, y: item.y },
-                        );
-
-                        return {
-                          ...current,
-                          config: normalizeLayoutConfigToPreviewGrid(
-                            created.config,
-                            created.config.items,
-                            previewGridMetrics.cols,
-                            previewGridMetrics.rows,
-                          ),
-                        };
-                      });
-
-                      setDraggingModuleId(null);
+                            return {
+                              ...current,
+                              config: normalizeLayoutConfigToPreviewGrid(
+                                created.config,
+                                created.config.items,
+                                previewGridMetrics.cols,
+                                previewGridMetrics.rows,
+                              ),
+                            };
+                          });
+                        })
+                        .catch((loadError) => {
+                          setError(
+                            loadError instanceof Error
+                              ? loadError.message
+                              : "Failed to load module",
+                          );
+                        })
+                        .finally(() => {
+                          setDraggingModuleId(null);
+                        });
                     }}
                     onResize={(nextItems) => {
                       applyLiveGridItems(nextItems as GridItem[]);
@@ -1120,7 +1245,7 @@ export const AdminLayoutEditorPage = () => {
                     onResizeStop={(nextItems) => persistGridItems(nextItems as GridItem[])}
                   >
                     {layout.config.modules.map((instance) => {
-                      const definition = moduleRegistry.getModule(instance.moduleId);
+                      const manifest = moduleRegistry.getModuleManifest(instance.moduleId);
 
                       return (
                         <div
@@ -1130,7 +1255,7 @@ export const AdminLayoutEditorPage = () => {
                           }`}
                         >
                           <ModuleFrame
-                            title={definition?.displayName ?? instance.moduleId}
+                            title={manifest?.displayName ?? instance.moduleId}
                             onSelect={() => setSelectedInstanceId(instance.id)}
                             onRemove={() => {
                               applyLayoutPatch((current) => {
@@ -1155,8 +1280,9 @@ export const AdminLayoutEditorPage = () => {
                               );
                             }}
                           >
-                            {definition ? (
-                              <definition.DashboardTile
+                            {manifest ? (
+                              <ModuleDashboardTile
+                                moduleId={instance.moduleId}
                                 instanceId={instance.id}
                                 config={instance.config}
                                 isEditing
@@ -1177,59 +1303,51 @@ export const AdminLayoutEditorPage = () => {
               <p className="text-sm text-slate-400">Preparing preview canvas...</p>
             )}
           </div>
-
-          <div className="mt-3 shrink-0">
-            <LayoutTypographyPanel
-              value={draftTypography}
-              onChange={(nextTypography) => {
-                setDraftTypography(nextTypography);
-              }}
-              onReset={() => {
-                setDraftTypography(DEFAULT_LAYOUT_TYPOGRAPHY);
-              }}
-            />
-          </div>
         </div>
 
-        <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900/80 p-4">
-          <h2 className="font-display text-lg font-semibold text-slate-100">{inspectorTitle}</h2>
-          {hasSelectedModuleSettings ? (
-            <p className="mt-1 text-xs text-slate-400">{selectedModuleDefinition?.displayName}</p>
-          ) : null}
-          <div className="mt-3 min-h-0 space-y-4 overflow-y-auto pr-1">
-            {!selectedInstance || !selectedModuleDefinition || !selectedModuleConfig ? (
-              <div className="rounded-lg border border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-300">
-                <p>Select a tile to edit its module settings.</p>
-                <p className="mt-2 text-xs text-slate-400">
-                  Layout-wide typography now lives below the preview canvas.
-                </p>
-              </div>
-            ) : (
-              <selectedModuleDefinition.SettingsPanel
-                config={selectedModuleConfig}
-                onChange={(nextConfig) => {
-                  applyLayoutPatch((current) => {
-                    const updatedConfig = updateModuleConfig(
-                      current.config,
-                      selectedInstance.id,
-                      nextConfig as Record<string, unknown>,
-                    );
+        {selectedInstance ? (
+          <aside className="hearth-layout-studio__inspector lg:col-span-2 xl:col-span-1">
+            <h2 className="text-xl font-semibold text-stone-900">{inspectorTitle}</h2>
+            {hasSelectedModuleSettings ? (
+              <p className="mt-1 text-xs text-slate-400">{selectedModuleDefinition?.displayName}</p>
+            ) : null}
+            <div className="mt-3 min-h-0 space-y-4 overflow-y-auto pr-1">
+              {!selectedModuleDefinition ? (
+                <div className="rounded-lg border border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-300">
+                  Loading module settings...
+                </div>
+              ) : !selectedModuleConfig ? (
+                <div className="rounded-lg border border-rose-500/50 bg-rose-500/10 p-4 text-sm text-rose-100">
+                  Module settings could not be parsed.
+                </div>
+              ) : (
+                <ModuleSettingsPanel
+                  moduleId={selectedInstance.moduleId}
+                  config={selectedModuleConfig}
+                  onChange={(nextConfig) => {
+                    applyLayoutPatch((current) => {
+                      const updatedConfig = updateModuleConfig(
+                        current.config,
+                        selectedInstance.id,
+                        nextConfig as Record<string, unknown>,
+                      );
 
-                    return {
-                      ...current,
-                      config: normalizeLayoutConfigToPreviewGrid(
-                        updatedConfig,
-                        updatedConfig.items,
-                        updatedConfig.cols,
-                        inferLayoutRows(updatedConfig),
-                      ),
-                    };
-                  });
-                }}
-              />
-            )}
-          </div>
-        </aside>
+                      return {
+                        ...current,
+                        config: normalizeLayoutConfigToPreviewGrid(
+                          updatedConfig,
+                          updatedConfig.items,
+                          updatedConfig.cols,
+                          inferLayoutRows(updatedConfig),
+                        ),
+                      };
+                    });
+                  }}
+                />
+              )}
+            </div>
+          </aside>
+        ) : null}
       </section>
     </main>
   );

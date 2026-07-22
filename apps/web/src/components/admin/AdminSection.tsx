@@ -14,17 +14,17 @@ interface AdminSectionHeaderProps {
 }
 
 export const ADMIN_SECTION_CLASS =
-  "rounded-xl border border-slate-700 bg-slate-900/70 p-4 shadow-[0_10px_26px_rgba(2,6,23,0.12)]";
-export const ADMIN_PANEL_CLASS = "rounded-lg border border-slate-800 bg-slate-950/60 p-4";
+  "rounded-2xl border border-stone-200 bg-white p-5 shadow-[0_8px_28px_rgba(40,52,50,0.04)]";
+export const ADMIN_PANEL_CLASS = "rounded-xl border border-stone-200 bg-[#fdfcf9] p-4";
 export const ADMIN_INPUT_CLASS =
-  "w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500";
+  "w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-stone-800 outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-700/10";
 export const ADMIN_BUTTON_PRIMARY_CLASS =
-  "rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60";
 export const ADMIN_BUTTON_SECONDARY_CLASS =
-  "rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 transition hover:border-teal-600 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-60";
 export const ADMIN_BUTTON_DANGER_CLASS =
-  "rounded-lg border border-rose-500/70 px-3 py-2 text-sm font-semibold text-rose-100 hover:border-rose-400 hover:text-rose-50 disabled:cursor-not-allowed disabled:opacity-60";
-export const ADMIN_META_TEXT_CLASS = "text-xs text-slate-400";
+  "rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60";
+export const ADMIN_META_TEXT_CLASS = "text-xs text-stone-500";
 
 export const AdminSection = ({
   as = "section",
@@ -50,11 +50,11 @@ export const AdminSectionHeader = ({
 }: AdminSectionHeaderProps) => (
   <div className={`flex flex-wrap items-start justify-between gap-3 ${compact ? "" : "md:gap-4"}`}>
     <div className="min-w-0 flex-1">
-      <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
-      {description ? <p className="mt-1 text-sm leading-6 text-slate-300">{description}</p> : null}
+      <h2 className="text-lg font-semibold text-stone-900">{title}</h2>
+      {description ? <p className="mt-1 text-sm leading-6 text-stone-600">{description}</p> : null}
     </div>
     {meta ? (
-      <div className="rounded-lg border border-slate-700/80 bg-slate-950/60 px-3 py-2 text-sm text-slate-300">
+      <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-600">
         {meta}
       </div>
     ) : null}

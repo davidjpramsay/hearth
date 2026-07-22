@@ -46,8 +46,8 @@ const DARK_FOREGROUND = "#020617";
 export const THEME_OPTIONS: ThemeOption[] = [
   {
     id: "default",
-    label: "Default",
-    primary: "#67E8F9",
+    label: "Hearth",
+    primary: "#157B78",
     palette: {
       "color-1": "#F97066",
       "color-2": "#F58B1F",

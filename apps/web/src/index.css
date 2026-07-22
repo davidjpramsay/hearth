@@ -3,9 +3,9 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
-  --font-display: "Space Grotesk", sans-serif;
-  --font-body: "IBM Plex Sans", sans-serif;
+  color-scheme: light;
+  --font-display: "Avenir Next", "Segoe UI", "Space Grotesk", sans-serif;
+  --font-body: "Avenir Next", "Segoe UI", "IBM Plex Sans", sans-serif;
 
   --size-app-title: clamp(2rem, 2.2vw + 1.2rem, 3rem);
   --size-section-title: 1.125rem;
@@ -44,27 +44,27 @@
   --radius-module: 0.5rem;
   --radius-module-inner: 0.25rem;
 
-  --color-bg-app: #020617;
-  --color-bg-surface: rgba(15, 23, 42, 0.8);
-  --color-bg-surface-strong: rgba(2, 6, 23, 0.6);
+  --color-bg-app: #f7f6f1;
+  --color-bg-surface: rgba(255, 254, 250, 0.9);
+  --color-bg-surface-strong: rgba(245, 242, 235, 0.94);
   --color-bg-danger: rgba(244, 63, 94, 0.1);
-  --color-border-subtle: rgba(51, 65, 85, 0.8);
+  --color-border-subtle: rgba(194, 193, 185, 0.8);
   --color-border-danger: rgba(244, 63, 94, 0.55);
 
-  --color-text-primary: #e2e8f0;
-  --color-text-secondary: #cbd5e1;
-  --color-text-muted: #94a3b8;
-  --color-text-accent: #67e8f9;
-  --color-text-accent-rgb: 103 232 249;
-  --color-text-danger: #fecdd3;
-  --color-text-danger-rgb: 254 205 211;
+  --color-text-primary: #252c2a;
+  --color-text-secondary: #4f5956;
+  --color-text-muted: #7b827f;
+  --color-text-accent: #157b78;
+  --color-text-accent-rgb: 21 123 120;
+  --color-text-danger: #9f3f48;
+  --color-text-danger-rgb: 159 63 72;
 
-  --color-status-ok: #6ee7b7;
-  --color-status-ok-rgb: 110 231 183;
-  --color-status-loading: #fcd34d;
-  --color-status-loading-rgb: 252 211 77;
-  --color-status-error: #fb7185;
-  --color-status-error-rgb: 251 113 133;
+  --color-status-ok: #668e6b;
+  --color-status-ok-rgb: 102 142 107;
+  --color-status-loading: #d39a28;
+  --color-status-loading-rgb: 211 154 40;
+  --color-status-error: #c7616a;
+  --color-status-error-rgb: 199 97 106;
 
   --theme-palette-color-1: #fb7185;
   --theme-palette-color-1-rgb: 251 113 133;
@@ -103,18 +103,18 @@
   --theme-palette-color-12-rgb: 234 179 8;
   --theme-palette-color-12-foreground: #020617;
 
-  --app-bg-gradient: radial-gradient(circle at top, #1e293b, #020617 60%);
+  --app-bg-gradient: #f7f6f1;
 
-  --tone-slate-100-rgb: 241 245 249;
-  --tone-slate-200-rgb: 226 232 240;
-  --tone-slate-300-rgb: 203 213 225;
-  --tone-slate-400-rgb: 148 163 184;
-  --tone-slate-500-rgb: 100 116 139;
-  --tone-slate-600-rgb: 71 85 105;
-  --tone-slate-700-rgb: 51 65 85;
-  --tone-slate-800-rgb: 30 41 59;
-  --tone-slate-900-rgb: 15 23 42;
-  --tone-slate-950-rgb: 2 6 23;
+  --tone-slate-100-rgb: 37 44 42;
+  --tone-slate-200-rgb: 61 70 67;
+  --tone-slate-300-rgb: 79 89 86;
+  --tone-slate-400-rgb: 123 130 127;
+  --tone-slate-500-rgb: 151 155 151;
+  --tone-slate-600-rgb: 194 193 185;
+  --tone-slate-700-rgb: 222 221 215;
+  --tone-slate-800-rgb: 240 238 232;
+  --tone-slate-900-rgb: 249 248 244;
+  --tone-slate-950-rgb: 255 254 250;
 }
 
 :root.theme-nord {
@@ -1630,4 +1630,367 @@ body {
 
 .react-flow__edge-textwrapper {
   pointer-events: none;
+}
+
+/* Hearth admin design system: calm, family-first, and intentionally separate
+   from the configurable colour themes used by the wall display. */
+.hearth-admin-shell {
+  --admin-bg: #f8f7f3;
+  --admin-surface: #fffefa;
+  --admin-ink: #252a29;
+  --admin-muted: #69716e;
+  --admin-border: #deddd7;
+  --admin-accent: #157b78;
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: 15.5rem minmax(0, 1fr);
+  background: var(--admin-bg);
+  color: var(--admin-ink);
+  color-scheme: light;
+  font-family: "Avenir Next", "Segoe UI", var(--font-body);
+}
+
+.hearth-admin-shell__rail {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  border-right: 1px solid var(--admin-border);
+  background: rgba(255, 254, 250, 0.92);
+}
+
+.hearth-admin-content {
+  min-width: 0;
+  width: 100%;
+  max-width: 94rem;
+  padding: 2.75rem clamp(1.5rem, 4vw, 4rem) 4rem;
+}
+
+.hearth-admin-page-header {
+  margin-bottom: 2rem;
+}
+
+.hearth-admin-page-header h1 {
+  font-family: "Avenir Next", "Segoe UI", var(--font-display);
+  font-size: clamp(2rem, 2.6vw, 3rem);
+  font-weight: 650;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  color: var(--admin-ink);
+}
+
+.hearth-admin-page-header p {
+  margin-top: 0.55rem;
+  max-width: 42rem;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--admin-muted);
+}
+
+.hearth-admin-nav {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  padding: 2rem 1.25rem 1.5rem;
+  color: var(--admin-ink);
+}
+
+.hearth-admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 0.75rem 2.25rem;
+  font-family: "Avenir Next", "Segoe UI", var(--font-display);
+  font-size: 1.65rem;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.hearth-admin-brand__mark {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: #f4d8ce;
+  color: #b75e47;
+}
+
+.hearth-admin-nav__select {
+  display: none;
+}
+
+.hearth-admin-nav__items {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.hearth-admin-nav__item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.9rem;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  font-size: 0.98rem;
+  font-weight: 520;
+  color: #4c5351;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.hearth-admin-nav__item:hover {
+  background: #f0f3ef;
+  color: #155e5c;
+}
+
+.hearth-admin-nav__item[aria-current="page"] {
+  background: #e4f0ed;
+  color: #116966;
+  font-weight: 650;
+}
+
+.hearth-admin-nav__item[aria-current="page"] > span:first-child {
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.hearth-admin-nav__footer {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: auto;
+  padding: 1.25rem 0.8rem 0;
+  border-top: 1px solid var(--admin-border);
+  font-size: 0.875rem;
+  color: var(--admin-muted);
+}
+
+.hearth-admin-nav__footer a:hover,
+.hearth-admin-nav__footer button:hover {
+  color: var(--admin-accent);
+}
+
+.hearth-admin-content .text-slate-100,
+.hearth-admin-content .text-slate-200 {
+  color: #292f2d !important;
+}
+
+.hearth-admin-content .text-slate-300 {
+  color: #59615e !important;
+}
+
+.hearth-admin-content .text-slate-400 {
+  color: #78807d !important;
+}
+
+.hearth-admin-content .bg-slate-900\/70,
+.hearth-admin-content .bg-slate-900\/80,
+.hearth-admin-content .bg-slate-950\/60,
+.hearth-admin-content .bg-slate-950\/70 {
+  background-color: #fffefa !important;
+}
+
+.hearth-admin-content .bg-slate-800 {
+  background-color: #f3f1ec !important;
+}
+
+.hearth-admin-content .border-slate-700,
+.hearth-admin-content .border-slate-800,
+.hearth-admin-content .border-slate-600 {
+  border-color: #deddd7 !important;
+}
+
+@media (max-width: 900px) {
+  .hearth-admin-shell {
+    display: block;
+  }
+
+  .hearth-admin-shell__rail {
+    position: relative;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--admin-border);
+  }
+
+  .hearth-admin-nav {
+    height: auto;
+    padding: max(1rem, env(safe-area-inset-top)) 1rem 1rem;
+  }
+
+  .hearth-admin-brand {
+    padding: 0 0 0.9rem;
+    font-size: 1.35rem;
+  }
+
+  .hearth-admin-nav__select {
+    display: block;
+    width: 100%;
+    border: 1px solid var(--admin-border);
+    border-radius: 0.75rem;
+    background: white;
+    padding: 0.7rem 0.8rem;
+    color: var(--admin-ink);
+  }
+
+  .hearth-admin-nav__items,
+  .hearth-admin-nav__footer {
+    display: none;
+  }
+
+  .hearth-admin-content {
+    padding: 2rem 1rem 3rem;
+  }
+}
+
+.hearth-layout-studio {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  flex-direction: column;
+  overflow-x: hidden;
+  background: #f8f7f3;
+  color: #252a29;
+  color-scheme: light;
+  font-family: "Avenir Next", "Segoe UI", var(--font-body);
+}
+
+.hearth-layout-studio__toolbar {
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 5.5rem;
+  border-bottom: 1px solid #deddd7;
+  background: rgba(255, 254, 250, 0.96);
+  padding: 1rem 1.5rem;
+}
+
+.hearth-studio-icon-button {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 1px solid #d7d5ce;
+  border-radius: 0.8rem;
+  background: white;
+  color: #3e4542;
+  font-size: 1.35rem;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.hearth-studio-icon-button:hover {
+  border-color: #157b78;
+  color: #157b78;
+}
+
+.hearth-layout-studio__library,
+.hearth-layout-studio__inspector {
+  display: flex;
+  min-width: 0;
+  max-height: 22rem;
+  flex-direction: column;
+  overflow: hidden;
+  border-color: #deddd7;
+  background: #fffefa;
+  padding: 1.4rem;
+}
+
+.hearth-layout-studio__library {
+  border-right: 1px solid #deddd7;
+}
+
+.hearth-layout-studio__inspector {
+  border-left: 1px solid #deddd7;
+}
+
+.hearth-layout-studio__canvas-region {
+  display: flex;
+  min-width: 0;
+  min-height: 34rem;
+  flex-direction: column;
+  background: #f3f0e9;
+  padding: 1.25rem;
+}
+
+.hearth-layout-studio .text-slate-100,
+.hearth-layout-studio .text-slate-200 {
+  color: #2b302f !important;
+}
+
+.hearth-layout-studio .text-slate-300 {
+  color: #555d5a !important;
+}
+
+.hearth-layout-studio .text-slate-400 {
+  color: #78807d !important;
+}
+
+.hearth-layout-studio .bg-slate-900\/70,
+.hearth-layout-studio .bg-slate-900\/80,
+.hearth-layout-studio .bg-slate-950\/60,
+.hearth-layout-studio .bg-slate-950\/70,
+.hearth-layout-studio .bg-slate-950\/75 {
+  background-color: #fffefa !important;
+}
+
+.hearth-layout-studio__inspector .bg-slate-900,
+.hearth-layout-studio__inspector .bg-slate-950 {
+  background-color: #fffefa !important;
+}
+
+.hearth-layout-studio .bg-slate-800 {
+  background-color: #f1eee8 !important;
+}
+
+.hearth-layout-studio .border-slate-600,
+.hearth-layout-studio .border-slate-700,
+.hearth-layout-studio .border-slate-800 {
+  border-color: #deddd7 !important;
+}
+
+.hearth-layout-studio .ring-cyan-400 {
+  --tw-ring-color: #157b78 !important;
+}
+
+.hearth-layout-studio .hearth-layout-resize-handle {
+  border-color: rgba(21, 123, 120, 0.55);
+  background: white;
+  box-shadow: 0 3px 12px rgba(37, 42, 41, 0.14);
+}
+
+.hearth-layout-studio .hearth-layout-resize-handle__grip {
+  background: linear-gradient(135deg, transparent 0 45%, #157b78 45% 55%, transparent 55% 100%);
+}
+
+@media (min-width: 1280px) {
+  .hearth-layout-studio {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .hearth-layout-studio__library,
+  .hearth-layout-studio__inspector {
+    max-height: none;
+    min-height: 0;
+  }
+
+  .hearth-layout-studio__canvas-region {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 1023px) {
+  .hearth-layout-studio__toolbar {
+    padding: 0.9rem 1rem;
+  }
+
+  .hearth-layout-studio__library,
+  .hearth-layout-studio__inspector {
+    border: 0;
+    border-bottom: 1px solid #deddd7;
+  }
 }

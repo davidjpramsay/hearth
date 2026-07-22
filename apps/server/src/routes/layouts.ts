@@ -237,6 +237,14 @@ export const registerLayoutRoutes = (app: FastifyInstance, services: AppServices
     if (!existingLayout) {
       return reply.code(404).send({ message: "Layout not found" });
     }
+    if (
+      parsedBody.data.expectedVersion !== undefined &&
+      existingLayout.version !== parsedBody.data.expectedVersion
+    ) {
+      return reply.code(409).send({
+        message: "Layout changed on the server. Reload the editor before saving again.",
+      });
+    }
 
     let updated;
     try {

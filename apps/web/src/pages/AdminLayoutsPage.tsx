@@ -23,6 +23,15 @@ import {
 import { logoutAdminSession } from "../auth/session";
 import { getAuthToken } from "../auth/storage";
 import { AdminNavActions } from "../components/admin/AdminNavActions";
+import {
+  AdminSection,
+  AdminSectionHeader,
+  ADMIN_BUTTON_DANGER_CLASS,
+  ADMIN_BUTTON_PRIMARY_CLASS,
+  ADMIN_BUTTON_SECONDARY_CLASS,
+  ADMIN_INPUT_CLASS,
+  ADMIN_PANEL_CLASS,
+} from "../components/admin/AdminSection";
 import type { LogicBranchTrigger } from "../components/admin/logicNodeRegistry";
 import { PageShell } from "../components/PageShell";
 import { buildDuplicateLayoutName } from "./layout-name-utils";
@@ -59,6 +68,40 @@ const GraphEditorLoading = () => (
     Loading graph editor...
   </div>
 );
+
+const LAYOUT_PREVIEW_COLORS = ["#f6d8d1", "#e4ecdf", "#e3daf0", "#dbe8f1", "#f7e4b8"];
+
+const LayoutPreview = ({ layout }: { layout: LayoutRecord }) => {
+  const rows = Math.max(
+    1,
+    ...layout.config.items.map((item) => item.y + item.h),
+    layout.config.rows ?? 1,
+  );
+  const cols = Math.max(1, layout.config.cols);
+
+  return (
+    <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-stone-200 bg-[#f8f6f0]">
+      {layout.config.items.map((item, index) => {
+        const module = layout.config.modules.find((entry) => entry.id === item.i);
+        return (
+          <div
+            key={item.i}
+            className="absolute overflow-hidden rounded-[5px] border border-white/70 p-1 text-[7px] font-semibold leading-tight text-stone-700"
+            style={{
+              left: `${(item.x / cols) * 100}%`,
+              top: `${(item.y / rows) * 100}%`,
+              width: `${(item.w / cols) * 100}%`,
+              height: `${(item.h / rows) * 100}%`,
+              background: LAYOUT_PREVIEW_COLORS[index % LAYOUT_PREVIEW_COLORS.length],
+            }}
+          >
+            {module?.moduleId.replaceAll("-", " ")}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 const defaultProfileLayouts: ScreenProfileLayouts = screenProfileLayoutsSchema.parse({});
 const defaultPhotoCollections: PhotoCollectionsConfig = photoCollectionsConfigSchema.parse({});
@@ -429,6 +472,8 @@ export const AdminLayoutsPage = () => {
   const [loading, setLoading] = useState(true);
   const [refreshingPhotoFolders, setRefreshingPhotoFolders] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [workspace, setWorkspace] = useState<"layouts" | "switching" | "photos">("layouts");
+  const [creatingLayout, setCreatingLayout] = useState(false);
 
   useEffect(() => {
     screenProfileLayoutsRef.current = screenProfileLayouts;
@@ -1080,287 +1125,364 @@ export const AdminLayoutsPage = () => {
   return (
     <PageShell
       title="Layouts"
-      subtitle="Create and manage dashboard layouts."
+      subtitle="Design what your family sees throughout the day."
       rightActions={<AdminNavActions current="layouts" onLogout={onLogout} />}
     >
-      <section className="mb-6 rounded-xl border border-slate-700 bg-slate-900/80 p-4">
-        <form className="flex flex-wrap items-end gap-3" onSubmit={onCreateLayout}>
-          <label className="flex min-w-[260px] flex-1 flex-col gap-2 text-sm text-slate-300">
-            <span>New layout name</span>
-            <input
-              value={newLayoutName}
-              onChange={(event) => setNewLayoutName(event.target.value)}
-              className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
-              required
-            />
-          </label>
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-stone-200">
+        <div className="flex gap-7" role="tablist" aria-label="Layout workspaces">
+          {(["layouts", "switching", "photos"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={workspace === tab}
+              onClick={() => setWorkspace(tab)}
+              className={`border-b-2 px-0.5 pb-3 text-sm font-semibold capitalize transition ${
+                workspace === tab
+                  ? "border-teal-700 text-teal-800"
+                  : "border-transparent text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              {tab === "switching"
+                ? "Automatic switching"
+                : tab === "photos"
+                  ? "Photo sources"
+                  : "Your layouts"}
+            </button>
+          ))}
+        </div>
+        {workspace === "layouts" ? (
           <button
-            type="submit"
-            className="h-10 rounded bg-cyan-500 px-4 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+            type="button"
+            className={`${ADMIN_BUTTON_PRIMARY_CLASS} mb-2`}
+            onClick={() => setCreatingLayout(true)}
           >
-            Create layout
+            + New layout
           </button>
-        </form>
-      </section>
+        ) : null}
+      </div>
 
-      {loading ? <p className="text-slate-300">Loading layouts...</p> : null}
       {error ? (
-        <p className="rounded border border-rose-600/70 bg-rose-500/10 px-3 py-2 text-rose-200">
+        <p className="mb-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-800">
           {error}
         </p>
       ) : null}
+      {loading ? <p className="text-stone-600">Loading your layouts…</p> : null}
 
-      <div className="grid gap-4">
-        {sortedLayouts.map((layout) => (
-          <article
-            key={layout.id}
-            className="rounded-xl border border-slate-700 bg-slate-900/70 p-4"
-          >
-            <div className="flex flex-wrap items-center gap-3">
-              <input
-                defaultValue={layout.name}
-                className="min-w-[220px] flex-1 rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter") {
-                    return;
-                  }
-                  event.preventDefault();
-                  event.currentTarget.blur();
-                }}
-                onBlur={(event) => {
-                  if (event.target.value !== layout.name) {
-                    void onRenameLayout(layout, event.target.value);
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => navigate(`/admin/layouts/${layout.id}`)}
-                className="h-10 rounded border border-slate-500 px-3 text-sm font-semibold text-slate-100 hover:border-slate-300"
-              >
-                Edit layout
-              </button>
-              <button
-                type="button"
-                onClick={() => void onDuplicateLayout(layout)}
-                className="h-10 rounded border border-cyan-500/70 px-3 text-sm font-semibold text-cyan-100 hover:bg-cyan-500/20"
-              >
-                Duplicate
-              </button>
-              <button
-                type="button"
-                onClick={() => void onDeleteLayout(layout)}
-                className="h-10 rounded border border-rose-400 px-3 text-sm font-semibold text-rose-200 hover:bg-rose-500/20"
-              >
-                Delete
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
-
-      <section className="mt-6 rounded-xl border border-slate-700 bg-slate-900/80 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-slate-100">Photo Collections</h2>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void onRefreshPhotoFolders()}
-              disabled={refreshingPhotoFolders}
-              className="h-10 rounded border border-slate-500/70 bg-slate-800/70 px-3 text-sm font-semibold text-slate-100 hover:bg-slate-700/70 disabled:cursor-not-allowed disabled:opacity-50"
+      {workspace === "layouts" ? (
+        <section>
+          {creatingLayout ? (
+            <form
+              className="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-stone-200 bg-white p-5"
+              onSubmit={(event) => {
+                void onCreateLayout(event);
+                setCreatingLayout(false);
+              }}
             >
-              {refreshingPhotoFolders ? "Refreshing..." : "Refresh folders"}
-            </button>
-            <button
-              type="button"
-              onClick={() => void onAddPhotoCollection()}
-              className="h-10 rounded border border-cyan-500/60 bg-cyan-500/10 px-3 text-sm font-semibold text-cyan-100 hover:bg-cyan-500/20"
-            >
-              Add collection
-            </button>
-          </div>
-        </div>
-        <p className="mt-1 text-sm text-slate-300">
-          <span className="block">
-            Collections are built from subfolders in your main photos library. Add one or more
-            folders to each collection.
-          </span>
-          <span className="block">
-            If no collection is selected, the default /photos library root is used.
-          </span>
-        </p>
-        {sortedPhotoLibraryFolders.length === 0 ? (
-          <p className="mt-1 text-xs text-amber-200/90">
-            No folders were found under the photos library yet.
-          </p>
-        ) : null}
-
-        <div className="mt-4 grid gap-3">
-          {photoCollectionOptions.length === 0 ? (
-            <p className="rounded border border-slate-700 bg-slate-950/60 px-3 py-3 text-sm text-slate-300">
-              No collections yet. Add one to reuse across sets and layouts.
-            </p>
-          ) : null}
-          {sortedPhotoCollections.map((collection) => (
-            <article
-              key={collection.id}
-              className="rounded-lg border border-slate-700 bg-slate-950/60 p-3"
-            >
-              <div className="flex flex-wrap items-center gap-2">
+              <label className="flex min-w-[260px] flex-1 flex-col gap-2 text-sm font-medium text-stone-700">
+                <span>Layout name</span>
                 <input
-                  defaultValue={collection.name}
-                  className="h-10 min-w-[220px] flex-1 rounded border border-slate-700 bg-slate-800 px-3 text-base font-semibold text-slate-100 outline-none focus:border-cyan-500"
-                  onBlur={(event) => {
-                    const resolvedName = toUniqueCollectionName({
-                      desiredName: event.target.value,
-                      existing: photoCollectionsRef.current.collections,
-                      excludeId: collection.id,
-                    });
-                    event.target.value = resolvedName;
-                    void onRenamePhotoCollection(collection.id, resolvedName);
-                  }}
+                  value={newLayoutName}
+                  onChange={(event) => setNewLayoutName(event.target.value)}
+                  className={ADMIN_INPUT_CLASS}
+                  autoFocus
+                  required
                 />
+              </label>
+              <button
+                type="button"
+                className={ADMIN_BUTTON_SECONDARY_CLASS}
+                onClick={() => setCreatingLayout(false)}
+              >
+                Cancel
+              </button>
+              <button type="submit" className={ADMIN_BUTTON_PRIMARY_CLASS}>
+                Create layout
+              </button>
+            </form>
+          ) : null}
+
+          <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white">
+            {sortedLayouts.map((layout, index) => (
+              <article
+                key={layout.id}
+                className="grid gap-5 border-b border-stone-200 p-5 last:border-b-0 md:grid-cols-[minmax(260px,440px)_1fr_auto] md:items-center"
+              >
                 <button
                   type="button"
-                  onClick={() => void onRemovePhotoCollection(collection.id)}
-                  className="h-10 rounded border border-rose-400/70 px-3 text-sm font-semibold text-rose-100 hover:bg-rose-500/20"
+                  onClick={() => navigate(`/admin/layouts/${layout.id}`)}
+                  className="text-left transition hover:opacity-90"
                 >
-                  Remove
+                  <LayoutPreview layout={layout} />
                 </button>
-              </div>
-
-              <div className="mt-3 space-y-2">
-                {collection.folders.map((folder, folderIndex) => (
-                  <div key={`${collection.id}-folder-${folderIndex}`} className="flex gap-2">
-                    <select
-                      value={folder}
-                      className="h-10 flex-1 rounded border border-slate-700 bg-slate-800 px-3 text-slate-100 outline-none focus:border-cyan-500"
-                      onChange={(event) => {
-                        const nextFolders = [...collection.folders];
-                        nextFolders[folderIndex] = event.target.value;
-                        void onUpdatePhotoCollectionFolders(collection.id, nextFolders);
-                      }}
-                    >
-                      {[
-                        ...sortedPhotoLibraryFolders,
-                        ...(sortedPhotoLibraryFolders.includes(folder) ? [] : [folder]),
-                      ].map((folderPath) => (
-                        <option key={folderPath} value={folderPath}>
-                          {folderPath}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextFolders = collection.folders.filter(
-                          (_entry, index) => index !== folderIndex,
-                        );
-                        void onUpdatePhotoCollectionFolders(collection.id, nextFolders);
-                      }}
-                      className="h-10 rounded border border-rose-400/60 px-3 text-xs font-semibold text-rose-100 hover:bg-rose-500/20"
-                      disabled={collection.folders.length <= 1}
-                    >
-                      Remove folder
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                className="mt-2 h-10 rounded border border-cyan-500/50 px-3 text-sm font-semibold text-cyan-100 hover:bg-cyan-500/20"
-                onClick={() => {
-                  const nextFolder = getNextCollectionFolderPath(
-                    collection.folders,
-                    sortedPhotoLibraryFolders,
-                  );
-                  if (!nextFolder) {
-                    return;
-                  }
-                  void onUpdatePhotoCollectionFolders(collection.id, [
-                    ...collection.folders,
-                    nextFolder,
-                  ]);
-                }}
-                disabled={
-                  getNextCollectionFolderPath(collection.folders, sortedPhotoLibraryFolders) ===
-                  null
-                }
-              >
-                Add folder
-              </button>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-6 rounded-xl border border-slate-700 bg-slate-900/80 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-slate-100">Layout Sets</h2>
-          <button
-            type="button"
-            onClick={() => void onAddSet()}
-            className="h-10 rounded border border-cyan-500/60 bg-cyan-500/10 px-3 text-sm font-semibold text-cyan-100 hover:bg-cyan-500/20"
-          >
-            Add set
-          </button>
-        </div>
-        <p className="mt-1 text-sm text-slate-300">
-          <span className="block">Build each set as an action graph.</span>
-          <span className="block">
-            Start with a Photo Orientation node: choose a photo source, define portrait and
-            landscape conditions, drag action and layout nodes into the top-down canvas, wire the
-            paths, and the runtime compiles that into the execution graph automatically.
-          </span>
-        </p>
-
-        <div className="mt-4 grid gap-3">
-          {setEntries.map(([setId, setConfig]) => {
-            const runtimeHealth = runtimeHealthBySetId[setId];
-
-            return (
-              <article
-                key={setId}
-                className="rounded-lg border border-slate-700 bg-slate-950/60 p-3"
-              >
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
                   <input
-                    defaultValue={setConfig.name}
-                    className="h-10 min-w-[220px] flex-1 rounded border border-slate-700 bg-slate-800 px-3 text-base font-semibold text-slate-100 outline-none focus:border-cyan-500"
+                    defaultValue={layout.name}
+                    aria-label={`Layout name: ${layout.name}`}
+                    className="w-full border-0 bg-transparent p-0 text-xl font-semibold text-stone-900 outline-none focus:text-teal-800"
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        event.currentTarget.blur();
+                      }
+                    }}
                     onBlur={(event) => {
-                      void onRenameSet(setId, event.target.value);
+                      if (event.target.value !== layout.name)
+                        void onRenameLayout(layout, event.target.value);
+                    }}
+                  />
+                  <p className="mt-2 text-sm text-stone-500">
+                    {layout.config.cols}:{layout.config.rows ?? "auto"} grid ·{" "}
+                    {layout.config.modules.length} modules
+                  </p>
+                  {index === 0 ? (
+                    <p className="mt-3 text-sm italic text-stone-500">Default fallback</p>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-2 md:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/admin/layouts/${layout.id}`)}
+                    className={ADMIN_BUTTON_PRIMARY_CLASS}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onDuplicateLayout(layout)}
+                    className={ADMIN_BUTTON_SECONDARY_CLASS}
+                  >
+                    Duplicate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onDeleteLayout(layout)}
+                    className={ADMIN_BUTTON_DANGER_CLASS}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {workspace === "photos" ? (
+        <AdminSection>
+          <AdminSectionHeader
+            title="Photo sources"
+            description="Group folders from your main photo library so layouts and switching rules can reuse them."
+            actions={
+              <>
+                <button
+                  type="button"
+                  onClick={() => void onRefreshPhotoFolders()}
+                  disabled={refreshingPhotoFolders}
+                  className={ADMIN_BUTTON_SECONDARY_CLASS}
+                >
+                  {refreshingPhotoFolders ? "Refreshing…" : "Refresh folders"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onAddPhotoCollection()}
+                  className={ADMIN_BUTTON_PRIMARY_CLASS}
+                >
+                  Add source
+                </button>
+              </>
+            }
+          />
+          {sortedPhotoLibraryFolders.length === 0 ? (
+            <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              No folders were found under the photo library yet.
+            </p>
+          ) : null}
+          <div className="mt-5 grid gap-3">
+            {photoCollectionOptions.length === 0 ? (
+              <p className={ADMIN_PANEL_CLASS}>No photo sources yet.</p>
+            ) : null}
+            {sortedPhotoCollections.map((collection) => (
+              <article key={collection.id} className={ADMIN_PANEL_CLASS}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    defaultValue={collection.name}
+                    className={`${ADMIN_INPUT_CLASS} min-w-[220px] flex-1 text-base font-semibold`}
+                    onBlur={(event) => {
+                      const resolvedName = toUniqueCollectionName({
+                        desiredName: event.target.value,
+                        existing: photoCollectionsRef.current.collections,
+                        excludeId: collection.id,
+                      });
+                      event.target.value = resolvedName;
+                      void onRenamePhotoCollection(collection.id, resolvedName);
                     }}
                   />
                   <button
                     type="button"
+                    onClick={() => void onRemovePhotoCollection(collection.id)}
+                    className={ADMIN_BUTTON_DANGER_CLASS}
+                  >
+                    Remove source
+                  </button>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {collection.folders.map((folder, folderIndex) => (
+                    <div
+                      key={`${collection.id}-folder-${folderIndex}`}
+                      className="flex flex-wrap gap-2"
+                    >
+                      <select
+                        value={folder}
+                        className={`${ADMIN_INPUT_CLASS} h-11 min-w-[220px] flex-1`}
+                        onChange={(event) => {
+                          const nextFolders = [...collection.folders];
+                          nextFolders[folderIndex] = event.target.value;
+                          void onUpdatePhotoCollectionFolders(collection.id, nextFolders);
+                        }}
+                      >
+                        {[
+                          ...sortedPhotoLibraryFolders,
+                          ...(sortedPhotoLibraryFolders.includes(folder) ? [] : [folder]),
+                        ].map((folderPath) => (
+                          <option key={folderPath} value={folderPath}>
+                            {folderPath}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void onUpdatePhotoCollectionFolders(
+                            collection.id,
+                            collection.folders.filter((_entry, index) => index !== folderIndex),
+                          )
+                        }
+                        className={ADMIN_BUTTON_DANGER_CLASS}
+                        disabled={collection.folders.length <= 1}
+                      >
+                        Remove folder
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className={`${ADMIN_BUTTON_SECONDARY_CLASS} mt-3`}
+                  onClick={() => {
+                    const nextFolder = getNextCollectionFolderPath(
+                      collection.folders,
+                      sortedPhotoLibraryFolders,
+                    );
+                    if (nextFolder)
+                      void onUpdatePhotoCollectionFolders(collection.id, [
+                        ...collection.folders,
+                        nextFolder,
+                      ]);
+                  }}
+                  disabled={
+                    getNextCollectionFolderPath(collection.folders, sortedPhotoLibraryFolders) ===
+                    null
+                  }
+                >
+                  Add folder
+                </button>
+              </article>
+            ))}
+          </div>
+        </AdminSection>
+      ) : null}
+
+      {workspace === "switching" ? (
+        <section className="space-y-5">
+          <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-stone-200 bg-white p-5">
+            <div>
+              <h2 className="text-xl font-semibold text-stone-900">Automatic switching</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
+                Choose which layout appears when the photo orientation, time, or household context
+                changes. The graph remains available for advanced rules.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void onAddSet()}
+              className={ADMIN_BUTTON_PRIMARY_CLASS}
+            >
+              Add rule set
+            </button>
+          </div>
+          {setEntries.map(([setId, setConfig]) => {
+            const runtimeHealth = runtimeHealthBySetId[setId];
+            const portrait =
+              setConfig.portraitPhotoLayoutNames[0] ??
+              setConfig.portraitPhotoLayoutName ??
+              "fallback layout";
+            const landscape =
+              setConfig.landscapePhotoLayoutNames[0] ??
+              setConfig.landscapePhotoLayoutName ??
+              "fallback layout";
+            return (
+              <article
+                key={setId}
+                className="overflow-hidden rounded-2xl border border-stone-200 bg-white"
+              >
+                <div className="flex flex-wrap items-center gap-4 border-b border-stone-200 p-5">
+                  <input
+                    defaultValue={setConfig.name}
+                    className="min-w-[220px] flex-1 border-0 bg-transparent p-0 text-xl font-semibold text-stone-900 outline-none focus:text-teal-800"
+                    onBlur={(event) => void onRenameSet(setId, event.target.value)}
+                  />
+                  <button
+                    type="button"
                     disabled={setEntries.length <= 1}
-                    className="h-10 rounded border border-rose-400/70 px-4 text-sm font-semibold text-rose-100 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-40"
-                    onClick={() => {
-                      void onRemoveSet(setId);
-                    }}
+                    className={ADMIN_BUTTON_DANGER_CLASS}
+                    onClick={() => void onRemoveSet(setId)}
                   >
                     Remove set
                   </button>
                 </div>
-
-                <Suspense fallback={<GraphEditorLoading />}>
-                  <SetLogicEditor
-                    draftStorageKey={`set-logic:${setId}`}
-                    authoring={setConfig.logicBlocks}
-                    layoutOptions={layoutOptions}
-                    photoCollectionOptions={photoCollectionOptions}
-                    runtimeHealth={runtimeHealth}
-                    onChange={(nextAuthoring) => {
-                      void onUpdateSetAuthoring(setId, nextAuthoring);
-                    }}
-                  />
-                </Suspense>
+                <div className="grid gap-4 bg-[#fbfaf7] px-5 py-4 text-sm text-stone-700 md:grid-cols-3">
+                  <p>
+                    <strong className="block text-stone-900">Portrait photo</strong>
+                    {portrait}
+                  </p>
+                  <p>
+                    <strong className="block text-stone-900">Landscape photo</strong>
+                    {landscape}
+                  </p>
+                  <p>
+                    <strong className="block text-stone-900">Runtime</strong>
+                    {runtimeHealth.status === "ok"
+                      ? "Ready"
+                      : `${runtimeHealth.issues.length} items need attention`}
+                  </p>
+                </div>
+                <details className="group">
+                  <summary className="cursor-pointer list-none border-t border-stone-200 px-5 py-4 font-semibold text-teal-800">
+                    Advanced rule editor{" "}
+                    <span className="ml-1 text-stone-400 group-open:hidden">+</span>
+                    <span className="ml-1 hidden text-stone-400 group-open:inline">−</span>
+                  </summary>
+                  <div className="border-t border-stone-200 p-4">
+                    <Suspense fallback={<GraphEditorLoading />}>
+                      <SetLogicEditor
+                        draftStorageKey={`set-logic:${setId}`}
+                        authoring={setConfig.logicBlocks}
+                        layoutOptions={layoutOptions}
+                        photoCollectionOptions={photoCollectionOptions}
+                        runtimeHealth={runtimeHealth}
+                        onChange={(nextAuthoring) =>
+                          void onUpdateSetAuthoring(setId, nextAuthoring)
+                        }
+                      />
+                    </Suspense>
+                  </div>
+                </details>
               </article>
             );
           })}
-        </div>
-      </section>
+        </section>
+      ) : null}
     </PageShell>
   );
 };

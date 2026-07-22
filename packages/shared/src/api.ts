@@ -20,6 +20,7 @@ export const updateLayoutRequestSchema = z
   .object({
     name: z.string().trim().min(1).max(80).optional(),
     config: layoutConfigSchema.optional(),
+    expectedVersion: z.number().int().min(1).optional(),
   })
   .refine((value) => value.name !== undefined || value.config !== undefined, {
     message: "At least one field is required",

@@ -35,7 +35,7 @@ import {
   useBrowserOnlineStatus,
 } from "../modules/data/connection-state";
 import { ModuleConnectionBadge } from "../modules/ui/ModuleConnectionBadge";
-import { moduleRegistry } from "../registry/module-registry";
+import { ModuleDashboardTile, moduleRegistry } from "../registry/module-registry";
 import { getDisplayNowMs, syncDisplayTimeContext } from "../runtime/display-time";
 import { applyTheme } from "../theme/theme";
 import {
@@ -715,13 +715,13 @@ export const DashboardPage = () => {
     if (!layout) {
       return [] as Array<{
         instance: ModuleInstance;
-        moduleDefinition: ReturnType<typeof moduleRegistry.getModule>;
+        moduleManifest: ReturnType<typeof moduleRegistry.getModuleManifest>;
       }>;
     }
 
     return layout.config.modules.map((instance) => ({
       instance,
-      moduleDefinition: moduleRegistry.getModule(instance.moduleId),
+      moduleManifest: moduleRegistry.getModuleManifest(instance.moduleId),
     }));
   }, []);
 
@@ -805,15 +805,16 @@ export const DashboardPage = () => {
         containerPadding={[0, 0]}
         useCSSTransforms={false}
       >
-        {input.renderedModules.map(({ instance, moduleDefinition }) => (
+        {input.renderedModules.map(({ instance, moduleManifest }) => (
           <div key={instance.id} className="module-tile-host h-full w-full min-h-0">
-            {moduleDefinition ? (
+            {moduleManifest ? (
               <div className="h-full w-full min-h-0 overflow-hidden rounded-lg">
                 <DashboardModuleErrorBoundary
                   boundaryKey={`${activeLayout?.id ?? "layout"}:${activeLayout?.version ?? 0}:${instance.id}`}
-                  moduleName={moduleDefinition.displayName}
+                  moduleName={moduleManifest.displayName}
                 >
-                  <moduleDefinition.DashboardTile
+                  <ModuleDashboardTile
+                    moduleId={instance.moduleId}
                     instanceId={instance.id}
                     config={instance.config}
                   />
