@@ -563,11 +563,11 @@ const DEFAULT_LAYOUT_SEEDS: DefaultLayoutSeed[] = [
       rows: 20,
       rowHeight: 54,
       items: [
-        { i: "mod-cfac714f-dca1-4474-99c5-fd5d330f0174", x: 0, y: 0, w: 6, h: 2 },
-        { i: "mod-c0df2f00-b51b-44b2-a09a-30e5dd7a381b", x: 7, y: 0, w: 4, h: 2 },
-        { i: "mod-37fc8626-bafa-4d11-a155-fd8c64d0a31e", x: 12, y: 0, w: 23, h: 20 },
-        { i: "mod-871c01c0-6597-47b7-8439-26a8b16f6338", x: 0, y: 3, w: 11, h: 8 },
-        { i: "mod-be8d6a1a-16c9-491d-871b-5d49efd2393f", x: 0, y: 12, w: 11, h: 8 },
+        { i: "mod-cfac714f-dca1-4474-99c5-fd5d330f0174", x: 0, y: 0, w: 7, h: 4 },
+        { i: "mod-c0df2f00-b51b-44b2-a09a-30e5dd7a381b", x: 7, y: 0, w: 6, h: 4 },
+        { i: "mod-37fc8626-bafa-4d11-a155-fd8c64d0a31e", x: 0, y: 4, w: 25, h: 16 },
+        { i: "mod-871c01c0-6597-47b7-8439-26a8b16f6338", x: 25, y: 0, w: 10, h: 10 },
+        { i: "mod-be8d6a1a-16c9-491d-871b-5d49efd2393f", x: 25, y: 10, w: 10, h: 10 },
       ],
       modules: [
         {
@@ -637,13 +637,13 @@ const DEFAULT_LAYOUT_SEEDS: DefaultLayoutSeed[] = [
       rows: 20,
       rowHeight: 54,
       items: [
-        { i: "mod-b7b3d37d-6305-427c-a651-a4804da36a87", x: 0, y: 0, w: 9, h: 3 },
-        { i: "mod-be0136c8-b34b-45d6-b7b1-23f4d5e157d0", x: 10, y: 0, w: 15, h: 20 },
-        { i: "mod-8123d00e-1782-4aec-94b5-89b89a5c3f10", x: 26, y: 0, w: 9, h: 10 },
-        { i: "mod-481fd8c4-ef25-4482-b95f-62ab3ef1dbea", x: 0, y: 4, w: 9, h: 5 },
-        { i: "mod-348d50e7-ff55-4d90-82c8-353a71ef3a7d", x: 0, y: 10, w: 9, h: 5 },
-        { i: "mod-1e692127-17d0-437f-9ea0-59df713f9733", x: 26, y: 11, w: 9, h: 9 },
-        { i: "mod-2bf2f15e-9efd-4f92-9594-0106517e8a8e", x: 0, y: 16, w: 9, h: 4 },
+        { i: "mod-b7b3d37d-6305-427c-a651-a4804da36a87", x: 0, y: 0, w: 8, h: 4 },
+        { i: "mod-be0136c8-b34b-45d6-b7b1-23f4d5e157d0", x: 8, y: 0, w: 12, h: 20 },
+        { i: "mod-8123d00e-1782-4aec-94b5-89b89a5c3f10", x: 20, y: 0, w: 15, h: 11 },
+        { i: "mod-481fd8c4-ef25-4482-b95f-62ab3ef1dbea", x: 0, y: 4, w: 8, h: 5 },
+        { i: "mod-348d50e7-ff55-4d90-82c8-353a71ef3a7d", x: 0, y: 9, w: 8, h: 5 },
+        { i: "mod-1e692127-17d0-437f-9ea0-59df713f9733", x: 20, y: 11, w: 15, h: 9 },
+        { i: "mod-2bf2f15e-9efd-4f92-9594-0106517e8a8e", x: 0, y: 14, w: 8, h: 6 },
       ],
       modules: [
         {
@@ -759,8 +759,8 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
       { i: "clock", x: 0, y: 0, w: 8, h: 4 },
       { i: "weather", x: 8, y: 0, w: 7, h: 4 },
       { i: "calendar", x: 0, y: 4, w: 24, h: 14 },
-      { i: "chores", x: 24, y: 0, w: 8, h: 9 },
-      { i: "photos", x: 24, y: 9, w: 8, h: 9 },
+      { i: "photos", x: 24, y: 0, w: 8, h: 9 },
+      { i: "chores", x: 24, y: 9, w: 8, h: 9 },
     ],
   },
   {
@@ -775,8 +775,8 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
       { i: "clock", x: 0, y: 0, w: 6, h: 3 },
       { i: "weather", x: 6, y: 0, w: 5, h: 3 },
       { i: "calendar", x: 0, y: 3, w: 14, h: 12 },
-      { i: "chores", x: 14, y: 0, w: 6, h: 8 },
-      { i: "photos", x: 14, y: 8, w: 6, h: 7 },
+      { i: "photos", x: 14, y: 0, w: 6, h: 8 },
+      { i: "chores", x: 14, y: 8, w: 6, h: 7 },
     ],
   },
   {
@@ -791,8 +791,8 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
       { i: "clock", x: 0, y: 0, w: 6, h: 3 },
       { i: "weather", x: 6, y: 0, w: 5, h: 3 },
       { i: "calendar", x: 0, y: 3, w: 15, h: 11 },
-      { i: "chores", x: 15, y: 0, w: 6, h: 7 },
-      { i: "photos", x: 15, y: 7, w: 6, h: 7 },
+      { i: "photos", x: 15, y: 0, w: 6, h: 7 },
+      { i: "chores", x: 15, y: 7, w: 6, h: 7 },
     ],
   },
   {
@@ -806,9 +806,9 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
     items: [
       { i: "clock", x: 0, y: 0, w: 10, h: 4 },
       { i: "weather", x: 10, y: 0, w: 8, h: 4 },
-      { i: "calendar", x: 0, y: 4, w: 18, h: 16 },
-      { i: "chores", x: 0, y: 20, w: 9, h: 12 },
-      { i: "photos", x: 9, y: 20, w: 9, h: 12 },
+      { i: "photos", x: 0, y: 4, w: 18, h: 10 },
+      { i: "calendar", x: 0, y: 14, w: 18, h: 10 },
+      { i: "chores", x: 0, y: 24, w: 18, h: 8 },
     ],
   },
   {
@@ -822,9 +822,9 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
     items: [
       { i: "clock", x: 0, y: 0, w: 8, h: 3 },
       { i: "weather", x: 8, y: 0, w: 7, h: 3 },
-      { i: "calendar", x: 0, y: 3, w: 15, h: 9 },
-      { i: "chores", x: 0, y: 12, w: 8, h: 8 },
-      { i: "photos", x: 8, y: 12, w: 7, h: 8 },
+      { i: "photos", x: 0, y: 3, w: 15, h: 6 },
+      { i: "calendar", x: 0, y: 9, w: 15, h: 6 },
+      { i: "chores", x: 0, y: 15, w: 15, h: 5 },
     ],
   },
   {
@@ -1062,13 +1062,52 @@ const seedDefaultLayoutsAndSettings = (db: Database.Database): void => {
         .all()
         .map((row) => row.name),
     );
-    const seeds =
-      existingLayoutNames.size === 0
-        ? [...DEFAULT_LAYOUT_SEEDS, ...STARTER_LAYOUT_SEEDS]
-        : STARTER_LAYOUT_SEEDS;
+    const hadExistingLayouts = existingLayoutNames.size > 0;
+    const legacyDefaultNames = new Set(DEFAULT_LAYOUT_SEEDS.map((seed) => seed.name));
+    const seeds = [...DEFAULT_LAYOUT_SEEDS, ...STARTER_LAYOUT_SEEDS];
 
     for (const seed of seeds) {
       if (existingLayoutNames.has(seed.name)) {
+        const existing = db
+          .prepare<
+            { name: string },
+            { id: number; version: number; config_json: string }
+          >("SELECT id, version, config_json FROM layouts WHERE name = @name")
+          .get({ name: seed.name });
+        if (existing?.version === 1) {
+          try {
+            const existingConfig = JSON.parse(existing.config_json) as {
+              modules?: Array<{ id?: unknown }>;
+            };
+            const seedConfig = seed.config as { modules?: Array<{ id?: unknown }> };
+            const expectedModuleIds = new Set(
+              seedConfig.modules?.flatMap((module) =>
+                typeof module.id === "string" ? [module.id] : [],
+              ) ?? [],
+            );
+            const isUntouchedStarter =
+              expectedModuleIds.size > 0 &&
+              existingConfig.modules?.length === expectedModuleIds.size &&
+              existingConfig.modules.every(
+                (module) => typeof module.id === "string" && expectedModuleIds.has(module.id),
+              );
+            const configJson = JSON.stringify(seed.config);
+            if (isUntouchedStarter && existing.config_json !== configJson) {
+              db.prepare(
+                "UPDATE layouts SET config_json = @configJson, version = 2, updated_at = CURRENT_TIMESTAMP WHERE id = @id",
+              ).run({ id: existing.id, configJson });
+              db.prepare(
+                "INSERT OR IGNORE INTO layout_versions (layout_id, version, config_json) VALUES (@layoutId, 2, @configJson)",
+              ).run({ layoutId: existing.id, configJson });
+            }
+          } catch {
+            // Preserve malformed or user-modified layouts for manual recovery.
+          }
+        }
+        continue;
+      }
+
+      if (hadExistingLayouts && legacyDefaultNames.has(seed.name)) {
         continue;
       }
 

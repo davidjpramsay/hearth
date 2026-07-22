@@ -60,6 +60,7 @@ export interface ModuleComponentProps<TSettings, TData> {
   loading: boolean;
   error: string | null;
   isEditing?: boolean;
+  presentationMode?: "tile" | "focus";
 }
 
 export interface ModuleRuntime<TSettings, TData> {

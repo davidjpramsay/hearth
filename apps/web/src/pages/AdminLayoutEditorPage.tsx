@@ -53,6 +53,14 @@ const PREVIEW_CANVAS_BASE_WIDTH = 1920;
 const GRID_MARGIN_PX = 0;
 const PREVIEW_GRID_MAJOR_STEP = 4;
 const MODULE_SWATCHES = ["#f6d8d1", "#e4ecdf", "#e3daf0", "#dbe8f1", "#f7e4b8"];
+const ASPECT_RATIO_PRESETS = [
+  { label: "Wide display", width: 16, height: 9 },
+  { label: "Classic display", width: 4, height: 3 },
+  { label: "Balanced display", width: 3, height: 2 },
+  { label: "Portrait display", width: 9, height: 16 },
+  { label: "Tall display", width: 3, height: 4 },
+  { label: "Square display", width: 1, height: 1 },
+] as const;
 
 const toPositiveNumberOr = (value: string, fallback: number): number => {
   const parsed = Number(value);
@@ -944,34 +952,74 @@ export const AdminLayoutEditorPage = () => {
               />
             </div>
           </details>
-          <div className="flex items-center gap-1 rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700">
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={customAspectWidth}
-              onChange={(event) => setCustomAspectWidth(event.target.value)}
-              className="w-8 bg-transparent text-center outline-none"
-              aria-label="Custom ratio width"
-            />
-            <span>:</span>
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={customAspectHeight}
-              onChange={(event) => setCustomAspectHeight(event.target.value)}
-              className="w-8 bg-transparent text-center outline-none"
-              aria-label="Custom ratio height"
-            />
-          </div>
+          <details className="relative">
+            <summary className="list-none cursor-pointer rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 hover:border-teal-600">
+              Screen · {customAspectWidth}:{customAspectHeight}
+            </summary>
+            <div className="absolute right-0 top-12 z-50 w-[min(420px,88vw)] rounded-2xl border border-stone-200 bg-white p-4 shadow-xl">
+              <p className="text-sm font-semibold text-stone-900">Preview screen</p>
+              <p className="mt-1 text-xs leading-5 text-stone-500">
+                Test the same layout on common wall displays. The grid and typography adapt without
+                changing your modules.
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {ASPECT_RATIO_PRESETS.map((preset) => {
+                  const selected =
+                    customAspectWidth === String(preset.width) &&
+                    customAspectHeight === String(preset.height);
+                  return (
+                    <button
+                      key={`${preset.width}:${preset.height}`}
+                      type="button"
+                      onClick={() => {
+                        setCustomAspectWidth(String(preset.width));
+                        setCustomAspectHeight(String(preset.height));
+                      }}
+                      className={`rounded-xl border px-3 py-2 text-left transition ${
+                        selected
+                          ? "border-teal-600 bg-teal-50 text-teal-900"
+                          : "border-stone-200 text-stone-700 hover:border-stone-400"
+                      }`}
+                    >
+                      <span className="block text-sm font-semibold">
+                        {preset.width}:{preset.height}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-stone-500">{preset.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
+                <span className="mr-auto font-medium">Custom ratio</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={customAspectWidth}
+                  onChange={(event) => setCustomAspectWidth(event.target.value)}
+                  className="w-12 rounded-md border border-stone-300 bg-white px-1.5 py-1 text-center outline-none focus:border-teal-600"
+                  aria-label="Custom ratio width"
+                />
+                <span>:</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={customAspectHeight}
+                  onChange={(event) => setCustomAspectHeight(event.target.value)}
+                  className="w-12 rounded-md border border-stone-300 bg-white px-1.5 py-1 text-center outline-none focus:border-teal-600"
+                  aria-label="Custom ratio height"
+                />
+              </div>
+            </div>
+          </details>
           <a
             href="/"
             target="_blank"
             rel="noreferrer"
             className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:border-teal-600"
           >
-            Preview
+            Open interactive display
           </a>
         </div>
       </header>
@@ -1026,6 +1074,11 @@ export const AdminLayoutEditorPage = () => {
                         Default size: {moduleManifest.defaultSize.w} x{" "}
                         {moduleManifest.defaultSize.h}
                       </p>
+                      {moduleManifest.id === "photos" || moduleManifest.id === "chores" ? (
+                        <p className="mt-1 text-xs font-semibold text-teal-700">
+                          Interactive on the live display
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                   <button

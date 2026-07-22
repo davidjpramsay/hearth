@@ -71,6 +71,7 @@ export const adaptSdkModule = (definition: SdkModuleAny): RegisteredModuleDefini
           loading={false}
           error={null}
           isEditing={props.isEditing}
+          presentationMode={props.presentationMode}
         />
       );
     },

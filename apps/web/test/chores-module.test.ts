@@ -451,7 +451,8 @@ test("chores module keeps incomplete items first and shows actual earned payout"
 
     const tree = JSON.stringify(renderer?.toJSON());
     assert.ok(tree.indexOf("Open Task") < tree.indexOf("Completed Task"));
-    assert.ok(tree.includes('"children":["Pay $","0.00"," / $","10.00"]'));
+    assert.ok(tree.includes("Earned $"));
+    assert.ok(tree.includes('"0.00"," of $","10.00"'));
   } finally {
     await act(async () => {
       renderer?.unmount();

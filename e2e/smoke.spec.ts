@@ -36,7 +36,127 @@ const hasNodeGateCount = (value: unknown, nodeId: string, expectedCount: number)
   return Object.values(record).some((entry) => hasNodeGateCount(entry, nodeId, expectedCount));
 };
 
+const buildChoresBoard = (completed: boolean) => ({
+  generatedAt: new Date().toISOString(),
+  startDate: "2026-07-23",
+  days: 1,
+  payoutConfig: {
+    mode: "all-or-nothing",
+    oneOffBonusEnabled: true,
+    paydayDayOfWeek: 6,
+    siteTimezone: "Australia/Perth",
+  },
+  members: [
+    {
+      id: 1,
+      name: "Alex",
+      avatarUrl: null,
+      weeklyAllowance: 5,
+      createdAt: "2026-07-23T00:00:00.000Z",
+      updatedAt: "2026-07-23T00:00:00.000Z",
+    },
+  ],
+  chores: [
+    {
+      id: 1,
+      name: "Make bed",
+      memberId: 1,
+      schedule: { type: "daily" },
+      startsOn: "2026-07-23",
+      valueAmount: 1,
+      active: true,
+      createdAt: "2026-07-23T00:00:00.000Z",
+      updatedAt: "2026-07-23T00:00:00.000Z",
+    },
+  ],
+  board: [
+    {
+      date: "2026-07-23",
+      items: [
+        {
+          date: "2026-07-23",
+          choreId: 1,
+          choreName: "Make bed",
+          memberId: 1,
+          memberName: "Alex",
+          memberAvatarUrl: null,
+          schedule: { type: "daily" },
+          valueAmount: 1,
+          completed,
+        },
+      ],
+    },
+  ],
+  stats: {
+    dailyCompletionRate: completed ? 1 : 0,
+    weeklyCompletedCount: completed ? 1 : 0,
+    weeklyTotalValue: completed ? 1 : 0,
+    weeklyByMember: [
+      {
+        memberId: 1,
+        memberName: "Alex",
+        memberAvatarUrl: null,
+        completedCount: completed ? 1 : 0,
+        totalValue: completed ? 1 : 0,
+        recurringScheduledCount: 1,
+        recurringCompletedCount: completed ? 1 : 0,
+        completionRatio: completed ? 1 : 0,
+        baseAllowance: 5,
+        basePayout: completed ? 5 : 0,
+        bonusPayout: 0,
+        payoutTotal: completed ? 5 : 0,
+      },
+    ],
+  },
+});
+
 test.describe("Hearth smoke", () => {
+  test("dashboard opens focused chores and persists a completion", async ({ page }) => {
+    let completed = false;
+    await page.route("**/api/modules/chores/*/summary*", async (route) => {
+      await route.fulfill({ json: buildChoresBoard(completed) });
+    });
+    await page.route("**/api/modules/chores/*/completions", async (route) => {
+      completed = true;
+      await route.fulfill({ json: buildChoresBoard(true) });
+    });
+
+    await page.goto("/");
+    const viewDock = page.getByRole("navigation", { name: "Dashboard views" });
+    await expect(viewDock).toBeVisible();
+    await viewDock.getByRole("button", { name: "Chores" }).click();
+    await expect(page.getByRole("region", { name: "Chores view" })).toBeVisible();
+
+    const choreCheckbox = page.getByRole("checkbox", { name: "Make bed" });
+    await expect(choreCheckbox).toBeVisible();
+    await choreCheckbox.check();
+    await expect(choreCheckbox).toBeChecked();
+    await expect.poll(() => completed).toBe(true);
+
+    await page.getByRole("button", { name: "Back to Home" }).click();
+    await expect(viewDock.getByRole("button", { name: "Home" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  test("dashboard photo fullscreen closes after five seconds", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("navigation", { name: "Dashboard views" })).toBeVisible();
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new CustomEvent("hearth:open-photo", {
+          detail: { imageUrl: "/icons/icon-512.png", alt: "Family memory" },
+        }),
+      );
+    });
+
+    const fullscreenPhoto = page.getByRole("region", { name: "Fullscreen photo" });
+    await expect(fullscreenPhoto).toBeVisible();
+    await expect(fullscreenPhoto.getByRole("img", { name: "Family memory" })).toBeVisible();
+    await expect(fullscreenPhoto).toBeHidden({ timeout: 6_500 });
+  });
+
   test("admin login survives logout and re-login", async ({ page }) => {
     await loginAsAdmin(page);
 
@@ -65,7 +185,7 @@ test.describe("Hearth smoke", () => {
       .poll(async () => {
         const bodyText = await page.locator("body").innerText();
         return (
-          bodyText.includes("Today's Chores") ||
+          bodyText.includes("Chores") ||
           bodyText.includes("No display layout is configured for this screen")
         );
       })

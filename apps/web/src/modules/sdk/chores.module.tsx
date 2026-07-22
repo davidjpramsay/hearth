@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   choresBoardResponseSchema,
   choresModuleConfigSchema,
@@ -135,7 +135,7 @@ export const moduleDefinition = defineModule({
   settingsSchema: choresModuleConfigSchema,
   dataSchema: choresBoardResponseSchema,
   runtime: {
-    Component: ({ instanceId, settings, isEditing }) => {
+    Component: ({ instanceId, settings, isEditing, presentationMode = "tile" }) => {
       const runtimeSiteTimeZone = getDisplaySiteTimeZone();
       const snapshotKey = useMemo(
         () => buildChoresSnapshotKey(instanceId, settings.enableMoneyTracking),
@@ -160,6 +160,7 @@ export const moduleDefinition = defineModule({
       const [loading, setLoading] = useState(() => initialSnapshot === null);
       const [error, setError] = useState<string | null>(null);
       const [savingKeys, setSavingKeys] = useState<string[]>([]);
+      const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
       const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(
         () => initialSnapshot?.updatedAtMs ?? null,
       );
@@ -387,18 +388,38 @@ export const moduleDefinition = defineModule({
         }
       };
 
+      const activeMemberId = memberRows.some((member) => member.memberId === selectedMemberId)
+        ? selectedMemberId
+        : (memberRows[0]?.memberId ?? null);
+      const activeMember = memberRows.find((member) => member.memberId === activeMemberId) ?? null;
+      const visibleItems =
+        activeMemberId === null ? [] : (todayItemsByMember.get(activeMemberId) ?? []);
+      const activeCompletionPercent = activeMember
+        ? Math.round(activeMember.completionRatio * 100)
+        : 0;
+      const memberAccents = ["#f27668", "#668bc2", "#dda427", "#8ca27b", "#9a7bb8"];
+
       return (
-        <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 p-2 text-slate-100">
+        <div
+          className={`chores-module relative flex h-full min-h-0 flex-col overflow-hidden ${presentationMode === "focus" ? "chores-module--focus" : "chores-module--tile"}`}
+        >
           <ModuleConnectionBadge
             visible={connectivityState.showDisconnected}
             title={connectivityState.disconnectedTitle ?? undefined}
             label={connectivityState.disconnectedLabel}
           />
-          <header className="mb-2 flex items-center justify-between rounded border border-slate-700 bg-slate-900/80 px-3 py-2">
-            <p className="module-copy-title text-slate-100">Today&apos;s Chores</p>
-            <p className="module-copy-meta rounded border border-slate-700/70 bg-slate-950/60 px-2 py-1 text-slate-300">
-              {`${totalTodayCompleted} of ${todayItems.length}`}
-            </p>
+          <header className="chores-module__heading">
+            <div>
+              <p className="module-copy-label">Today</p>
+              <h2 className="module-copy-title">Chores</h2>
+            </div>
+            <div
+              className="chores-module__total"
+              aria-label={`${totalTodayCompleted} of ${todayItems.length} chores complete`}
+            >
+              <strong>{totalTodayCompleted}</strong>
+              <span>/ {todayItems.length}</span>
+            </div>
           </header>
 
           {loading ? <ModuleSkeleton variant="list" /> : null}
@@ -409,81 +430,98 @@ export const moduleDefinition = defineModule({
           ) : null}
 
           {!loading && !connectivityState.blockingError ? (
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-              {memberRows.map((member) => {
-                const memberItems = todayItemsByMember.get(member.memberId) ?? [];
-                const completionPercent = Math.round(member.completionRatio * 100);
+            <div className="chores-module__content">
+              <div
+                className="chores-module__members"
+                role="tablist"
+                aria-label="Choose a family member"
+              >
+                {memberRows.map((member, memberIndex) => {
+                  const completionPercent = Math.round(member.completionRatio * 100);
+                  const isSelected = member.memberId === activeMemberId;
+                  const accent = memberAccents[memberIndex % memberAccents.length];
+                  return (
+                    <button
+                      key={member.memberId}
+                      type="button"
+                      role="tab"
+                      aria-selected={isSelected}
+                      className={isSelected ? "is-selected" : undefined}
+                      style={{ "--chore-member-accent": accent } as CSSProperties}
+                      onClick={() => setSelectedMemberId(member.memberId)}
+                    >
+                      <span className="chores-module__avatar">
+                        {member.memberAvatarUrl ? (
+                          <img src={member.memberAvatarUrl} alt="" />
+                        ) : (
+                          member.memberName.slice(0, 1).toUpperCase()
+                        )}
+                      </span>
+                      <span className="chores-module__member-copy">
+                        <strong>{member.memberName}</strong>
+                        <small>{completionPercent}% this week</small>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
 
-                return (
-                  <section
-                    key={member.memberId}
-                    className="rounded border border-slate-700 bg-slate-900/70"
-                  >
-                    <header className="flex items-center justify-between gap-3 border-b border-slate-700 px-2.5 py-2">
-                      <p className="module-copy-title text-slate-100">{member.memberName}</p>
-                      {settings.showStats ? (
-                        <div className="flex flex-wrap items-center justify-end gap-1.5 text-slate-300">
-                          <span className="module-copy-meta rounded border border-cyan-500/40 bg-cyan-500/10 px-2 py-1 text-cyan-200">
-                            Week {completionPercent}%
-                          </span>
-                          {settings.enableMoneyTracking ? (
-                            <span className="module-copy-meta rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-emerald-200">
-                              Pay ${member.basePayout.toFixed(2)} / $
-                              {member.baseAllowance.toFixed(2)}
-                            </span>
-                          ) : null}
-                          {settings.enableMoneyTracking && member.bonusPayout > 0 ? (
-                            <span className="module-copy-meta rounded border border-emerald-500/30 bg-emerald-500/5 px-2 py-1 text-emerald-100">
-                              +${member.bonusPayout.toFixed(2)} bonus
-                            </span>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </header>
-
-                    <div className="space-y-1.5 px-2.5 py-2">
-                      {memberItems.length > 0 ? (
-                        memberItems.map((item) => (
-                          <label
-                            key={itemKey(item)}
-                            className={`flex items-center gap-2.5 rounded border px-2.5 py-1.5 ${
-                              item.completed
-                                ? "border-emerald-500/60 bg-emerald-500/15"
-                                : "border-slate-700 bg-slate-900/90"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={item.completed}
-                              disabled={savingSet.has(itemKey(item))}
-                              onChange={(event) =>
-                                void onToggleCompletion(item, event.currentTarget.checked)
-                              }
-                              className="h-4 w-4 accent-cyan-500"
-                            />
-                            <span className="module-copy-body min-w-0 flex-1 text-slate-100">
-                              {item.choreName}
-                            </span>
-                            {settings.enableMoneyTracking && item.valueAmount !== null ? (
-                              <span className="module-copy-meta text-emerald-200">
-                                ${item.valueAmount.toFixed(2)}
-                              </span>
-                            ) : null}
-                          </label>
-                        ))
-                      ) : (
-                        <p className="module-copy-meta rounded border border-slate-700 bg-slate-900/60 px-2.5 py-1.5 text-slate-300">
-                          No chores today.
-                        </p>
-                      )}
+              {activeMember ? (
+                <section className="chores-module__list" role="tabpanel">
+                  <header>
+                    <div>
+                      <p className="module-copy-label">{activeMember.memberName}&apos;s list</p>
+                      <p className="module-copy-body">Tap a chore when it&apos;s done.</p>
                     </div>
-                  </section>
-                );
-              })}
+                    {settings.showStats ? (
+                      <div className="chores-module__progress">
+                        <div>
+                          <strong>{activeCompletionPercent}%</strong>
+                          <span>this week</span>
+                        </div>
+                        {settings.enableMoneyTracking ? (
+                          <small>
+                            Earned ${activeMember.basePayout.toFixed(2)} of $
+                            {activeMember.baseAllowance.toFixed(2)}
+                          </small>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </header>
+                  <div className="chores-module__items">
+                    {visibleItems.length > 0 ? (
+                      visibleItems.map((item) => (
+                        <label
+                          key={itemKey(item)}
+                          className={item.completed ? "is-complete" : undefined}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={item.completed}
+                            disabled={savingSet.has(itemKey(item))}
+                            onChange={(event) =>
+                              void onToggleCompletion(item, event.currentTarget.checked)
+                            }
+                          />
+                          <span className="chores-module__check" aria-hidden>
+                            {item.completed ? "✓" : ""}
+                          </span>
+                          <span className="chores-module__name">{item.choreName}</span>
+                          {settings.enableMoneyTracking && item.valueAmount !== null ? (
+                            <span className="chores-module__value">
+                              ${item.valueAmount.toFixed(2)}
+                            </span>
+                          ) : null}
+                        </label>
+                      ))
+                    ) : (
+                      <p className="chores-module__empty">Nothing left for today. Nice work!</p>
+                    )}
+                  </div>
+                </section>
+              ) : null}
               {memberRows.length === 0 ? (
-                <p className="module-copy-meta rounded border border-slate-700 bg-slate-900/60 px-2.5 py-1.5 text-slate-300">
-                  No children configured yet.
-                </p>
+                <p className="chores-module__empty">No children configured yet.</p>
               ) : null}
             </div>
           ) : null}

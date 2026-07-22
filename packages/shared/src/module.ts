@@ -13,6 +13,7 @@ export interface DashboardTileProps<TConfig = unknown> {
   instanceId: string;
   config: TConfig;
   isEditing?: boolean;
+  presentationMode?: "tile" | "focus";
 }
 
 export interface SettingsPanelProps<TConfig = unknown> {

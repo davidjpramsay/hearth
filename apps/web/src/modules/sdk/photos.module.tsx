@@ -30,6 +30,7 @@ const DISPLAY_CYCLE_SECONDS_STORAGE_KEY = "hearth:display-cycle-seconds";
 const DISPLAY_PHOTO_COLLECTION_ID_STORAGE_KEY = "hearth:display-photo-collection-id";
 const DISPLAY_CYCLE_CONTEXT_EVENT = "hearth:display-cycle-context";
 const PHOTO_LIBRARY_UPDATED_EVENT = "hearth:photos-updated";
+const DASHBOARD_OPEN_PHOTO_EVENT = "hearth:open-photo";
 const LEGACY_PHOTO_LIBRARY_ROOT_LABEL = "/photos";
 
 interface DisplayCycleContextEventDetail {
@@ -629,7 +630,22 @@ export const moduleDefinition = defineModule({
       }
 
       return (
-        <div className="relative h-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950">
+        <button
+          type="button"
+          className="group relative block h-full w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 text-left disabled:cursor-default"
+          disabled={!displayFrame}
+          aria-label={
+            displayFrame ? `Open ${displayFrame.filename} fullscreen for five seconds` : "Photos"
+          }
+          onClick={() => {
+            if (!displayFrame) return;
+            window.dispatchEvent(
+              new CustomEvent(DASHBOARD_OPEN_PHOTO_EVENT, {
+                detail: { imageUrl: displayFrame.imageUrl, alt: displayFrame.filename },
+              }),
+            );
+          }}
+        >
           <ModuleConnectionBadge
             visible={connectivityState.showDisconnected}
             title={connectivityState.disconnectedTitle ?? undefined}
@@ -657,19 +673,36 @@ export const moduleDefinition = defineModule({
           ) : null}
 
           {!loading && !connectivityState.blockingError && displayFrame ? (
-            <img
-              key={displayFrame.imageId}
-              src={displayFrame.imageUrl}
-              alt={displayFrame.filename}
-              className={`absolute inset-0 h-full w-full ${imageFitClass} ${
-                isLayoutCrossfading
-                  ? "opacity-100 transition-none"
-                  : `transition-opacity duration-700 ease-out [will-change:opacity] ${imageVisible ? "opacity-100" : "opacity-0"}`
-              }`}
-              loading="eager"
-              decoding="async"
-              draggable={false}
-            />
+            <>
+              <img
+                key={displayFrame.imageId}
+                src={displayFrame.imageUrl}
+                alt={displayFrame.filename}
+                className={`absolute inset-0 h-full w-full ${imageFitClass} ${
+                  isLayoutCrossfading
+                    ? "opacity-100 transition-none"
+                    : `transition-opacity duration-700 ease-out [will-change:opacity] ${imageVisible ? "opacity-100" : "opacity-0"}`
+                }`}
+                loading="eager"
+                decoding="async"
+                draggable={false}
+              />
+              <span className="absolute bottom-3 right-3 z-10 grid h-11 w-11 place-items-center rounded-full border border-white/50 bg-black/45 text-white opacity-90 shadow-lg backdrop-blur-sm transition group-hover:scale-105 group-focus-visible:ring-2 group-focus-visible:ring-white">
+                <svg
+                  aria-hidden
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+                </svg>
+                <span className="sr-only">View fullscreen</span>
+              </span>
+            </>
           ) : null}
 
           {!loading && !connectivityState.blockingError && !displayFrame && frameData.warning ? (
@@ -677,7 +710,7 @@ export const moduleDefinition = defineModule({
               {frameData.warning}
             </div>
           ) : null}
-        </div>
+        </button>
       );
     },
   },

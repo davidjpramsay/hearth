@@ -54,6 +54,9 @@ const DISPLAY_PHOTO_COLLECTION_ID_STORAGE_KEY = "hearth:display-photo-collection
 const DISPLAY_CYCLE_CONTEXT_EVENT = "hearth:display-cycle-context";
 const DASHBOARD_PHOTOS_UPDATED_EVENT = "hearth:photos-updated";
 const DASHBOARD_CALENDAR_UPDATED_EVENT = "hearth:calendar-updated";
+const DASHBOARD_OPEN_PHOTO_EVENT = "hearth:open-photo";
+const PHOTO_FULLSCREEN_DURATION_MS = 5_000;
+const DASHBOARD_DOCK_HEIGHT_PX = 82;
 
 interface DisplayCycleContextEventDetail {
   sourceKind: "set" | "layout";
@@ -183,6 +186,108 @@ interface DisplayDeviceUpdatedEventDetail {
 interface DisplaySettingsUpdatedEventDetail {
   reason: "screen-profiles-updated" | "photo-collections-updated" | "calendar-feeds-updated";
 }
+
+interface OpenPhotoEventDetail {
+  imageUrl: string;
+  alt: string;
+}
+
+interface FullscreenPhoto extends OpenPhotoEventDetail {
+  closesAtMs: number;
+}
+
+const DashboardIcon = ({ name }: { name: "home" | "calendar" | "chores" | "photos" | "close" }) => {
+  const paths = {
+    home: <path d="M3 11.5 12 4l9 7.5V21h-6v-6H9v6H3z" />,
+    calendar: (
+      <>
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path d="M8 3v4M16 3v4M3 10h18" />
+      </>
+    ),
+    chores: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="m8.5 12 2.3 2.3 4.8-5" />
+      </>
+    ),
+    photos: (
+      <>
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <circle cx="9" cy="9" r="1.5" />
+        <path d="m5.5 18 4.8-5 3.2 3 2.2-2.2L20 18" />
+      </>
+    ),
+    close: <path d="m6 6 12 12M18 6 6 18" />,
+  } as const;
+
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {paths[name]}
+    </svg>
+  );
+};
+
+const PhotoFullscreenOverlay = ({
+  photo,
+  onClose,
+}: {
+  photo: FullscreenPhoto;
+  onClose: () => void;
+}) => {
+  const [remainingSeconds, setRemainingSeconds] = useState(5);
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      setRemainingSeconds(Math.max(0, Math.ceil((photo.closesAtMs - Date.now()) / 1000)));
+    };
+    updateCountdown();
+    const interval = window.setInterval(updateCountdown, 100);
+    const timeout = window.setTimeout(onClose, Math.max(0, photo.closesAtMs - Date.now()));
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose, photo.closesAtMs]);
+
+  return (
+    <section
+      className="dashboard-photo-fullscreen"
+      aria-label="Fullscreen photo"
+      aria-live="polite"
+    >
+      <img src={photo.imageUrl} alt={photo.alt} />
+      <button
+        type="button"
+        className="dashboard-photo-fullscreen__close"
+        onClick={onClose}
+        aria-label="Close fullscreen photo"
+      >
+        <DashboardIcon name="close" />
+      </button>
+      <div
+        className="dashboard-photo-fullscreen__countdown"
+        aria-label={`Closing in ${remainingSeconds} seconds`}
+      >
+        <span>{remainingSeconds}</span>
+        <small>Closing</small>
+      </div>
+    </section>
+  );
+};
 
 const DeviceIdentityCard = (props: {
   device: DisplayDeviceRuntime | null;
@@ -370,6 +475,8 @@ export const DashboardPage = () => {
   const [viewportSize, setViewportSize] = useState(getViewportSize);
   const [photoOrientationHint, setPhotoOrientationHint] = useState<PhotosOrientation | null>(null);
   const [nextCycleAtMs, setNextCycleAtMs] = useState<number | null>(null);
+  const [focusedInstanceId, setFocusedInstanceId] = useState<string | null>(null);
+  const [fullscreenPhoto, setFullscreenPhoto] = useState<FullscreenPhoto | null>(null);
   const browserOnline = useBrowserOnlineStatus();
   const activeLayoutRef = useRef<LayoutRecord | null>(null);
   const photoOrientationRef = useRef<PhotosOrientation | null>(null);
@@ -398,6 +505,24 @@ export const DashboardPage = () => {
   useEffect(() => {
     showDisconnectedBadgeRef.current = showDisconnectedBadge;
   }, [showDisconnectedBadge]);
+
+  const closeFullscreenPhoto = useCallback(() => setFullscreenPhoto(null), []);
+
+  useEffect(() => {
+    const handleOpenPhoto = (event: Event) => {
+      const detail = (event as CustomEvent<OpenPhotoEventDetail>).detail;
+      if (!detail?.imageUrl) return;
+      setFullscreenPhoto({
+        imageUrl: detail.imageUrl,
+        alt: detail.alt || "Family photo",
+        closesAtMs: Date.now() + PHOTO_FULLSCREEN_DURATION_MS,
+      });
+    };
+    window.addEventListener(DASHBOARD_OPEN_PHOTO_EVENT, handleOpenPhoto as EventListener);
+    return () => {
+      window.removeEventListener(DASHBOARD_OPEN_PHOTO_EVENT, handleOpenPhoto as EventListener);
+    };
+  }, []);
 
   useEffect(() => {
     const snapshot = initialSnapshotRef.current;
@@ -750,6 +875,26 @@ export const DashboardPage = () => {
     [activeLayout, mapTranslatedLayoutItems],
   );
 
+  const dashboardViewEntries = useMemo(() => {
+    const desiredModules = ["calendar", "chores", "photos"] as const;
+    return desiredModules.flatMap((moduleId) => {
+      const entry = activeRenderedModules.find(({ instance }) => instance.moduleId === moduleId);
+      return entry ? [{ moduleId, ...entry }] : [];
+    });
+  }, [activeRenderedModules]);
+
+  const focusedModule = useMemo(
+    () =>
+      focusedInstanceId
+        ? (activeRenderedModules.find(({ instance }) => instance.id === focusedInstanceId) ?? null)
+        : null,
+    [activeRenderedModules, focusedInstanceId],
+  );
+
+  useEffect(() => {
+    if (focusedInstanceId && !focusedModule) setFocusedInstanceId(null);
+  }, [focusedInstanceId, focusedModule]);
+
   const gridDisplayMetrics = useMemo(() => {
     if (!activeLayout) {
       return null;
@@ -765,7 +910,8 @@ export const DashboardPage = () => {
     );
     const baseWidth = Math.max(1, cols * storedRowHeight);
     const baseHeight = Math.max(1, rows * storedRowHeight);
-    const scale = Math.min(viewportSize.width / baseWidth, viewportSize.height / baseHeight);
+    const availableHeight = Math.max(1, viewportSize.height - DASHBOARD_DOCK_HEIGHT_PX);
+    const scale = Math.min(viewportSize.width / baseWidth, availableHeight / baseHeight);
     const rowHeight = Math.max(1, storedRowHeight * scale);
     const width = Math.max(1, cols * rowHeight);
     const height = Math.max(1, rows * rowHeight);
@@ -856,7 +1002,40 @@ export const DashboardPage = () => {
           label={browserOnline ? "Cached" : "Offline"}
         />
 
-        {!activeLayout ? (
+        {focusedModule ? (
+          <section
+            className="dashboard-focus-view"
+            aria-label={`${focusedModule.moduleManifest?.displayName ?? focusedModule.instance.moduleId} view`}
+          >
+            <header className="dashboard-focus-view__header">
+              <button type="button" onClick={() => setFocusedInstanceId(null)}>
+                <span aria-hidden>←</span>
+                Back to Home
+              </button>
+              <div>
+                <p>Hearth</p>
+                <h1>
+                  {focusedModule.moduleManifest?.displayName ?? focusedModule.instance.moduleId}
+                </h1>
+              </div>
+            </header>
+            <div className="dashboard-focus-view__module module-tile-host">
+              <DashboardModuleErrorBoundary
+                boundaryKey={`focus:${activeLayout?.id ?? "layout"}:${activeLayout?.version ?? 0}:${focusedModule.instance.id}`}
+                moduleName={
+                  focusedModule.moduleManifest?.displayName ?? focusedModule.instance.moduleId
+                }
+              >
+                <ModuleDashboardTile
+                  moduleId={focusedModule.instance.moduleId}
+                  instanceId={focusedModule.instance.id}
+                  config={focusedModule.instance.config}
+                  presentationMode="focus"
+                />
+              </DashboardModuleErrorBoundary>
+            </div>
+          </section>
+        ) : !activeLayout ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/70 text-center text-slate-300">
             <h1 className="font-display text-4xl font-bold text-slate-100">Hearth</h1>
             <p className="text-lg text-slate-200">Hearth — Home is where the Hearth is.</p>
@@ -884,7 +1063,10 @@ export const DashboardPage = () => {
             />
           </div>
         ) : gridDisplayMetrics ? (
-          <div className="flex h-full w-full items-center justify-center">
+          <div
+            className="flex w-full items-center justify-center"
+            style={{ height: `calc(100% - ${DASHBOARD_DOCK_HEIGHT_PX}px)` }}
+          >
             <div
               className="relative overflow-hidden"
               style={{
@@ -903,10 +1085,39 @@ export const DashboardPage = () => {
           </div>
         ) : null}
 
+        {activeLayout && activeHasPlacedModules ? (
+          <nav className="dashboard-view-dock" aria-label="Dashboard views">
+            <button
+              type="button"
+              className={focusedInstanceId === null ? "is-active" : undefined}
+              onClick={() => setFocusedInstanceId(null)}
+              aria-current={focusedInstanceId === null ? "page" : undefined}
+            >
+              <DashboardIcon name="home" />
+              <span>Home</span>
+            </button>
+            {dashboardViewEntries.map(({ moduleId, instance, moduleManifest }) => (
+              <button
+                key={moduleId}
+                type="button"
+                className={focusedInstanceId === instance.id ? "is-active" : undefined}
+                onClick={() => setFocusedInstanceId(instance.id)}
+                aria-current={focusedInstanceId === instance.id ? "page" : undefined}
+              >
+                <DashboardIcon name={moduleId} />
+                <span>{moduleManifest?.displayName ?? moduleId}</span>
+              </button>
+            ))}
+          </nav>
+        ) : null}
+
         {warningTicker &&
         warningTicker.warnings.length > 0 &&
         !isLocalWarningAutoLayoutName(activeLayout?.name ?? null) ? (
           <DashboardWarningTicker ticker={warningTicker} />
+        ) : null}
+        {fullscreenPhoto ? (
+          <PhotoFullscreenOverlay photo={fullscreenPhoto} onClose={closeFullscreenPhoto} />
         ) : null}
       </main>
     </div>
