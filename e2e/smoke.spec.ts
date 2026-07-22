@@ -147,7 +147,7 @@ test.describe("Hearth smoke", () => {
     ).toBeAttached();
 
     const latestTimeGateNode = page
-      .locator(".react-flow__node")
+      .locator(".react-flow__node:visible")
       .filter({ hasText: "Time Gate Node" })
       .last();
     await latestTimeGateNode.getByText("Time Gate Node").click({ force: true });
@@ -197,24 +197,26 @@ test.describe("Hearth smoke", () => {
     await openAutomaticSwitchingEditor(page);
 
     await page.getByRole("button", { name: "Time Gate Node" }).click();
-    const latestTimeGateNode = page
+    const activeEditor = page.locator("details[open]").first();
+    const latestTimeGateNode = activeEditor
       .locator(".react-flow__node")
       .filter({ hasText: "Time Gate Node" })
       .last();
-    await latestTimeGateNode.click();
+    await latestTimeGateNode.click({ force: true });
     await expect(page.getByText("Edit the selected time gate node settings.")).toBeVisible();
 
-    const gateCountBefore = await page.locator("text=/Gate \\d+/").count();
-    await page.getByRole("button", { name: "Add window" }).click();
-    await expect(page.locator("text=/Gate \\d+/")).toHaveCount(gateCountBefore + 1);
+    const gateCountBefore = await activeEditor.locator("text=/Gate \\d+/").count();
+    await activeEditor.getByRole("button", { name: "Add window" }).click();
+    await expect(activeEditor.locator("text=/Gate \\d+/")).toHaveCount(gateCountBefore + 1);
 
     await page.reload();
     await openAutomaticSwitchingEditor(page);
-    const latestTimeGateNodeAfterReload = page
+    const reloadedEditor = page.locator("details[open]").first();
+    const latestTimeGateNodeAfterReload = reloadedEditor
       .locator(".react-flow__node")
       .filter({ hasText: "Time Gate Node" })
       .last();
-    await latestTimeGateNodeAfterReload.click();
-    await expect(page.locator("text=/Gate \\d+/")).toHaveCount(gateCountBefore + 1);
+    await latestTimeGateNodeAfterReload.click({ force: true });
+    await expect(reloadedEditor.locator("text=/Gate \\d+/")).toHaveCount(gateCountBefore + 1);
   });
 });
