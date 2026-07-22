@@ -1,14 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Hearth icon">
-  <defs>
-    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#020617"/>
-    </linearGradient>
-    <linearGradient id="fg" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0%" stop-color="#67e8f9"/>
-      <stop offset="100%" stop-color="#22d3ee"/>
-    </linearGradient>
-  </defs>
-  <rect x="24" y="24" width="464" height="464" rx="96" fill="url(#bg)"/>
-  <path d="M152 136h64v100h80V136h64v240h-64v-84h-80v84h-64V136z" fill="url(#fg)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Hearth home and flame icon">
+  <rect x="20" y="20" width="472" height="472" rx="112" fill="#0f6f6c"/>
+  <path d="M112 230 256 108l144 122v164H112Z" fill="#fffefa" fill-opacity=".1" stroke="#fffefa" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M256 396c-58 0-96-39-96-94 0-43 25-75 64-109-2 31 13 49 29 57 4-47 30-79 59-105 2 45 40 71 40 122 0 74-39 129-96 129Z" fill="#ef7a63"/>
+  <path d="M258 354c-23 0-39-16-39-38 0-19 10-33 27-49 2 16 10 23 19 28 3-19 13-32 24-43 3 21 17 32 17 52 0 29-18 50-48 50Z" fill="#fffefa"/>
 </svg>

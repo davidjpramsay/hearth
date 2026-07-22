@@ -20,6 +20,7 @@ import {
   isLocalWarningAutoLayoutName,
 } from "@hearth/shared";
 import { reportScreenProfile } from "../api/client";
+import { HearthIcon, type HearthIconName } from "../components/HearthIcon";
 import { getOrCreateDeviceId } from "../device/device-id";
 import { inferLayoutRows, sanitizeGridItems } from "../layout/grid-math";
 import { buildLayoutTypographyStyle } from "../layout/layout-typography";
@@ -197,43 +198,14 @@ interface FullscreenPhoto extends OpenPhotoEventDetail {
 }
 
 const DashboardIcon = ({ name }: { name: "home" | "calendar" | "chores" | "photos" | "close" }) => {
-  const paths = {
-    home: <path d="M3 11.5 12 4l9 7.5V21h-6v-6H9v6H3z" />,
-    calendar: (
-      <>
-        <rect x="3" y="5" width="18" height="16" rx="2" />
-        <path d="M8 3v4M16 3v4M3 10h18" />
-      </>
-    ),
-    chores: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="m8.5 12 2.3 2.3 4.8-5" />
-      </>
-    ),
-    photos: (
-      <>
-        <rect x="3" y="4" width="18" height="16" rx="2" />
-        <circle cx="9" cy="9" r="1.5" />
-        <path d="m5.5 18 4.8-5 3.2 3 2.2-2.2L20 18" />
-      </>
-    ),
-    close: <path d="m6 6 12 12M18 6 6 18" />,
-  } as const;
-
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {paths[name]}
-    </svg>
-  );
+  const iconNames: Record<typeof name, HearthIconName> = {
+    home: "home",
+    calendar: "calendar",
+    chores: "checklist",
+    photos: "photos",
+    close: "close",
+  };
+  return <HearthIcon name={iconNames[name]} />;
 };
 
 const PhotoFullscreenOverlay = ({
@@ -1009,7 +981,7 @@ export const DashboardPage = () => {
           >
             <header className="dashboard-focus-view__header">
               <button type="button" onClick={() => setFocusedInstanceId(null)}>
-                <span aria-hidden>←</span>
+                <HearthIcon name="arrow-left" className="h-5 w-5" />
                 Back to Home
               </button>
               <div>

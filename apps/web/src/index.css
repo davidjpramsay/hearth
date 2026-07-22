@@ -1575,6 +1575,12 @@ body {
   width: 1.35em;
   height: 1.35em;
   flex: 0 0 auto;
+  transition: transform 150ms ease;
+}
+
+.dashboard-view-dock button:hover svg,
+.dashboard-view-dock button.is-active svg {
+  transform: translateY(-1px);
 }
 
 .dashboard-focus-view {
@@ -1597,6 +1603,9 @@ body {
 }
 
 .dashboard-focus-view__header button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   justify-self: start;
   min-height: 2.75rem;
   border: 1px solid var(--color-border-subtle);
@@ -2227,12 +2236,17 @@ body {
 
 .hearth-admin-brand__mark {
   display: grid;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
   place-items: center;
-  border-radius: 0.75rem;
-  background: #f4d8ce;
-  color: #b75e47;
+  border: 1px solid rgba(183, 94, 71, 0.16);
+  border-radius: 0.9rem;
+  background: #f6ded5;
+  color: #ae513d;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 5px 14px rgba(114, 64, 50, 0.1);
+  --hearth-mark-cutout: #fffaf5;
 }
 
 .hearth-admin-nav__select {
@@ -2260,6 +2274,27 @@ body {
     color 150ms ease;
 }
 
+.hearth-admin-nav__icon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.48);
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.hearth-admin-nav__item:hover .hearth-admin-nav__icon {
+  transform: translateY(-1px);
+  border-color: rgba(17, 105, 102, 0.12);
+  background: rgba(255, 255, 255, 0.86);
+}
+
 .hearth-admin-nav__item:hover {
   background: #f0f3ef;
   color: #155e5c;
@@ -2272,6 +2307,7 @@ body {
 }
 
 .hearth-admin-nav__item[aria-current="page"] > span:first-child {
+  border-color: rgba(17, 105, 102, 0.14);
   background: rgba(255, 255, 255, 0.82);
 }
 
