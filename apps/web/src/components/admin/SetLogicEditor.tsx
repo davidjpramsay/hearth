@@ -1067,7 +1067,7 @@ export const SetLogicEditor = ({
 
   return (
     <section className="rounded-xl border border-slate-700/80 bg-slate-950/70 p-4">
-      <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_340px]">
+      <div className="grid gap-4 xl:grid-cols-[200px_minmax(0,1fr)] 2xl:grid-cols-[220px_minmax(0,1fr)_340px]">
         <SetLogicPalette
           layoutOptions={layoutOptions}
           onAddLayoutNode={() => addLayoutNodeAtPosition()}
@@ -1148,23 +1148,25 @@ export const SetLogicEditor = ({
           }}
         />
 
-        <SetLogicInspector
-          editorError={editorError}
-          layoutOptions={layoutOptions}
-          photoCollectionOptions={photoCollectionOptions}
-          selectedLayoutNode={selectedLayoutNode}
-          selectedActionNode={selectedActionNode}
-          selectedActionKind={selectedActionKind}
-          selectedActionUsesPhotoSource={selectedActionUsesPhotoSource}
-          selectedCanvasAction={selectedCanvasAction}
-          selectedTimeGateNode={selectedTimeGateNode}
-          selectedTimeGateIssues={selectedTimeGateIssues}
-          nextAvailableTimeGateWindow={nextAvailableTimeGateWindow}
-          updateSelectedLayoutNode={updateSelectedLayoutNode}
-          updateSelectedActionNode={updateSelectedActionNode}
-          updateSelectedTimeGateNode={updateSelectedTimeGateNode}
-          clampCycleSeconds={clampCycleSeconds}
-        />
+        <div className="xl:col-span-2 2xl:col-span-1">
+          <SetLogicInspector
+            editorError={editorError}
+            layoutOptions={layoutOptions}
+            photoCollectionOptions={photoCollectionOptions}
+            selectedLayoutNode={selectedLayoutNode}
+            selectedActionNode={selectedActionNode}
+            selectedActionKind={selectedActionKind}
+            selectedActionUsesPhotoSource={selectedActionUsesPhotoSource}
+            selectedCanvasAction={selectedCanvasAction}
+            selectedTimeGateNode={selectedTimeGateNode}
+            selectedTimeGateIssues={selectedTimeGateIssues}
+            nextAvailableTimeGateWindow={nextAvailableTimeGateWindow}
+            updateSelectedLayoutNode={updateSelectedLayoutNode}
+            updateSelectedActionNode={updateSelectedActionNode}
+            updateSelectedTimeGateNode={updateSelectedTimeGateNode}
+            clampCycleSeconds={clampCycleSeconds}
+          />
+        </div>
       </div>
     </section>
   );

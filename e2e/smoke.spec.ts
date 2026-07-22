@@ -11,11 +11,17 @@ const loginAsAdmin = async (page: Page, pathname = "/admin/login"): Promise<void
   await expect(page.getByRole("heading", { name: "Layouts" })).toBeVisible();
 };
 
+const openAutomaticSwitchingEditor = async (page: Page): Promise<void> => {
+  await page.getByRole("tab", { name: "Automatic switching" }).click();
+  await page.getByText("Advanced rule editor").first().click();
+  await expect(page.getByRole("button", { name: "Time Gate Node" }).first()).toBeVisible();
+};
+
 test.describe("Hearth smoke", () => {
   test("admin login survives logout and re-login", async ({ page }) => {
     await loginAsAdmin(page);
 
-    await page.getByRole("button", { name: "Logout" }).click();
+    await page.getByRole("button", { name: "Log out" }).click();
     await page.waitForURL("**/admin/login");
     await expect(page.getByRole("heading", { name: "Hearth Admin" })).toBeVisible();
 
@@ -47,7 +53,7 @@ test.describe("Hearth smoke", () => {
       .toBe(true);
 
     await loginAsAdmin(page);
-    await page.getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("button", { name: "Devices" }).click();
     await page.waitForURL("**/devices");
     await expect(page.getByRole("heading", { name: "Connected displays" })).toBeVisible();
 
@@ -95,41 +101,37 @@ test.describe("Hearth smoke", () => {
     const layoutName = `Smoke Layout ${Date.now()}`;
 
     await loginAsAdmin(page);
-    await page.getByLabel("New layout name").fill(layoutName);
+    await page.getByRole("button", { name: "+ New layout" }).click();
+    await page.getByRole("textbox", { name: "Layout name", exact: true }).fill(layoutName);
     await page.getByRole("button", { name: "Create layout" }).click();
 
-    await expect
-      .poll(async () =>
-        page
-          .locator("article input")
-          .evaluateAll(
-            (inputs, expectedName) =>
-              inputs.some(
-                (input) => input instanceof HTMLInputElement && input.value === expectedName,
-              ),
-            layoutName,
-          ),
-      )
-      .toBe(true);
+    await expect(page.getByRole("textbox", { name: `Layout name: ${layoutName}` })).toHaveValue(
+      layoutName,
+    );
   });
 
   test("set logic editor connects start into a time gate and selects it", async ({ page }) => {
     await loginAsAdmin(page);
+    await openAutomaticSwitchingEditor(page);
 
-    const edgeCountBefore = await page.locator(".react-flow__edge").count();
     await page.getByRole("button", { name: "Time Gate Node" }).click();
-    await page.waitForTimeout(300);
+    await page.getByRole("button", { name: "Fit canvas" }).click();
 
     const startHandle = page.locator('[data-nodeid="__start__"][data-handlepos="bottom"]');
     const latestTimeGateTarget = page
       .locator('[data-nodeid^="action-"][data-handlepos="top"]')
       .last();
 
+    await expect(startHandle).toBeInViewport();
+    await expect(latestTimeGateTarget).toBeInViewport();
+
     const startBox = await startHandle.boundingBox();
     const targetBox = await latestTimeGateTarget.boundingBox();
+    const targetNodeId = await latestTimeGateTarget.getAttribute("data-nodeid");
 
     expect(startBox).not.toBeNull();
     expect(targetBox).not.toBeNull();
+    expect(targetNodeId).not.toBeNull();
 
     await page.mouse.move(startBox!.x + startBox!.width / 2, startBox!.y + startBox!.height / 2);
     await page.mouse.down();
@@ -140,9 +142,9 @@ test.describe("Hearth smoke", () => {
     );
     await page.mouse.up();
 
-    await expect
-      .poll(async () => page.locator(".react-flow__edge").count())
-      .toBeGreaterThan(edgeCountBefore);
+    await expect(
+      page.getByRole("group", { name: `Edge from __start__ to ${targetNodeId}` }),
+    ).toBeAttached();
 
     const latestTimeGateNode = page
       .locator(".react-flow__node")
@@ -156,6 +158,7 @@ test.describe("Hearth smoke", () => {
     page,
   }) => {
     await loginAsAdmin(page);
+    await openAutomaticSwitchingEditor(page);
 
     await page.getByRole("button", { name: "Time Gate Node" }).click();
     await page.getByRole("button", { name: "Layout Node" }).click();
@@ -185,11 +188,13 @@ test.describe("Hearth smoke", () => {
     await expect(page.locator(".react-flow__node")).toHaveCount(nodeCountAfterAdd);
 
     await page.reload();
+    await openAutomaticSwitchingEditor(page);
     await expect(page.locator(".react-flow__node")).toHaveCount(nodeCountAfterAdd);
   });
 
   test("set logic editor persists time gate windows after reload", async ({ page }) => {
     await loginAsAdmin(page);
+    await openAutomaticSwitchingEditor(page);
 
     await page.getByRole("button", { name: "Time Gate Node" }).click();
     const latestTimeGateNode = page
@@ -204,6 +209,7 @@ test.describe("Hearth smoke", () => {
     await expect(page.locator("text=/Gate \\d+/")).toHaveCount(gateCountBefore + 1);
 
     await page.reload();
+    await openAutomaticSwitchingEditor(page);
     const latestTimeGateNodeAfterReload = page
       .locator(".react-flow__node")
       .filter({ hasText: "Time Gate Node" })
