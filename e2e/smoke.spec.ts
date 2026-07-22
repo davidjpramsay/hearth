@@ -17,6 +17,25 @@ const openAutomaticSwitchingEditor = async (page: Page): Promise<void> => {
   await expect(page.getByRole("button", { name: "Time Gate Node" }).first()).toBeVisible();
 };
 
+const hasNodeGateCount = (value: unknown, nodeId: string, expectedCount: number): boolean => {
+  if (Array.isArray(value)) {
+    return value.some((entry) => hasNodeGateCount(entry, nodeId, expectedCount));
+  }
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (
+    record.id === nodeId &&
+    Array.isArray(record.gates) &&
+    record.gates.length === expectedCount
+  ) {
+    return true;
+  }
+  return Object.values(record).some((entry) => hasNodeGateCount(entry, nodeId, expectedCount));
+};
+
 test.describe("Hearth smoke", () => {
   test("admin login survives logout and re-login", async ({ page }) => {
     await loginAsAdmin(page);
@@ -110,30 +129,43 @@ test.describe("Hearth smoke", () => {
     );
   });
 
-  test("set logic editor connects start into a time gate and selects it", async ({ page }) => {
+  test("set logic editor connects a time gate to a layout and selects it", async ({ page }) => {
     await loginAsAdmin(page);
     await openAutomaticSwitchingEditor(page);
 
-    await page.getByRole("button", { name: "Time Gate Node" }).click();
-    await page.getByRole("button", { name: "Fit canvas" }).click();
+    const activeEditor = page.locator("details[open]").first();
+    await activeEditor.getByRole("button", { name: "Time Gate Node" }).click();
+    await activeEditor.getByRole("button", { name: "Layout Node" }).click();
+    await activeEditor.getByRole("button", { name: "Fit canvas" }).click();
 
-    const startHandle = page.locator('[data-nodeid="__start__"][data-handlepos="bottom"]:visible');
-    const latestTimeGateTarget = page
-      .locator('[data-nodeid^="action-"][data-handlepos="top"]:visible')
+    const latestTimeGateNode = activeEditor
+      .locator(".react-flow__node")
+      .filter({ hasText: "Time Gate Node" })
       .last();
+    const latestLayoutNode = activeEditor
+      .locator(".react-flow__node")
+      .filter({ hasText: "Layout" })
+      .last();
+    const timeGateSource = latestTimeGateNode.locator('[data-handlepos="bottom"]').first();
+    const layoutTarget = latestLayoutNode.locator('[data-handlepos="top"]');
 
-    await expect(startHandle).toBeInViewport();
-    await expect(latestTimeGateTarget).toBeInViewport();
+    await expect(timeGateSource).toBeInViewport();
+    await expect(layoutTarget).toBeInViewport();
 
-    const startBox = await startHandle.boundingBox();
-    const targetBox = await latestTimeGateTarget.boundingBox();
-    const targetNodeId = await latestTimeGateTarget.getAttribute("data-nodeid");
+    const sourceBox = await timeGateSource.boundingBox();
+    const targetBox = await layoutTarget.boundingBox();
+    const sourceNodeId = await timeGateSource.getAttribute("data-nodeid");
+    const targetNodeId = await layoutTarget.getAttribute("data-nodeid");
 
-    expect(startBox).not.toBeNull();
+    expect(sourceBox).not.toBeNull();
     expect(targetBox).not.toBeNull();
+    expect(sourceNodeId).not.toBeNull();
     expect(targetNodeId).not.toBeNull();
 
-    await page.mouse.move(startBox!.x + startBox!.width / 2, startBox!.y + startBox!.height / 2);
+    await page.mouse.move(
+      sourceBox!.x + sourceBox!.width / 2,
+      sourceBox!.y + sourceBox!.height / 2,
+    );
     await page.mouse.down();
     await page.mouse.move(
       targetBox!.x + targetBox!.width / 2,
@@ -143,15 +175,16 @@ test.describe("Hearth smoke", () => {
     await page.mouse.up();
 
     await expect(
-      page.getByRole("group", { name: `Edge from __start__ to ${targetNodeId}` }),
+      activeEditor.getByRole("group", { name: `Edge from ${sourceNodeId} to ${targetNodeId}` }),
     ).toBeAttached();
 
-    const latestTimeGateNode = page
-      .locator(".react-flow__node:visible")
-      .filter({ hasText: "Time Gate Node" })
-      .last();
-    await latestTimeGateNode.getByText("Time Gate Node").click({ force: true });
-    await expect(page.getByText("Edit the selected time gate node settings.")).toBeVisible();
+    await activeEditor
+      .locator(`[data-id="${sourceNodeId}"]`)
+      .getByRole("heading")
+      .click({ force: true });
+    await expect(
+      activeEditor.getByText("Edit the selected time gate node settings."),
+    ).toBeVisible();
   });
 
   test("set logic editor keeps the graph visible after dragging a node across another node", async ({
@@ -202,21 +235,44 @@ test.describe("Hearth smoke", () => {
       .locator(".react-flow__node")
       .filter({ hasText: "Time Gate Node" })
       .last();
+    const selectedTimeGateNodeId = await latestTimeGateNode.getAttribute("data-id");
+    expect(selectedTimeGateNodeId).not.toBeNull();
     await latestTimeGateNode.click({ force: true });
     await expect(page.getByText("Edit the selected time gate node settings.")).toBeVisible();
 
     const gateCountBefore = await activeEditor.locator("text=/Gate \\d+/").count();
+    const settingsSaved = page.waitForResponse((response) => {
+      if (
+        !response.url().includes("/api/display/screen-profiles") ||
+        response.request().method() !== "PUT" ||
+        !response.ok()
+      ) {
+        return false;
+      }
+      try {
+        return hasNodeGateCount(
+          response.request().postDataJSON(),
+          selectedTimeGateNodeId!,
+          gateCountBefore + 1,
+        );
+      } catch {
+        return false;
+      }
+    });
     await activeEditor.getByRole("button", { name: "Add window" }).click();
     await expect(activeEditor.locator("text=/Gate \\d+/")).toHaveCount(gateCountBefore + 1);
+    await settingsSaved;
 
     await page.reload();
     await openAutomaticSwitchingEditor(page);
     const reloadedEditor = page.locator("details[open]").first();
-    const latestTimeGateNodeAfterReload = reloadedEditor
-      .locator(".react-flow__node")
-      .filter({ hasText: "Time Gate Node" })
-      .last();
-    await latestTimeGateNodeAfterReload.click({ force: true });
+    const latestTimeGateNodeAfterReload = reloadedEditor.locator(
+      `[data-id="${selectedTimeGateNodeId}"]`,
+    );
+    await latestTimeGateNodeAfterReload.getByRole("heading").click({ force: true });
+    await expect(
+      reloadedEditor.getByText("Edit the selected time gate node settings."),
+    ).toBeVisible();
     await expect(reloadedEditor.locator("text=/Gate \\d+/")).toHaveCount(gateCountBefore + 1);
   });
 });
