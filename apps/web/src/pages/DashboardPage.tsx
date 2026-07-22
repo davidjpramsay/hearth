@@ -833,7 +833,7 @@ export const DashboardPage = () => {
 
   return (
     <div
-      className="overflow-hidden bg-slate-950"
+      className="dashboard-canvas overflow-hidden"
       style={{
         width: "100vw",
         height: "100dvh",
@@ -844,7 +844,7 @@ export const DashboardPage = () => {
         boxSizing: "border-box",
       }}
     >
-      <main className="relative h-full w-full text-slate-100">
+      <main className="relative h-full w-full text-[color:var(--color-text-primary)]">
         {error ? (
           <p className="absolute left-4 top-4 z-20 rounded border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-rose-100">
             {error}

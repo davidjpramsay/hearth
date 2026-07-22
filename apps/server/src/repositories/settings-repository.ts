@@ -201,6 +201,7 @@ export class SettingsRepository {
 
       return {
         name: `Layout set ${setIndex}`,
+        targetAspectRatio: null,
         staticLayoutName,
         defaultPhotoCollectionId: null,
         photoActionCollectionId: null,

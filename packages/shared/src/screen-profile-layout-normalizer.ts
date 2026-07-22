@@ -201,6 +201,7 @@ export const normalizeScreenProfileLayoutsConfig = (
 
     families[setId] = {
       name: resolvedName,
+      targetAspectRatio: source.targetAspectRatio ?? null,
       staticLayoutName: resolvedStaticLayoutName,
       defaultPhotoCollectionId: source.defaultPhotoCollectionId ?? null,
       photoActionCollectionId: primaryPhotoRouter.photoActionCollectionId ?? null,
@@ -230,6 +231,7 @@ export const normalizeScreenProfileLayoutsConfig = (
 
     families[defaultSetId] = {
       name: defaultSetName,
+      targetAspectRatio: null,
       staticLayoutName: fallbackStaticLayoutName,
       defaultPhotoCollectionId: null,
       photoActionCollectionId: null,

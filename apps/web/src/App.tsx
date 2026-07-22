@@ -24,6 +24,11 @@ const AdminDevicesPage = lazy(async () => {
   return { default: module.AdminDevicesPage };
 });
 
+const AdminConnectionsPage = lazy(async () => {
+  const module = await import("./pages/AdminDevicesPage");
+  return { default: module.AdminConnectionsPage };
+});
+
 const AdminPlannerPage = lazy(async () => {
   const module = await import("./pages/AdminPlannerPage");
   return { default: module.AdminPlannerPage };
@@ -108,6 +113,10 @@ export const App = () => {
           element={<RequireAuth>{withRouteSuspense(<AdminDevicesPage />)}</RequireAuth>}
         />
         <Route
+          path="/connections"
+          element={<RequireAuth>{withRouteSuspense(<AdminConnectionsPage />)}</RequireAuth>}
+        />
+        <Route
           path="/school"
           element={<RequireAuth>{withRouteSuspense(<AdminPlannerPage />)}</RequireAuth>}
         />
@@ -123,6 +132,10 @@ export const App = () => {
         <Route
           path="/admin/devices"
           element={<RequireAuth>{withRouteSuspense(<AdminDevicesPage />)}</RequireAuth>}
+        />
+        <Route
+          path="/admin/connections"
+          element={<RequireAuth>{withRouteSuspense(<AdminConnectionsPage />)}</RequireAuth>}
         />
         <Route
           path="/admin/school"

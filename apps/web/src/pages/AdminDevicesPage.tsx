@@ -302,6 +302,25 @@ const formatViewport = (value: DisplayDeviceInfo | null): string | null => {
   return `${base} @ ${Number(value.pixelRatio.toFixed(2))}x`;
 };
 
+const getDeviceMatchKey = (device: DisplayDevice): string | null => {
+  if (!device.lastSeenIp || !device.deviceInfo) {
+    return null;
+  }
+
+  const info = device.deviceInfo;
+  return JSON.stringify([
+    device.lastSeenIp,
+    info.label,
+    info.platform,
+    info.browser,
+    info.formFactor,
+    info.viewportWidth,
+    info.viewportHeight,
+    info.pixelRatio,
+    info.standalone,
+  ]);
+};
+
 const hasValidRoutingTarget = (draft: DeviceDraft): boolean => {
   if (draft.routingMode === "set") {
     return draft.setId.trim().length > 0;
@@ -332,7 +351,9 @@ const autosaveStatusText = (input: {
   return input.savedLabel ?? "Saved";
 };
 
-export const AdminDevicesPage = () => {
+type SettingsSection = "devices" | "connections";
+
+const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
   const token = getAuthToken();
   const navigate = useNavigate();
   const [devices, setDevices] = useState<DisplayDevice[]>([]);
@@ -372,6 +393,7 @@ export const AdminDevicesPage = () => {
       Object.entries(screenProfileLayouts.families).map(([id, config]) => ({
         id,
         name: config.name,
+        targetAspectRatio: config.targetAspectRatio,
       })),
     [screenProfileLayouts.families],
   );
@@ -394,6 +416,29 @@ export const AdminDevicesPage = () => {
     }
 
     return counts;
+  }, [devices]);
+  const possibleDuplicateOf = useMemo(() => {
+    const groups = new Map<string, DisplayDevice[]>();
+    const duplicates = new Map<string, DisplayDevice>();
+
+    for (const device of devices) {
+      const key = getDeviceMatchKey(device);
+      if (!key) continue;
+      groups.set(key, [...(groups.get(key) ?? []), device]);
+    }
+
+    for (const group of groups.values()) {
+      const sorted = [...group].sort(
+        (left, right) => Date.parse(right.lastSeenAt) - Date.parse(left.lastSeenAt),
+      );
+      const primary = sorted[0];
+      if (!primary) continue;
+      for (const duplicate of sorted.slice(1)) {
+        duplicates.set(duplicate.id, primary);
+      }
+    }
+
+    return duplicates;
   }, [devices]);
   const timeZoneOptions = useMemo(() => getSupportedTimeZoneOptions(), []);
   const siteTimeZoneIsValid = isValidIanaTimeZone(siteTimeZoneDraft.trim());
@@ -926,9 +971,13 @@ export const AdminDevicesPage = () => {
 
   return (
     <PageShell
-      title="Settings"
-      subtitle="Manage household time, calendar feeds, and connected displays."
-      rightActions={<AdminNavActions current="devices" onLogout={onLogout} />}
+      title={section === "devices" ? "Displays" : "Connections"}
+      subtitle={
+        section === "devices"
+          ? "Identify each wall display and choose what it should show."
+          : "Manage household time, calendar sources, storage, and runtime health."
+      }
+      rightActions={<AdminNavActions current={section} onLogout={onLogout} />}
     >
       {error ? (
         <p className="mb-4 rounded border border-rose-500/70 bg-rose-500/10 px-3 py-2 text-rose-200">
@@ -936,636 +985,694 @@ export const AdminDevicesPage = () => {
         </p>
       ) : null}
 
-      <AdminSection className="mb-6">
-        <AdminSectionHeader
-          title="Household time"
-          description="This timezone controls chores, clocks, time gates, and verse-of-the-day."
-          meta={
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300/90">
-                Current time
-              </p>
-              <p className="mt-2 text-base font-semibold text-slate-100">
-                {formatDateTimeAtTimeZone(householdNowMs, siteTimeConfig.siteTimezone)}
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                {siteTimeConfig.siteTimezone} · {householdTimeStatusLabel}
-              </p>
-            </div>
-          }
-        />
-
-        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-          <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-            <h3 className="text-sm font-semibold text-slate-100">Timezone</h3>
-            <div className="mt-3 space-y-3 text-sm text-slate-300">
-              <label className="block space-y-2 text-sm text-slate-300">
-                <span>Household timezone</span>
-                <input
-                  list={ADMIN_TIME_ZONE_DATALIST_ID}
-                  className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
-                  value={siteTimeZoneDraft}
-                  onChange={(event) => setSiteTimeZoneDraft(event.target.value)}
-                  placeholder="Australia/Perth"
-                />
-                <datalist id={ADMIN_TIME_ZONE_DATALIST_ID}>
-                  {timeZoneOptions.map((timeZone) => (
-                    <option key={timeZone} value={timeZone} />
-                  ))}
-                </datalist>
-              </label>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSiteTimeZoneDraft(getRuntimeTimeZone())}
-                  className="rounded border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-300"
-                >
-                  Use browser timezone
-                </button>
-              </div>
-
-              <p className="text-xs text-slate-400">
-                Use an IANA timezone like `Australia/Perth` or `America/New_York`.
-              </p>
-              <p
-                className={`text-xs ${
-                  siteTimeSaveState === "error"
-                    ? "text-amber-200"
-                    : siteTimeSaveState === "saved"
-                      ? "text-emerald-200"
-                      : "text-slate-400"
-                }`}
-              >
-                {siteTimeZoneIsValid
-                  ? autosaveStatusText({
-                      state: siteTimeSaveState,
-                      dirty: siteTimeDirty,
-                      error: siteTimeSaveError,
-                      idleLabel: "Timezone changes save automatically.",
-                      savedLabel: "Timezone saved.",
-                    })
-                  : "Enter a valid IANA timezone such as Australia/Perth."}
-              </p>
-            </div>
-          </article>
-
-          <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-            <h3 className="text-sm font-semibold text-slate-100">Status</h3>
-            <dl className="mt-3 space-y-3 text-sm text-slate-300">
+      <div className={section === "connections" ? "contents" : "hidden"}>
+        <AdminSection className="mb-6">
+          <AdminSectionHeader
+            title="Household time"
+            description="This timezone controls chores, clocks, time gates, and verse-of-the-day."
+            meta={
               <div>
-                <dt className="text-slate-500">Household timezone</dt>
-                <dd className="font-mono text-slate-200">{siteTimeConfig.siteTimezone}</dd>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300/90">
+                  Current time
+                </p>
+                <p className="mt-2 text-base font-semibold text-slate-100">
+                  {formatDateTimeAtTimeZone(householdNowMs, siteTimeConfig.siteTimezone)}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {siteTimeConfig.siteTimezone} · {householdTimeStatusLabel}
+                </p>
               </div>
-              <div>
-                <dt className="text-slate-500">Latest display check-in</dt>
-                <dd>{formatTimestamp(latestDeviceSeenAt)}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Clock source</dt>
-                <dd>{householdTimeStatusLabel}</dd>
-              </div>
-            </dl>
-          </article>
-        </div>
-      </AdminSection>
+            }
+          />
 
-      <AdminSection className="mb-6">
-        <AdminSectionHeader
-          title="Calendar feeds"
-          description="Store ICS feed URLs once here, then choose them from each calendar module by ID. Feed URLs stay admin-only; layouts and displays only reference saved feed IDs plus optional label and colour overrides."
-          actions={
-            <button
-              type="button"
-              onClick={addCalendarFeedDraft}
-              className="rounded border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-slate-300"
-            >
-              Add feed
-            </button>
-          }
-        />
-        <p
-          className={`mt-3 text-xs ${
-            calendarFeedsSaveState === "error"
-              ? "text-amber-200"
-              : calendarFeedsSaveState === "saved"
-                ? "text-emerald-200"
-                : "text-slate-400"
-          }`}
-        >
-          {autosaveStatusText({
-            state: calendarFeedsSaveState,
-            dirty: calendarFeedsDirty,
-            error: calendarFeedsSaveError,
-            idleLabel: "Feed edits save automatically.",
-            savedLabel: "Feeds saved.",
-          })}
-        </p>
+          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+            <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+              <h3 className="text-sm font-semibold text-slate-100">Timezone</h3>
+              <div className="mt-3 space-y-3 text-sm text-slate-300">
+                <label className="block space-y-2 text-sm text-slate-300">
+                  <span>Household timezone</span>
+                  <input
+                    list={ADMIN_TIME_ZONE_DATALIST_ID}
+                    className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
+                    value={siteTimeZoneDraft}
+                    onChange={(event) => setSiteTimeZoneDraft(event.target.value)}
+                    placeholder="Australia/Perth"
+                  />
+                  <datalist id={ADMIN_TIME_ZONE_DATALIST_ID}>
+                    {timeZoneOptions.map((timeZone) => (
+                      <option key={timeZone} value={timeZone} />
+                    ))}
+                  </datalist>
+                </label>
 
-        {calendarFeedsConfig.feeds.length === 0 ? (
-          <p className="mt-4 rounded border border-slate-700/80 bg-slate-950/60 px-3 py-3 text-sm text-slate-400">
-            No saved feeds yet.
-          </p>
-        ) : (
-          <div className="mt-4 space-y-3">
-            {calendarFeedsConfig.feeds.map((feed, index) => (
-              <article
-                key={`${feed.id || "draft"}-${index}`}
-                className="rounded-lg border border-slate-800 bg-slate-950/60 p-4"
-              >
-                <div className="grid gap-3 xl:grid-cols-[minmax(0,0.75fr)_minmax(0,0.85fr)_minmax(0,1.7fr)]">
-                  <label className="block space-y-1">
-                    <span className="text-xs font-medium text-slate-300">Name</span>
-                    <input
-                      className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
-                      type="text"
-                      value={feed.name}
-                      onChange={(event) =>
-                        updateCalendarFeedDraft(index, (current) => ({
-                          ...current,
-                          name: event.target.value,
-                        }))
-                      }
-                      placeholder="School"
-                    />
-                  </label>
-
-                  <label className="block space-y-1">
-                    <span className="text-xs font-medium text-slate-300">Stable ID</span>
-                    <input
-                      className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 font-mono text-sm text-slate-100"
-                      type="text"
-                      value={feed.id}
-                      onChange={(event) =>
-                        updateCalendarFeedDraft(index, (current) => ({
-                          ...current,
-                          id: normalizeCalendarFeedId(event.target.value),
-                        }))
-                      }
-                      placeholder="school"
-                    />
-                  </label>
-
-                  <label className="block space-y-1">
-                    <span className="text-xs font-medium text-slate-300">ICS feed URL or path</span>
-                    <input
-                      className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
-                      type="text"
-                      value={feed.url}
-                      onChange={(event) =>
-                        updateCalendarFeedDraft(index, (current) => ({
-                          ...current,
-                          url: event.target.value,
-                        }))
-                      }
-                      placeholder="https://calendar.example.com/family.ics"
-                    />
-                  </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSiteTimeZoneDraft(getRuntimeTimeZone())}
+                    className="rounded border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-300"
+                  >
+                    Use browser timezone
+                  </button>
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
-                  <label className="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
-                    <span className="text-xs font-medium text-slate-300">Colour</span>
-                    <ThemePalettePicker
-                      compact
-                      value={feed.color}
-                      onChange={(slot) =>
-                        updateCalendarFeedDraft(index, (current) => ({
-                          ...current,
-                          color: slot,
-                        }))
-                      }
-                    />
-                  </label>
+                <p className="text-xs text-slate-400">
+                  Use an IANA timezone like `Australia/Perth` or `America/New_York`.
+                </p>
+                <p
+                  className={`text-xs ${
+                    siteTimeSaveState === "error"
+                      ? "text-amber-200"
+                      : siteTimeSaveState === "saved"
+                        ? "text-emerald-200"
+                        : "text-slate-400"
+                  }`}
+                >
+                  {siteTimeZoneIsValid
+                    ? autosaveStatusText({
+                        state: siteTimeSaveState,
+                        dirty: siteTimeDirty,
+                        error: siteTimeSaveError,
+                        idleLabel: "Timezone changes save automatically.",
+                        savedLabel: "Timezone saved.",
+                      })
+                    : "Enter a valid IANA timezone such as Australia/Perth."}
+                </p>
+              </div>
+            </article>
 
-                  <div className="flex flex-wrap items-center gap-3">
-                    <label className="flex items-center gap-2 whitespace-nowrap rounded border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-200">
+            <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+              <h3 className="text-sm font-semibold text-slate-100">Status</h3>
+              <dl className="mt-3 space-y-3 text-sm text-slate-300">
+                <div>
+                  <dt className="text-slate-500">Household timezone</dt>
+                  <dd className="font-mono text-slate-200">{siteTimeConfig.siteTimezone}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Latest display check-in</dt>
+                  <dd>{formatTimestamp(latestDeviceSeenAt)}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Clock source</dt>
+                  <dd>{householdTimeStatusLabel}</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+        </AdminSection>
+
+        <AdminSection className="mb-6">
+          <AdminSectionHeader
+            title="Calendar feeds"
+            description="Store ICS feed URLs once here, then choose them from each calendar module by ID. Feed URLs stay admin-only; layouts and displays only reference saved feed IDs plus optional label and colour overrides."
+            actions={
+              <button
+                type="button"
+                onClick={addCalendarFeedDraft}
+                className="rounded border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-slate-300"
+              >
+                Add feed
+              </button>
+            }
+          />
+          <p
+            className={`mt-3 text-xs ${
+              calendarFeedsSaveState === "error"
+                ? "text-amber-200"
+                : calendarFeedsSaveState === "saved"
+                  ? "text-emerald-200"
+                  : "text-slate-400"
+            }`}
+          >
+            {autosaveStatusText({
+              state: calendarFeedsSaveState,
+              dirty: calendarFeedsDirty,
+              error: calendarFeedsSaveError,
+              idleLabel: "Feed edits save automatically.",
+              savedLabel: "Feeds saved.",
+            })}
+          </p>
+
+          {calendarFeedsConfig.feeds.length === 0 ? (
+            <p className="mt-4 rounded border border-slate-700/80 bg-slate-950/60 px-3 py-3 text-sm text-slate-400">
+              No saved feeds yet.
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {calendarFeedsConfig.feeds.map((feed, index) => (
+                <article
+                  key={`${feed.id || "draft"}-${index}`}
+                  className="rounded-lg border border-slate-800 bg-slate-950/60 p-4"
+                >
+                  <div className="grid gap-3 xl:grid-cols-[minmax(0,0.75fr)_minmax(0,0.85fr)_minmax(0,1.7fr)]">
+                    <label className="block space-y-1">
+                      <span className="text-xs font-medium text-slate-300">Name</span>
                       <input
-                        type="checkbox"
-                        checked={feed.enabled}
+                        className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                        type="text"
+                        value={feed.name}
                         onChange={(event) =>
                           updateCalendarFeedDraft(index, (current) => ({
-                            ...current,
-                            enabled: event.target.checked,
-                          }))
-                        }
-                      />
-                      <span>Enabled</span>
-                    </label>
-                    <div className="flex items-center justify-end">
-                      <button
-                        type="button"
-                        onClick={() => removeCalendarFeedDraft(index)}
-                        className="rounded border border-rose-400/70 px-3 py-2 text-sm font-semibold text-rose-100 hover:bg-rose-500/20"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </AdminSection>
-
-      <AdminSection className="mb-6">
-        <AdminSectionHeader
-          title="Connected displays"
-          description="Displays appear here after they open the dashboard once. Give each one a clear name so it is easy to tell your screens apart. If multiple screens share the same bridge or proxy IP, the detected device details below are a better identifier than Last seen IP."
-          actions={
-            <button
-              type="button"
-              onClick={() => void loadData()}
-              className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
-            >
-              Refresh
-            </button>
-          }
-        />
-        {devices.length === 0 ? (
-          <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-6 text-slate-300">
-            No displays have checked in yet.
-          </div>
-        ) : (
-          <div className="mt-4 grid gap-4">
-            {devices.map((device) => {
-              const draft =
-                drafts[device.id] ??
-                toDeviceDraft({
-                  device,
-                  availableSetIds,
-                  availableLayoutNames,
-                  firstAvailableSetId,
-                });
-              const payload = toUpdatePayload({
-                ...draft,
-                name: draft.name.trim().length > 0 ? draft.name : device.name,
-              });
-              const baselinePayload = toUpdatePayload(
-                toDeviceDraft({
-                  device,
-                  availableSetIds,
-                  availableLayoutNames,
-                  firstAvailableSetId,
-                }),
-              );
-              const isValidDraft = hasValidRoutingTarget(draft);
-              const isDirty = JSON.stringify(payload) !== JSON.stringify(baselinePayload);
-              const isBusy = busyDeviceState?.deviceId === device.id;
-              const isSaving = isBusy && busyDeviceState?.action === "save";
-              const isDeleting = isBusy && busyDeviceState?.action === "delete";
-              const deviceSaveState = deviceSaveStates[device.id] ?? "idle";
-              const deviceSaveError = deviceSaveErrors[device.id] ?? null;
-              const isSharedIp =
-                device.lastSeenIp !== null && (sharedIpCounts.get(device.lastSeenIp) ?? 0) > 1;
-              const detectedEnvironment = formatDeviceEnvironment(device.deviceInfo);
-              const detectedViewport = formatViewport(device.deviceInfo);
-
-              return (
-                <AdminSection key={device.id} as="article">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-semibold text-slate-100">{device.name}</h2>
-                      <p className="mt-1 text-xs text-slate-400">ID: {device.id}</p>
-                      {device.deviceInfo?.label ? (
-                        <p className="mt-1 text-xs text-slate-400">
-                          Detected: {device.deviceInfo.label}
-                        </p>
-                      ) : null}
-                      {detectedEnvironment ? (
-                        <p className="mt-1 text-xs text-slate-400">
-                          Environment: {detectedEnvironment}
-                        </p>
-                      ) : null}
-                      {detectedViewport ? (
-                        <p className="mt-1 text-xs text-slate-400">Viewport: {detectedViewport}</p>
-                      ) : null}
-                      <p className="mt-1 text-xs text-slate-400">
-                        Last seen IP: {device.lastSeenIp ?? "Unavailable"}
-                        {isSharedIp ? " (shared/proxied)" : ""}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-400">
-                        Last seen: {formatLastSeen(device.lastSeenAt)}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {isDirty ? (
-                        <button
-                          type="button"
-                          disabled={isBusy}
-                          onClick={() => resetDeviceDraft(device)}
-                          className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Reset
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        disabled={isBusy}
-                        onClick={() => void onDeleteDevice(device)}
-                        className="rounded-lg border border-rose-500/70 px-4 py-2 text-sm font-semibold text-rose-200 hover:border-rose-400 hover:text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {isDeleting ? "Removing..." : "Remove device"}
-                      </button>
-                    </div>
-                  </div>
-                  <p
-                    className={`mt-3 text-xs ${
-                      deviceSaveState === "error"
-                        ? "text-amber-200"
-                        : deviceSaveState === "saved"
-                          ? "text-emerald-200"
-                          : "text-slate-400"
-                    }`}
-                  >
-                    {autosaveStatusText({
-                      state: isSaving ? "saving" : deviceSaveState,
-                      dirty: isDirty,
-                      error: deviceSaveError,
-                      idleLabel: isValidDraft
-                        ? "Display edits save automatically."
-                        : "Choose a valid routing target first.",
-                      savedLabel: "Display saved.",
-                    })}
-                  </p>
-
-                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                    <label className="flex flex-col gap-2 text-sm text-slate-300">
-                      <span>Display name</span>
-                      <input
-                        value={draft.name}
-                        onChange={(event) =>
-                          updateDraft(device.id, (current) => ({
                             ...current,
                             name: event.target.value,
                           }))
                         }
-                        className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
+                        placeholder="School"
                       />
-                      <span className="text-xs text-slate-400">
-                        Custom device names must be unique.
-                      </span>
                     </label>
 
-                    <label className="flex flex-col gap-2 text-sm text-slate-300">
-                      <span>Theme</span>
-                      <select
-                        value={draft.themeId}
+                    <label className="block space-y-1">
+                      <span className="text-xs font-medium text-slate-300">Stable ID</span>
+                      <input
+                        className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 font-mono text-sm text-slate-100"
+                        type="text"
+                        value={feed.id}
                         onChange={(event) =>
-                          updateDraft(device.id, (current) => ({
+                          updateCalendarFeedDraft(index, (current) => ({
                             ...current,
-                            themeId: event.target.value as ThemeId,
+                            id: normalizeCalendarFeedId(event.target.value),
                           }))
                         }
-                        className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
-                      >
-                        {THEME_OPTIONS.map((theme) => (
-                          <option key={theme.id} value={theme.id}>
-                            {theme.label}
-                          </option>
-                        ))}
-                      </select>
-                      <ThemePreviewStrip themeId={draft.themeId} />
+                        placeholder="school"
+                      />
                     </label>
 
-                    <label className="flex flex-col gap-2 text-sm text-slate-300">
-                      <span>Routing mode</span>
-                      <select
-                        value={draft.routingMode}
+                    <label className="block space-y-1">
+                      <span className="text-xs font-medium text-slate-300">
+                        ICS feed URL or path
+                      </span>
+                      <input
+                        className="w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                        type="text"
+                        value={feed.url}
                         onChange={(event) =>
-                          updateDraft(device.id, (current) => {
-                            const nextRoutingMode = event.target.value as DeviceRoutingMode;
-                            const nextSetId =
-                              current.setId.trim().length > 0 && availableSetIds.has(current.setId)
-                                ? current.setId
-                                : firstAvailableSetId;
-                            const nextLayoutName =
-                              current.layoutName.trim().length > 0 &&
-                              availableLayoutNames.has(current.layoutName)
-                                ? current.layoutName
-                                : firstAvailableLayoutName;
-
-                            return {
-                              ...current,
-                              routingMode: nextRoutingMode,
-                              setId: nextRoutingMode === "set" ? nextSetId : current.setId,
-                              layoutName:
-                                nextRoutingMode === "layout" ? nextLayoutName : current.layoutName,
-                              preserveImplicitSelection: false,
-                            };
-                          })
+                          updateCalendarFeedDraft(index, (current) => ({
+                            ...current,
+                            url: event.target.value,
+                          }))
                         }
-                        className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
-                      >
-                        <option value="set">Follow set</option>
-                        <option value="layout">Pin layout</option>
-                      </select>
+                        placeholder="https://calendar.example.com/family.ics"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+                    <label className="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
+                      <span className="text-xs font-medium text-slate-300">Colour</span>
+                      <ThemePalettePicker
+                        compact
+                        value={feed.color}
+                        onChange={(slot) =>
+                          updateCalendarFeedDraft(index, (current) => ({
+                            ...current,
+                            color: slot,
+                          }))
+                        }
+                      />
                     </label>
 
-                    {draft.routingMode === "set" ? (
-                      <label className="flex flex-col gap-2 text-sm text-slate-300">
-                        <span>Layout set</span>
-                        <select
-                          value={draft.setId}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="flex items-center gap-2 whitespace-nowrap rounded border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={feed.enabled}
                           onChange={(event) =>
-                            updateDraft(device.id, (current) => ({
+                            updateCalendarFeedDraft(index, (current) => ({
                               ...current,
-                              setId: event.target.value,
-                              preserveImplicitSelection: false,
+                              enabled: event.target.checked,
                             }))
                           }
-                          className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
-                        >
-                          <option value="" disabled={availableSetOptions.length > 0}>
-                            {availableSetOptions.length === 0
-                              ? "No sets available"
-                              : "Choose a set..."}
-                          </option>
-                          {availableSetOptions.map((option) => (
-                            <option key={option.id} value={option.id}>
-                              {option.name}
-                            </option>
-                          ))}
-                        </select>
+                        />
+                        <span>Enabled</span>
                       </label>
-                    ) : (
-                      <label className="flex flex-col gap-2 text-sm text-slate-300">
-                        <span>Pinned layout</span>
-                        <select
-                          value={draft.layoutName}
-                          onChange={(event) =>
-                            updateDraft(device.id, (current) => ({
-                              ...current,
-                              layoutName: event.target.value,
-                              preserveImplicitSelection: false,
-                            }))
-                          }
-                          className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
+                      <div className="flex items-center justify-end">
+                        <button
+                          type="button"
+                          onClick={() => removeCalendarFeedDraft(index)}
+                          className="rounded border border-rose-400/70 px-3 py-2 text-sm font-semibold text-rose-100 hover:bg-rose-500/20"
                         >
-                          <option value="" disabled={layoutNames.length > 0}>
-                            {layoutNames.length === 0
-                              ? "No layouts available"
-                              : "Choose a layout..."}
-                          </option>
-                          {layoutNames.map((layoutName) => (
-                            <option key={layoutName} value={layoutName}>
-                              {layoutName}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
+                          Remove
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </AdminSection>
-              );
-            })}
+                </article>
+              ))}
+            </div>
+          )}
+        </AdminSection>
+      </div>
+
+      <div className={section === "devices" ? "contents" : "hidden"}>
+        <AdminSection className="mb-6">
+          <AdminSectionHeader
+            title="Connected displays"
+            description="Displays appear here after they open the dashboard once. Give each one a clear name so it is easy to tell your screens apart. If multiple screens share the same bridge or proxy IP, the detected device details below are a better identifier than Last seen IP."
+            actions={
+              <button
+                type="button"
+                onClick={() => void loadData()}
+                className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
+              >
+                Refresh
+              </button>
+            }
+          />
+          {possibleDuplicateOf.size > 0 ? (
+            <div className="mt-4 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <p className="font-semibold">
+                {possibleDuplicateOf.size} possible duplicate
+                {possibleDuplicateOf.size === 1 ? "" : "s"} found
+              </p>
+              <p className="mt-1 text-amber-800">
+                Hearth now keeps one installation ID in both a cookie and browser storage. Older
+                matching records are marked below so you can remove them safely.
+              </p>
+            </div>
+          ) : null}
+          {devices.length === 0 ? (
+            <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-6 text-slate-300">
+              No displays have checked in yet.
+            </div>
+          ) : (
+            <div className="mt-4 grid gap-4">
+              {devices.map((device) => {
+                const draft =
+                  drafts[device.id] ??
+                  toDeviceDraft({
+                    device,
+                    availableSetIds,
+                    availableLayoutNames,
+                    firstAvailableSetId,
+                  });
+                const payload = toUpdatePayload({
+                  ...draft,
+                  name: draft.name.trim().length > 0 ? draft.name : device.name,
+                });
+                const baselinePayload = toUpdatePayload(
+                  toDeviceDraft({
+                    device,
+                    availableSetIds,
+                    availableLayoutNames,
+                    firstAvailableSetId,
+                  }),
+                );
+                const isValidDraft = hasValidRoutingTarget(draft);
+                const isDirty = JSON.stringify(payload) !== JSON.stringify(baselinePayload);
+                const isBusy = busyDeviceState?.deviceId === device.id;
+                const isSaving = isBusy && busyDeviceState?.action === "save";
+                const isDeleting = isBusy && busyDeviceState?.action === "delete";
+                const deviceSaveState = deviceSaveStates[device.id] ?? "idle";
+                const deviceSaveError = deviceSaveErrors[device.id] ?? null;
+                const isSharedIp =
+                  device.lastSeenIp !== null && (sharedIpCounts.get(device.lastSeenIp) ?? 0) > 1;
+                const detectedEnvironment = formatDeviceEnvironment(device.deviceInfo);
+                const detectedViewport = formatViewport(device.deviceInfo);
+                const possiblePrimary = possibleDuplicateOf.get(device.id) ?? null;
+                const deviceAspectRatio =
+                  device.deviceInfo?.viewportWidth && device.deviceInfo.viewportHeight
+                    ? device.deviceInfo.viewportWidth / device.deviceInfo.viewportHeight
+                    : null;
+                const recommendedSetId = deviceAspectRatio
+                  ? ([...availableSetOptions]
+                      .filter(
+                        (option): option is typeof option & { targetAspectRatio: number } =>
+                          option.targetAspectRatio !== null,
+                      )
+                      .sort(
+                        (left, right) =>
+                          Math.abs(Math.log(deviceAspectRatio / left.targetAspectRatio)) -
+                          Math.abs(Math.log(deviceAspectRatio / right.targetAspectRatio)),
+                      )[0]?.id ?? null)
+                  : null;
+
+                return (
+                  <AdminSection key={device.id} as="article">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-lg font-semibold text-slate-100">{device.name}</h2>
+                        {possiblePrimary ? (
+                          <p className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">
+                            Possible older duplicate of {possiblePrimary.name}
+                          </p>
+                        ) : null}
+                        <p className="mt-1 text-xs text-slate-400">ID: {device.id}</p>
+                        {device.deviceInfo?.label ? (
+                          <p className="mt-1 text-xs text-slate-400">
+                            Detected: {device.deviceInfo.label}
+                          </p>
+                        ) : null}
+                        {detectedEnvironment ? (
+                          <p className="mt-1 text-xs text-slate-400">
+                            Environment: {detectedEnvironment}
+                          </p>
+                        ) : null}
+                        {detectedViewport ? (
+                          <p className="mt-1 text-xs text-slate-400">
+                            Viewport: {detectedViewport}
+                          </p>
+                        ) : null}
+                        <p className="mt-1 text-xs text-slate-400">
+                          Last seen IP: {device.lastSeenIp ?? "Unavailable"}
+                          {isSharedIp ? " (shared/proxied)" : ""}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Last seen: {formatLastSeen(device.lastSeenAt)}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {isDirty ? (
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => resetDeviceDraft(device)}
+                            className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Reset
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => void onDeleteDevice(device)}
+                          className="rounded-lg border border-rose-500/70 px-4 py-2 text-sm font-semibold text-rose-200 hover:border-rose-400 hover:text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isDeleting ? "Removing..." : "Remove device"}
+                        </button>
+                      </div>
+                    </div>
+                    <p
+                      className={`mt-3 text-xs ${
+                        deviceSaveState === "error"
+                          ? "text-amber-200"
+                          : deviceSaveState === "saved"
+                            ? "text-emerald-200"
+                            : "text-slate-400"
+                      }`}
+                    >
+                      {autosaveStatusText({
+                        state: isSaving ? "saving" : deviceSaveState,
+                        dirty: isDirty,
+                        error: deviceSaveError,
+                        idleLabel: isValidDraft
+                          ? "Display edits save automatically."
+                          : "Choose a valid routing target first.",
+                        savedLabel: "Display saved.",
+                      })}
+                    </p>
+
+                    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                      <label className="flex flex-col gap-2 text-sm text-slate-300">
+                        <span>Display name</span>
+                        <input
+                          value={draft.name}
+                          onChange={(event) =>
+                            updateDraft(device.id, (current) => ({
+                              ...current,
+                              name: event.target.value,
+                            }))
+                          }
+                          className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
+                        />
+                        <span className="text-xs text-slate-400">
+                          Custom device names must be unique.
+                        </span>
+                      </label>
+
+                      <label className="flex flex-col gap-2 text-sm text-slate-300">
+                        <span>Theme</span>
+                        <select
+                          value={draft.themeId}
+                          onChange={(event) =>
+                            updateDraft(device.id, (current) => ({
+                              ...current,
+                              themeId: event.target.value as ThemeId,
+                            }))
+                          }
+                          className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
+                        >
+                          {THEME_OPTIONS.map((theme) => (
+                            <option key={theme.id} value={theme.id}>
+                              {theme.label}
+                            </option>
+                          ))}
+                        </select>
+                        <ThemePreviewStrip themeId={draft.themeId} />
+                      </label>
+
+                      <label className="flex flex-col gap-2 text-sm text-slate-300">
+                        <span>Routing mode</span>
+                        <select
+                          value={draft.routingMode}
+                          onChange={(event) =>
+                            updateDraft(device.id, (current) => {
+                              const nextRoutingMode = event.target.value as DeviceRoutingMode;
+                              const nextSetId =
+                                current.setId.trim().length > 0 &&
+                                availableSetIds.has(current.setId)
+                                  ? current.setId
+                                  : firstAvailableSetId;
+                              const nextLayoutName =
+                                current.layoutName.trim().length > 0 &&
+                                availableLayoutNames.has(current.layoutName)
+                                  ? current.layoutName
+                                  : firstAvailableLayoutName;
+
+                              return {
+                                ...current,
+                                routingMode: nextRoutingMode,
+                                setId: nextRoutingMode === "set" ? nextSetId : current.setId,
+                                layoutName:
+                                  nextRoutingMode === "layout"
+                                    ? nextLayoutName
+                                    : current.layoutName,
+                                preserveImplicitSelection: false,
+                              };
+                            })
+                          }
+                          className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
+                        >
+                          <option value="set">Follow set</option>
+                          <option value="layout">Pin layout</option>
+                        </select>
+                      </label>
+
+                      {draft.routingMode === "set" ? (
+                        <label className="flex flex-col gap-2 text-sm text-slate-300">
+                          <span>Layout set</span>
+                          <select
+                            value={draft.setId}
+                            onChange={(event) =>
+                              updateDraft(device.id, (current) => ({
+                                ...current,
+                                setId: event.target.value,
+                                preserveImplicitSelection: false,
+                              }))
+                            }
+                            className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
+                          >
+                            <option value="" disabled={availableSetOptions.length > 0}>
+                              {availableSetOptions.length === 0
+                                ? "No sets available"
+                                : "Choose a set..."}
+                            </option>
+                            {availableSetOptions.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.name}
+                                {option.id === recommendedSetId
+                                  ? " · recommended for this screen"
+                                  : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : (
+                        <label className="flex flex-col gap-2 text-sm text-slate-300">
+                          <span>Pinned layout</span>
+                          <select
+                            value={draft.layoutName}
+                            onChange={(event) =>
+                              updateDraft(device.id, (current) => ({
+                                ...current,
+                                layoutName: event.target.value,
+                                preserveImplicitSelection: false,
+                              }))
+                            }
+                            className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500"
+                          >
+                            <option value="" disabled={layoutNames.length > 0}>
+                              {layoutNames.length === 0
+                                ? "No layouts available"
+                                : "Choose a layout..."}
+                            </option>
+                            {layoutNames.map((layoutName) => (
+                              <option key={layoutName} value={layoutName}>
+                                {layoutName}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                    </div>
+                  </AdminSection>
+                );
+              })}
+            </div>
+          )}
+        </AdminSection>
+      </div>
+
+      <div className={section === "connections" ? "contents" : "hidden"}>
+        <AdminSection className="mb-6">
+          <AdminSectionHeader
+            title="Operational health"
+            description="Quick diagnostics for display check-ins, calendar cache warmth, and automatic backups."
+          />
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-4">
+            <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+              <h3 className="text-sm font-semibold text-slate-100">Displays</h3>
+              <dl className="mt-3 space-y-3 text-sm text-slate-300">
+                <div>
+                  <dt className="text-slate-500">Total devices</dt>
+                  <dd>{deviceHealthSummary.total}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Recent check-ins</dt>
+                  <dd>{deviceHealthSummary.recentCount} in the last 15 min</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Stale devices</dt>
+                  <dd>{deviceHealthSummary.staleCount} over 1 hr old</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Latest device seen</dt>
+                  <dd>{formatTimestamp(deviceHealthSummary.latestSeenAt)}</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+              <h3 className="text-sm font-semibold text-slate-100">Calendar cache</h3>
+              <dl className="mt-3 space-y-3 text-sm text-slate-300">
+                <div>
+                  <dt className="text-slate-500">Enabled feeds</dt>
+                  <dd>
+                    {serverStatus?.diagnostics.calendar.enabledFeedCount ?? 0} of{" "}
+                    {serverStatus?.diagnostics.calendar.configuredFeedCount ?? 0}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Warm source cache</dt>
+                  <dd>{serverStatus?.diagnostics.calendar.memoryCacheEntries ?? 0} sources</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">In-flight refreshes</dt>
+                  <dd>{serverStatus?.diagnostics.calendar.inFlightRefreshes ?? 0}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Last prefetch</dt>
+                  <dd>
+                    {formatTimestamp(
+                      serverStatus?.diagnostics.calendar.lastPrefetchCompletedAt ?? null,
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </article>
+
+            <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+              <h3 className="text-sm font-semibold text-slate-100">Backups</h3>
+              <dl className="mt-3 space-y-3 text-sm text-slate-300">
+                <div>
+                  <dt className="text-slate-500">Latest backup</dt>
+                  <dd>
+                    {formatTimestamp(serverStatus?.diagnostics.backup.latestBackupAt ?? null)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Retained backups</dt>
+                  <dd>{serverStatus?.diagnostics.backup.backupCount ?? 0}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Backup interval</dt>
+                  <dd>
+                    {formatDurationMinutes(serverStatus?.diagnostics.backup.intervalMinutes ?? 0)} ·
+                    keep {serverStatus?.diagnostics.backup.retentionDays ?? 0} days
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Backup health</dt>
+                  <dd
+                    className={serverStatus?.diagnostics.backup.lastError ? "text-amber-200" : ""}
+                  >
+                    {serverStatus?.diagnostics.backup.lastError ?? "Healthy"}
+                  </dd>
+                </div>
+              </dl>
+            </article>
+
+            <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+              <h3 className="text-sm font-semibold text-slate-100">Storage</h3>
+              <dl className="mt-3 space-y-3 text-sm text-slate-300">
+                <div>
+                  <dt className="text-slate-500">Database size</dt>
+                  <dd>
+                    {formatBytes(serverStatus?.diagnostics.storage.databaseFileSizeBytes ?? null)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Database updated</dt>
+                  <dd>
+                    {formatTimestamp(
+                      serverStatus?.diagnostics.storage.databaseLastModifiedAt ?? null,
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </article>
           </div>
-        )}
-      </AdminSection>
+        </AdminSection>
 
-      <AdminSection className="mb-6">
-        <AdminSectionHeader
-          title="Operational health"
-          description="Quick diagnostics for display check-ins, calendar cache warmth, and automatic backups."
-        />
+        <AdminSection>
+          <AdminSectionHeader
+            title="Runtime details"
+            description="Only needed when checking what build is actually running."
+          />
 
-        <div className="mt-4 grid gap-4 xl:grid-cols-4">
-          <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-            <h3 className="text-sm font-semibold text-slate-100">Displays</h3>
-            <dl className="mt-3 space-y-3 text-sm text-slate-300">
-              <div>
-                <dt className="text-slate-500">Total devices</dt>
-                <dd>{deviceHealthSummary.total}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Recent check-ins</dt>
-                <dd>{deviceHealthSummary.recentCount} in the last 15 min</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Stale devices</dt>
-                <dd>{deviceHealthSummary.staleCount} over 1 hr old</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Latest device seen</dt>
-                <dd>{formatTimestamp(deviceHealthSummary.latestSeenAt)}</dd>
-              </div>
-            </dl>
-          </article>
+          {serverStatusError ? (
+            <p className="mt-4 rounded border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+              {serverStatusError}
+            </p>
+          ) : null}
 
-          <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-            <h3 className="text-sm font-semibold text-slate-100">Calendar cache</h3>
-            <dl className="mt-3 space-y-3 text-sm text-slate-300">
+          <article className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+            <dl className="grid gap-4 text-sm text-slate-300 md:grid-cols-2 xl:grid-cols-4">
               <div>
-                <dt className="text-slate-500">Enabled feeds</dt>
-                <dd>
-                  {serverStatus?.diagnostics.calendar.enabledFeedCount ?? 0} of{" "}
-                  {serverStatus?.diagnostics.calendar.configuredFeedCount ?? 0}
-                </dd>
+                <dt className="text-slate-500">Status</dt>
+                <dd className="text-slate-100">{serverStatus?.ok ? "Healthy" : "Unavailable"}</dd>
               </div>
               <div>
-                <dt className="text-slate-500">Warm source cache</dt>
-                <dd>{serverStatus?.diagnostics.calendar.memoryCacheEntries ?? 0} sources</dd>
+                <dt className="text-slate-500">Started</dt>
+                <dd>{formatTimestamp(serverStatus?.processStartedAt ?? null)}</dd>
               </div>
               <div>
-                <dt className="text-slate-500">In-flight refreshes</dt>
-                <dd>{serverStatus?.diagnostics.calendar.inFlightRefreshes ?? 0}</dd>
+                <dt className="text-slate-500">Web build</dt>
+                <dd>{formatTimestamp(serverStatus?.build.webIndexBuiltAt ?? null)}</dd>
               </div>
               <div>
-                <dt className="text-slate-500">Last prefetch</dt>
-                <dd>
-                  {formatTimestamp(
-                    serverStatus?.diagnostics.calendar.lastPrefetchCompletedAt ?? null,
-                  )}
+                <dt className="text-slate-500">Server timezone</dt>
+                <dd className="font-mono text-slate-200">
+                  {serverStatus?.time?.runtimeTimeZone ?? "Unavailable"}
                 </dd>
               </div>
             </dl>
           </article>
-
-          <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-            <h3 className="text-sm font-semibold text-slate-100">Backups</h3>
-            <dl className="mt-3 space-y-3 text-sm text-slate-300">
-              <div>
-                <dt className="text-slate-500">Latest backup</dt>
-                <dd>{formatTimestamp(serverStatus?.diagnostics.backup.latestBackupAt ?? null)}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Retained backups</dt>
-                <dd>{serverStatus?.diagnostics.backup.backupCount ?? 0}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Backup interval</dt>
-                <dd>
-                  {formatDurationMinutes(serverStatus?.diagnostics.backup.intervalMinutes ?? 0)} ·
-                  keep {serverStatus?.diagnostics.backup.retentionDays ?? 0} days
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Backup health</dt>
-                <dd className={serverStatus?.diagnostics.backup.lastError ? "text-amber-200" : ""}>
-                  {serverStatus?.diagnostics.backup.lastError ?? "Healthy"}
-                </dd>
-              </div>
-            </dl>
-          </article>
-
-          <article className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-            <h3 className="text-sm font-semibold text-slate-100">Storage</h3>
-            <dl className="mt-3 space-y-3 text-sm text-slate-300">
-              <div>
-                <dt className="text-slate-500">Database size</dt>
-                <dd>
-                  {formatBytes(serverStatus?.diagnostics.storage.databaseFileSizeBytes ?? null)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Database updated</dt>
-                <dd>
-                  {formatTimestamp(
-                    serverStatus?.diagnostics.storage.databaseLastModifiedAt ?? null,
-                  )}
-                </dd>
-              </div>
-            </dl>
-          </article>
-        </div>
-      </AdminSection>
-
-      <AdminSection>
-        <AdminSectionHeader
-          title="Runtime details"
-          description="Only needed when checking what build is actually running."
-        />
-
-        {serverStatusError ? (
-          <p className="mt-4 rounded border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-            {serverStatusError}
-          </p>
-        ) : null}
-
-        <article className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-          <dl className="grid gap-4 text-sm text-slate-300 md:grid-cols-2 xl:grid-cols-4">
-            <div>
-              <dt className="text-slate-500">Status</dt>
-              <dd className="text-slate-100">{serverStatus?.ok ? "Healthy" : "Unavailable"}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Started</dt>
-              <dd>{formatTimestamp(serverStatus?.processStartedAt ?? null)}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Web build</dt>
-              <dd>{formatTimestamp(serverStatus?.build.webIndexBuiltAt ?? null)}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Server timezone</dt>
-              <dd className="font-mono text-slate-200">
-                {serverStatus?.time?.runtimeTimeZone ?? "Unavailable"}
-              </dd>
-            </div>
-          </dl>
-        </article>
-      </AdminSection>
+        </AdminSection>
+      </div>
     </PageShell>
   );
 };
+
+export const AdminDevicesPage = () => <AdminSettingsPage section="devices" />;
+
+export const AdminConnectionsPage = () => <AdminSettingsPage section="connections" />;

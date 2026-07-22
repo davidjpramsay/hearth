@@ -10,6 +10,7 @@ interface MockWindow {
 }
 
 const originalWindowDescriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
+const originalDocumentDescriptor = Object.getOwnPropertyDescriptor(globalThis, "document");
 
 const restoreWindow = (): void => {
   if (originalWindowDescriptor) {
@@ -18,6 +19,12 @@ const restoreWindow = (): void => {
   }
 
   Reflect.deleteProperty(globalThis, "window");
+
+  if (originalDocumentDescriptor) {
+    Object.defineProperty(globalThis, "document", originalDocumentDescriptor);
+  } else {
+    Reflect.deleteProperty(globalThis, "document");
+  }
 };
 
 const installMockWindow = (initialStorage: Record<string, string> = {}): MockWindow => {
@@ -66,6 +73,19 @@ test("getOrCreateDeviceId creates and persists a new id", () => {
   assert.ok(firstId.length > 0);
   assert.equal(firstId, secondId);
   assert.equal(mockWindow.localStorage.getItem("hearth:screen-session-id"), firstId);
+
+  restoreWindow();
+});
+
+test("getOrCreateDeviceId recovers the installation id from its cookie", () => {
+  const mockWindow = installMockWindow();
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: { cookie: "hearth_device_id=cookie-device-id" },
+  });
+
+  assert.equal(getOrCreateDeviceId(), "cookie-device-id");
+  assert.equal(mockWindow.localStorage.getItem("hearth:screen-session-id"), "cookie-device-id");
 
   restoreWindow();
 });

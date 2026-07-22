@@ -117,9 +117,9 @@ test.describe("Hearth smoke", () => {
     await page.getByRole("button", { name: "Time Gate Node" }).click();
     await page.getByRole("button", { name: "Fit canvas" }).click();
 
-    const startHandle = page.locator('[data-nodeid="__start__"][data-handlepos="bottom"]');
+    const startHandle = page.locator('[data-nodeid="__start__"][data-handlepos="bottom"]:visible');
     const latestTimeGateTarget = page
-      .locator('[data-nodeid^="action-"][data-handlepos="top"]')
+      .locator('[data-nodeid^="action-"][data-handlepos="top"]:visible')
       .last();
 
     await expect(startHandle).toBeInViewport();

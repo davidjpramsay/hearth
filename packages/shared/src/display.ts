@@ -2732,6 +2732,8 @@ export const displayLayoutSwitchModeSchema = z.enum(["manual", "auto"]);
 
 export const screenFamilyLayoutTargetSchema = z.object({
   name: screenSetNameSchema.default("Layout set"),
+  /** Preferred physical display shape. Used only for unassigned displays. */
+  targetAspectRatio: z.number().positive().max(10).nullable().default(null),
   staticLayoutName: layoutNameSchema.nullable().default(null),
   defaultPhotoCollectionId: photoCollectionIdSchema.nullable().default(null),
   photoActionCollectionId: photoCollectionIdSchema.nullable().default(null),

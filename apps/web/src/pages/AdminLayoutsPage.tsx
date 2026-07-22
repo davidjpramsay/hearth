@@ -78,27 +78,33 @@ const LayoutPreview = ({ layout }: { layout: LayoutRecord }) => {
     layout.config.rows ?? 1,
   );
   const cols = Math.max(1, layout.config.cols);
+  const aspectRatio = cols / rows;
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-stone-200 bg-[#f8f6f0]">
-      {layout.config.items.map((item, index) => {
-        const module = layout.config.modules.find((entry) => entry.id === item.i);
-        return (
-          <div
-            key={item.i}
-            className="absolute overflow-hidden rounded-[5px] border border-white/70 p-1 text-[7px] font-semibold leading-tight text-stone-700"
-            style={{
-              left: `${(item.x / cols) * 100}%`,
-              top: `${(item.y / rows) * 100}%`,
-              width: `${(item.w / cols) * 100}%`,
-              height: `${(item.h / rows) * 100}%`,
-              background: LAYOUT_PREVIEW_COLORS[index % LAYOUT_PREVIEW_COLORS.length],
-            }}
-          >
-            {module?.moduleId.replaceAll("-", " ")}
-          </div>
-        );
-      })}
+    <div className="flex h-44 w-full items-center justify-center rounded-xl bg-[#f1eee7] p-3">
+      <div
+        className={`relative max-h-full max-w-full overflow-hidden rounded-xl border border-stone-200 bg-[#f8f6f0] shadow-sm ${aspectRatio >= 1 ? "w-full" : "h-full"}`}
+        style={{ aspectRatio: `${cols} / ${rows}` }}
+      >
+        {layout.config.items.map((item, index) => {
+          const module = layout.config.modules.find((entry) => entry.id === item.i);
+          return (
+            <div
+              key={item.i}
+              className="absolute overflow-hidden rounded-[5px] border border-white/70 p-1 text-[7px] font-semibold leading-tight text-stone-700"
+              style={{
+                left: `${(item.x / cols) * 100}%`,
+                top: `${(item.y / rows) * 100}%`,
+                width: `${(item.w / cols) * 100}%`,
+                height: `${(item.h / rows) * 100}%`,
+                background: LAYOUT_PREVIEW_COLORS[index % LAYOUT_PREVIEW_COLORS.length],
+              }}
+            >
+              {module?.moduleId.replaceAll("-", " ")}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -986,6 +992,7 @@ export const AdminLayoutsPage = () => {
           [nextId]: buildSetConfigFromAuthoring({
             current: {
               name: nextName,
+              targetAspectRatio: null,
               staticLayoutName: fallbackLayoutName,
               defaultPhotoCollectionId: null,
               photoActionCollectionId: null,
@@ -1171,6 +1178,19 @@ export const AdminLayoutsPage = () => {
 
       {workspace === "layouts" ? (
         <section>
+          <div className="mb-6 grid gap-4 rounded-2xl border border-teal-100 bg-teal-50/70 p-5 md:grid-cols-[1fr_auto] md:items-center">
+            <div>
+              <p className="text-sm font-semibold text-teal-950">Adaptive starter family</p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-teal-800">
+                Hearth includes editable layouts and matching Auto sets for 16:9, 4:3, 3:2, 9:16,
+                3:4, and square displays. Choose the closest Auto set for each screen in Devices;
+                pinning a custom layout or set still takes priority.
+              </p>
+            </div>
+            <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-teal-800 shadow-sm">
+              6 common ratios
+            </span>
+          </div>
           {creatingLayout ? (
             <form
               className="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-stone-200 bg-white p-5"
@@ -1235,6 +1255,11 @@ export const AdminLayoutsPage = () => {
                     {layout.config.cols}:{layout.config.rows ?? "auto"} grid ·{" "}
                     {layout.config.modules.length} modules
                   </p>
+                  {layout.name.startsWith("Hearth ") ? (
+                    <p className="mt-3 inline-flex rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">
+                      Adaptive starter · fully editable
+                    </p>
+                  ) : null}
                   {index === 0 ? (
                     <p className="mt-3 text-sm italic text-stone-500">Default fallback</p>
                   ) : null}

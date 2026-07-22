@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { PUBLIC_DOCS_URL } from "../../config/public-links";
 
 interface AdminNavActionsProps {
-  current: "layouts" | "devices" | "children" | "chores" | "school";
+  current: "layouts" | "devices" | "connections" | "children" | "chores" | "school";
   onLogout: () => void;
 }
 
@@ -21,6 +21,7 @@ export const AdminNavActions = ({ current, onLogout }: AdminNavActionsProps) => 
     { id: "chores", label: "Chores", href: "/chores", icon: "✓" },
     { id: "school", label: "School", href: "/school", icon: "▤" },
     { id: "devices", label: "Devices", href: "/devices", icon: "▣" },
+    { id: "connections", label: "Connections", href: "/connections", icon: "⌁" },
   ] as const;
 
   return (

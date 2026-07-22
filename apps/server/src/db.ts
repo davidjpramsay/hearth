@@ -729,10 +729,205 @@ const DEFAULT_LAYOUT_SEEDS: DefaultLayoutSeed[] = [
   },
 ];
 
+type StarterLayoutDefinition = {
+  id: string;
+  name: string;
+  ratioLabel: string;
+  cols: number;
+  rows: number;
+  calendarView: "week" | "list";
+  daysToShow: number;
+  items: Array<{
+    i: "clock" | "weather" | "calendar" | "chores" | "photos";
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  }>;
+};
+
+const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
+  {
+    id: "wide-16-9",
+    name: "Hearth Week · 16:9",
+    ratioLabel: "16:9",
+    cols: 32,
+    rows: 18,
+    calendarView: "week",
+    daysToShow: 7,
+    items: [
+      { i: "clock", x: 0, y: 0, w: 8, h: 4 },
+      { i: "weather", x: 8, y: 0, w: 7, h: 4 },
+      { i: "calendar", x: 0, y: 4, w: 24, h: 14 },
+      { i: "chores", x: 24, y: 0, w: 8, h: 9 },
+      { i: "photos", x: 24, y: 9, w: 8, h: 9 },
+    ],
+  },
+  {
+    id: "classic-4-3",
+    name: "Hearth Week · 4:3",
+    ratioLabel: "4:3",
+    cols: 20,
+    rows: 15,
+    calendarView: "week",
+    daysToShow: 7,
+    items: [
+      { i: "clock", x: 0, y: 0, w: 6, h: 3 },
+      { i: "weather", x: 6, y: 0, w: 5, h: 3 },
+      { i: "calendar", x: 0, y: 3, w: 14, h: 12 },
+      { i: "chores", x: 14, y: 0, w: 6, h: 8 },
+      { i: "photos", x: 14, y: 8, w: 6, h: 7 },
+    ],
+  },
+  {
+    id: "balanced-3-2",
+    name: "Hearth Week · 3:2",
+    ratioLabel: "3:2",
+    cols: 21,
+    rows: 14,
+    calendarView: "week",
+    daysToShow: 7,
+    items: [
+      { i: "clock", x: 0, y: 0, w: 6, h: 3 },
+      { i: "weather", x: 6, y: 0, w: 5, h: 3 },
+      { i: "calendar", x: 0, y: 3, w: 15, h: 11 },
+      { i: "chores", x: 15, y: 0, w: 6, h: 7 },
+      { i: "photos", x: 15, y: 7, w: 6, h: 7 },
+    ],
+  },
+  {
+    id: "portrait-9-16",
+    name: "Hearth Agenda · 9:16",
+    ratioLabel: "9:16",
+    cols: 18,
+    rows: 32,
+    calendarView: "list",
+    daysToShow: 5,
+    items: [
+      { i: "clock", x: 0, y: 0, w: 10, h: 4 },
+      { i: "weather", x: 10, y: 0, w: 8, h: 4 },
+      { i: "calendar", x: 0, y: 4, w: 18, h: 16 },
+      { i: "chores", x: 0, y: 20, w: 9, h: 12 },
+      { i: "photos", x: 9, y: 20, w: 9, h: 12 },
+    ],
+  },
+  {
+    id: "portrait-3-4",
+    name: "Hearth Agenda · 3:4",
+    ratioLabel: "3:4",
+    cols: 15,
+    rows: 20,
+    calendarView: "list",
+    daysToShow: 5,
+    items: [
+      { i: "clock", x: 0, y: 0, w: 8, h: 3 },
+      { i: "weather", x: 8, y: 0, w: 7, h: 3 },
+      { i: "calendar", x: 0, y: 3, w: 15, h: 9 },
+      { i: "chores", x: 0, y: 12, w: 8, h: 8 },
+      { i: "photos", x: 8, y: 12, w: 7, h: 8 },
+    ],
+  },
+  {
+    id: "square-1-1",
+    name: "Hearth Focus · 1:1",
+    ratioLabel: "1:1",
+    cols: 16,
+    rows: 16,
+    calendarView: "week",
+    daysToShow: 3,
+    items: [
+      { i: "clock", x: 0, y: 0, w: 9, h: 3 },
+      { i: "weather", x: 9, y: 0, w: 7, h: 3 },
+      { i: "calendar", x: 0, y: 3, w: 16, h: 7 },
+      { i: "chores", x: 0, y: 10, w: 8, h: 6 },
+      { i: "photos", x: 8, y: 10, w: 8, h: 6 },
+    ],
+  },
+];
+
+const STARTER_LAYOUT_SEEDS: DefaultLayoutSeed[] = STARTER_LAYOUT_DEFINITIONS.map((definition) => {
+  const instanceId = (module: StarterLayoutDefinition["items"][number]["i"]) =>
+    `starter-${definition.id}-${module}`;
+
+  return {
+    name: definition.name,
+    active: 0,
+    config: {
+      cols: definition.cols,
+      rows: definition.rows,
+      rowHeight: 54,
+      items: definition.items.map((item) => ({ ...item, i: instanceId(item.i) })),
+      modules: [
+        {
+          id: instanceId("clock"),
+          moduleId: "clock",
+          config: { use24Hour: true, showSeconds: false, showDate: true },
+        },
+        {
+          id: instanceId("weather"),
+          moduleId: "weather",
+          config: {
+            locationQuery: "Dunsborough, Western Australia, AU",
+            latitude: -33.61476,
+            longitude: 115.10445,
+            temperatureUnit: "celsius",
+            windSpeedUnit: "knots",
+            refreshIntervalSeconds: 600,
+            showForecast: false,
+            showTodayHumidity: false,
+            showTodayWind: false,
+          },
+        },
+        {
+          id: instanceId("calendar"),
+          moduleId: "calendar",
+          config: {
+            viewMode: definition.calendarView,
+            calendars: [],
+            calendarLabels: [],
+            calendarColors: [],
+            daysToShow: definition.daysToShow,
+            use24Hour: true,
+            refreshIntervalSeconds: 300,
+          },
+        },
+        {
+          id: instanceId("chores"),
+          moduleId: "chores",
+          config: { enableMoneyTracking: true, showStats: false },
+        },
+        {
+          id: instanceId("photos"),
+          moduleId: "photos",
+          config: {
+            folderPath: "/photos",
+            collectionId: null,
+            intervalSeconds: 20,
+            shuffle: true,
+            layoutOrientation: definition.cols >= definition.rows ? "landscape" : "portrait",
+          },
+        },
+      ],
+    },
+  };
+});
+
+const STARTER_SCREEN_SETS = Object.fromEntries(
+  STARTER_LAYOUT_DEFINITIONS.map((definition) => [
+    `starter-${definition.id}`,
+    {
+      name: `Auto · ${definition.ratioLabel}`,
+      targetAspectRatio: definition.cols / definition.rows,
+      staticLayoutName: definition.name,
+    },
+  ]),
+);
+
 const DEFAULT_SCREEN_PROFILE_LAYOUTS = {
   switchMode: "auto",
   autoCycleSeconds: 20,
   families: {
+    ...STARTER_SCREEN_SETS,
     "set-1": {
       name: "16:9 Family Set",
       staticLayoutName: "16:9 Standard Landscape",
@@ -860,16 +1055,23 @@ const DEFAULT_SCREEN_PROFILE_LAYOUTS = {
 const SCREEN_PROFILE_LAYOUTS_KEY = "screen_profile_layouts";
 
 const seedDefaultLayoutsAndSettings = (db: Database.Database): void => {
-  const existingLayoutCount = db
-    .prepare<[], { count: number }>("SELECT COUNT(*) AS count FROM layouts")
-    .get()?.count;
-
-  if ((existingLayoutCount ?? 0) > 0) {
-    return;
-  }
-
   const transaction = db.transaction(() => {
-    for (const seed of DEFAULT_LAYOUT_SEEDS) {
+    const existingLayoutNames = new Set(
+      db
+        .prepare<[], { name: string }>("SELECT name FROM layouts")
+        .all()
+        .map((row) => row.name),
+    );
+    const seeds =
+      existingLayoutNames.size === 0
+        ? [...DEFAULT_LAYOUT_SEEDS, ...STARTER_LAYOUT_SEEDS]
+        : STARTER_LAYOUT_SEEDS;
+
+    for (const seed of seeds) {
+      if (existingLayoutNames.has(seed.name)) {
+        continue;
+      }
+
       const configJson = JSON.stringify(seed.config);
       const result = db
         .prepare(
@@ -896,7 +1098,29 @@ const seedDefaultLayoutsAndSettings = (db: Database.Database): void => {
       });
     }
 
-    const screenProfileLayoutsValue = JSON.stringify(DEFAULT_SCREEN_PROFILE_LAYOUTS);
+    const existingSettings = db
+      .prepare<{ key: string }, { value: string }>("SELECT value FROM settings WHERE key = @key")
+      .get({ key: SCREEN_PROFILE_LAYOUTS_KEY });
+    let screenProfileLayoutsValue = JSON.stringify(DEFAULT_SCREEN_PROFILE_LAYOUTS);
+
+    if (existingSettings?.value) {
+      try {
+        const parsed = JSON.parse(existingSettings.value) as Record<string, unknown>;
+        const currentFamilies =
+          parsed.families && typeof parsed.families === "object" && !Array.isArray(parsed.families)
+            ? (parsed.families as Record<string, unknown>)
+            : {};
+        screenProfileLayoutsValue = JSON.stringify({
+          ...parsed,
+          families: {
+            ...STARTER_SCREEN_SETS,
+            ...currentFamilies,
+          },
+        });
+      } catch {
+        // Replace invalid historical settings with a valid starter configuration.
+      }
+    }
 
     db.prepare(
       `

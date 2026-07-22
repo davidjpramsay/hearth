@@ -299,6 +299,7 @@ export class ScreenProfileService {
       effectiveTargetSelection.kind === "set" ? effectiveTargetSelection.setId : null;
     const selectedSet =
       (requestedSetId ? availableSets.find((set) => set.id === requestedSetId) : null) ??
+      availableSets.find((set) => mapping.families[set.id]?.targetAspectRatio === null) ??
       availableSets[0] ??
       null;
     const family = selectedSet?.id ?? DEFAULT_SET_ID;
