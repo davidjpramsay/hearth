@@ -7,6 +7,7 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import "./index.css";
 import { App } from "./App";
+import { installRouteLoadRecovery } from "./routing/route-load-recovery";
 import { initializeTheme, startThemeSync } from "./theme/theme";
 
 const clearDevelopmentServiceWorkers = () => {
@@ -32,6 +33,7 @@ const clearDevelopmentServiceWorkers = () => {
 };
 
 if (import.meta.env.PROD) {
+  installRouteLoadRecovery();
   registerSW({ immediate: true });
 } else {
   clearDevelopmentServiceWorkers();

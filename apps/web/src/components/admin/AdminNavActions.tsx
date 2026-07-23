@@ -1,9 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { PUBLIC_DOCS_URL } from "../../config/public-links";
+import { preloadAdminRoute, type AdminRouteId } from "../../routing/admin-route-preload";
 import { HearthIcon, HearthMark, type HearthIconName } from "../HearthIcon";
 
 interface AdminNavActionsProps {
-  current: "layouts" | "devices" | "connections" | "children" | "chores" | "school";
+  current: AdminRouteId;
   onLogout: () => void;
 }
 
@@ -41,7 +42,10 @@ export const AdminNavActions = ({ current, onLogout }: AdminNavActionsProps) => 
         value={current}
         onChange={(event) => {
           const target = navItems.find((item) => item.id === event.target.value);
-          if (target) navigate(target.href);
+          if (target) {
+            preloadAdminRoute(target.id);
+            navigate(target.href);
+          }
         }}
         className="hearth-admin-nav__select"
       >
@@ -58,6 +62,9 @@ export const AdminNavActions = ({ current, onLogout }: AdminNavActionsProps) => 
             key={item.id}
             type="button"
             onClick={() => navigate(item.href)}
+            onPointerEnter={() => preloadAdminRoute(item.id)}
+            onFocus={() => preloadAdminRoute(item.id)}
+            onTouchStart={() => preloadAdminRoute(item.id)}
             aria-current={current === item.id ? "page" : undefined}
             className="hearth-admin-nav__item"
           >

@@ -236,6 +236,44 @@ test.describe("Hearth smoke", () => {
     await expect(page.getByRole("heading", { name: "Layouts" })).toBeVisible();
   });
 
+  test("admin navigation recovers when a lazily loaded page asset is stale", async ({ page }) => {
+    await loginAsAdmin(page);
+
+    let failedChoresAsset = false;
+    await page.route(/\/assets\/AdminChoresPage-[^/]+\.js(?:\?.*)?$/, async (route) => {
+      if (!failedChoresAsset) {
+        failedChoresAsset = true;
+        await route.abort("failed");
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.getByRole("button", { name: "Chores", exact: true }).click();
+
+    await expect.poll(() => failedChoresAsset).toBe(true);
+    await page.waitForURL("**/chores");
+    await expect(page.getByRole("heading", { name: "Chores" })).toBeVisible();
+  });
+
+  test("admin menu switches between family and chores without a refresh", async ({ page }) => {
+    await loginAsAdmin(page);
+
+    await page.getByRole("button", { name: "Family", exact: true }).click();
+    await page.waitForURL("**/children");
+    await expect(page.getByRole("heading", { name: "Family", exact: true })).toBeVisible();
+
+    await page.setViewportSize({ width: 800, height: 900 });
+    const sectionMenu = page.locator("select#admin-section-nav");
+    await sectionMenu.selectOption("chores");
+    await page.waitForURL("**/chores");
+    await expect(page.getByRole("heading", { name: "Chores" })).toBeVisible();
+
+    await sectionMenu.selectOption("children");
+    await page.waitForURL("**/children");
+    await expect(page.getByRole("heading", { name: "Family", exact: true })).toBeVisible();
+  });
+
   test("admin can create a layout", async ({ page }) => {
     const layoutName = `Smoke Layout ${Date.now()}`;
 
