@@ -993,63 +993,6 @@ const STARTER_LAYOUT_SEEDS: DefaultLayoutSeed[] = STARTER_LAYOUT_DEFINITIONS.fla
   ],
 );
 
-const STARTER_LAYOUT_V2_HOME_ITEMS: Record<string, StarterLayoutItem[]> = {
-  "wide-16-9": [
-    { i: "clock", x: 0, y: 0, w: 8, h: 4 },
-    { i: "weather", x: 8, y: 0, w: 7, h: 4 },
-    { i: "calendar", x: 0, y: 4, w: 24, h: 14 },
-    { i: "photos", x: 24, y: 0, w: 8, h: 9 },
-    { i: "chores", x: 24, y: 9, w: 8, h: 9 },
-  ],
-  "classic-4-3": [
-    { i: "clock", x: 0, y: 0, w: 6, h: 3 },
-    { i: "weather", x: 6, y: 0, w: 5, h: 3 },
-    { i: "calendar", x: 0, y: 3, w: 14, h: 12 },
-    { i: "photos", x: 14, y: 0, w: 6, h: 8 },
-    { i: "chores", x: 14, y: 8, w: 6, h: 7 },
-  ],
-  "balanced-3-2": [
-    { i: "clock", x: 0, y: 0, w: 6, h: 3 },
-    { i: "weather", x: 6, y: 0, w: 5, h: 3 },
-    { i: "calendar", x: 0, y: 3, w: 15, h: 11 },
-    { i: "photos", x: 15, y: 0, w: 6, h: 7 },
-    { i: "chores", x: 15, y: 7, w: 6, h: 7 },
-  ],
-  "portrait-9-16": [
-    { i: "clock", x: 0, y: 0, w: 10, h: 4 },
-    { i: "weather", x: 10, y: 0, w: 8, h: 4 },
-    { i: "photos", x: 0, y: 4, w: 18, h: 10 },
-    { i: "calendar", x: 0, y: 14, w: 18, h: 10 },
-    { i: "chores", x: 0, y: 24, w: 18, h: 8 },
-  ],
-  "portrait-3-4": [
-    { i: "clock", x: 0, y: 0, w: 8, h: 3 },
-    { i: "weather", x: 8, y: 0, w: 7, h: 3 },
-    { i: "photos", x: 0, y: 3, w: 15, h: 6 },
-    { i: "calendar", x: 0, y: 9, w: 15, h: 6 },
-    { i: "chores", x: 0, y: 15, w: 15, h: 5 },
-  ],
-};
-
-const STARTER_LAYOUT_V2_CONFIGS = new Map(
-  STARTER_LAYOUT_DEFINITIONS.flatMap((definition) => {
-    const oldHomeItems = STARTER_LAYOUT_V2_HOME_ITEMS[definition.id];
-    return oldHomeItems
-      ? [
-          [
-            definition.name,
-            buildStarterLayoutSeed(
-              definition,
-              "home",
-              oldHomeItems,
-              definition.cols >= definition.rows ? "landscape" : "portrait",
-            ).config,
-          ] as const,
-        ]
-      : [];
-  }),
-);
-
 const toStarterRule = (
   layoutName: string,
   trigger: AutoLayoutTarget["trigger"],
@@ -1255,17 +1198,17 @@ const seedDefaultLayoutsAndSettings = (db: Database.Database): void => {
                 typeof module.id === "string" ? [module.id] : [],
               ) ?? [],
             );
-            const previousStarterConfig = STARTER_LAYOUT_V2_CONFIGS.get(seed.name);
             const hasCanonicalModules =
               expectedModuleIds.size > 0 &&
+              existingConfig.modules?.length === expectedModuleIds.size &&
               existingConfig.modules?.every(
                 (module) => typeof module.id === "string" && expectedModuleIds.has(module.id),
               );
-            const isUntouchedStarter =
-              (existing.version === 1 && hasCanonicalModules) ||
-              (existing.version === 2 &&
-                previousStarterConfig !== undefined &&
-                existing.config_json === JSON.stringify(previousStarterConfig));
+            // Starter layouts are product-owned templates. Older releases normalized
+            // their JSON (for example typography and legacyCalendars), so byte-for-byte
+            // comparisons could leave the visibly old composition behind. Canonical
+            // module IDs distinguish these templates from user-created layouts.
+            const isUntouchedStarter = existing.version <= 2 && hasCanonicalModules;
             const configJson = JSON.stringify(seed.config);
             if (isUntouchedStarter && existing.config_json !== configJson) {
               db.prepare(

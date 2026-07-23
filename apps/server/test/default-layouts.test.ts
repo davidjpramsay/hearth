@@ -115,6 +115,50 @@ test("untouched starter layouts migrate to the polished arrangement", () => {
   }
 });
 
+test("normalized version 2 starter layouts still receive the polished arrangement", () => {
+  const directory = mkdtempSync(join(tmpdir(), "hearth-starter-v2-migration-"));
+  const filePath = join(directory, "hearth.sqlite");
+  try {
+    const db = createDatabase(filePath);
+    const row = db
+      .prepare("SELECT id, config_json FROM layouts WHERE name = ?")
+      .get("Hearth Week · 16:9") as { id: number; config_json: string };
+    const config = JSON.parse(row.config_json) as {
+      items: Array<{ i: string; x: number; y: number; w: number; h: number }>;
+      modules: Array<{ moduleId: string; config: Record<string, unknown> }>;
+      typography?: Record<string, unknown>;
+    };
+    config.items = [
+      { i: "starter-wide-16-9-clock", x: 0, y: 0, w: 8, h: 4 },
+      { i: "starter-wide-16-9-weather", x: 8, y: 0, w: 7, h: 4 },
+      { i: "starter-wide-16-9-calendar", x: 0, y: 4, w: 24, h: 14 },
+      { i: "starter-wide-16-9-photos", x: 24, y: 0, w: 8, h: 9 },
+      { i: "starter-wide-16-9-chores", x: 24, y: 9, w: 8, h: 9 },
+    ];
+    config.typography = { mode: "auto", density: "standard" };
+    const calendar = config.modules.find((module) => module.moduleId === "calendar");
+    if (calendar) calendar.config.legacyCalendars = [];
+    db.prepare("UPDATE layouts SET config_json = ?, version = 2 WHERE id = ?").run(
+      JSON.stringify(config),
+      row.id,
+    );
+    db.close();
+
+    const migratedDb = createDatabase(filePath);
+    const migrated = migratedDb
+      .prepare("SELECT version, config_json FROM layouts WHERE id = ?")
+      .get(row.id) as { version: number; config_json: string };
+    const migratedConfig = JSON.parse(migrated.config_json) as {
+      items: Array<{ i: string }>;
+    };
+    assert.equal(migrated.version, 3);
+    assert.ok(migratedConfig.items.some((item) => item.i === "starter-wide-16-9-welcome"));
+    migratedDb.close();
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("untouched starter sets upgrade to photo-aware switching without replacing custom sets", () => {
   const directory = mkdtempSync(join(tmpdir(), "hearth-starter-set-migration-"));
   const filePath = join(directory, "hearth.sqlite");
