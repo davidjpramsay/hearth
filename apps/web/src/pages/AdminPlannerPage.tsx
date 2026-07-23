@@ -33,9 +33,14 @@ import { AdminNavActions } from "../components/admin/AdminNavActions";
 import {
   AdminSection,
   AdminSectionHeader,
+  ADMIN_BUTTON_DANGER_CLASS,
+  ADMIN_BUTTON_PRIMARY_CLASS,
   ADMIN_BUTTON_SECONDARY_CLASS,
   ADMIN_EMPTY_STATE_CLASS,
+  ADMIN_FIELD_LABEL_CLASS,
   ADMIN_INPUT_CLASS,
+  ADMIN_META_TEXT_CLASS,
+  ADMIN_PANEL_CLASS,
 } from "../components/admin/AdminSection";
 import {
   PlannerTimetableEditor,
@@ -659,7 +664,7 @@ export const AdminPlannerPage = () => {
     >
       <div className="space-y-6">
         {activeError ? (
-          <div className="rounded-xl border border-rose-500/60 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {activeError}
           </div>
         ) : null}
@@ -668,11 +673,11 @@ export const AdminPlannerPage = () => {
           <AdminSectionHeader
             title="School day window"
             description="This timetable window applies to every saved school plan."
-            meta={<span className="text-cyan-100">Today: {siteToday}</span>}
+            meta={<span className="text-teal-800">Today: {siteToday}</span>}
           />
 
           <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={onSaveDayWindow}>
-            <label className="flex min-w-[10rem] flex-col gap-1 text-sm text-slate-200">
+            <label className={`min-w-[10rem] ${ADMIN_FIELD_LABEL_CLASS}`}>
               <span>Start time</span>
               <select
                 value={dayWindowForm.startTime}
@@ -680,7 +685,7 @@ export const AdminPlannerPage = () => {
                   setDayWindowForm((current) => ({ ...current, startTime: event.target.value }));
                   setDayWindowDirty(true);
                 }}
-                className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
+                className={ADMIN_INPUT_CLASS}
               >
                 {dayWindowStartOptions.map((value) => (
                   <option key={value} value={value}>
@@ -690,7 +695,7 @@ export const AdminPlannerPage = () => {
               </select>
             </label>
 
-            <label className="flex min-w-[10rem] flex-col gap-1 text-sm text-slate-200">
+            <label className={`min-w-[10rem] ${ADMIN_FIELD_LABEL_CLASS}`}>
               <span>End time</span>
               <select
                 value={dayWindowForm.endTime}
@@ -698,7 +703,7 @@ export const AdminPlannerPage = () => {
                   setDayWindowForm((current) => ({ ...current, endTime: event.target.value }));
                   setDayWindowDirty(true);
                 }}
-                className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
+                className={ADMIN_INPUT_CLASS}
               >
                 {dayWindowEndOptions.map((value) => (
                   <option key={value} value={value}>
@@ -708,7 +713,7 @@ export const AdminPlannerPage = () => {
               </select>
             </label>
 
-            <label className="flex min-w-[10rem] flex-col gap-1 text-sm text-slate-200">
+            <label className={`min-w-[10rem] ${ADMIN_FIELD_LABEL_CLASS}`}>
               <span>Grid size</span>
               <select
                 value={String(dayWindowForm.slotMinutes)}
@@ -719,7 +724,7 @@ export const AdminPlannerPage = () => {
                   }));
                   setDayWindowDirty(true);
                 }}
-                className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
+                className={ADMIN_INPUT_CLASS}
               >
                 <option value="15">15 minutes</option>
                 <option value="30">30 minutes</option>
@@ -730,7 +735,7 @@ export const AdminPlannerPage = () => {
             <button
               type="submit"
               disabled={busyKey === "day-window"}
-              className="rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className={ADMIN_BUTTON_PRIMARY_CLASS}
             >
               Save day window
             </button>
@@ -757,13 +762,13 @@ export const AdminPlannerPage = () => {
               {users.map((user) => (
                 <div
                   key={user.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5"
                 >
                   <div>
-                    <p className="font-semibold text-slate-100">{user.name}</p>
-                    <p className="text-xs text-slate-400">School column</p>
+                    <p className="font-semibold text-stone-800">{user.name}</p>
+                    <p className={ADMIN_META_TEXT_CLASS}>School column</p>
                   </div>
-                  <span className="text-xs text-slate-400">Managed in Children</span>
+                  <span className={ADMIN_META_TEXT_CLASS}>Managed in Family</span>
                 </div>
               ))}
               {users.length === 0 ? (
@@ -786,7 +791,7 @@ export const AdminPlannerPage = () => {
             onSubmit={onCreateTemplate}
             noValidate
           >
-            <label className="min-w-[16rem] flex-1 text-sm text-slate-200">
+            <label className={`min-w-[16rem] flex-1 ${ADMIN_FIELD_LABEL_CLASS}`}>
               <span className="mb-1 block">Plan name</span>
               <input
                 ref={createTemplateNameInputRef}
@@ -800,7 +805,7 @@ export const AdminPlannerPage = () => {
                 maxLength={120}
                 aria-invalid={createTemplateNameError ? "true" : undefined}
                 aria-describedby={createTemplateNameError ? "new-plan-name-error" : undefined}
-                className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
+                className={ADMIN_INPUT_CLASS}
               />
               {createTemplateNameError ? (
                 <span id="new-plan-name-error" className="mt-1 block text-sm text-rose-600">
@@ -811,7 +816,7 @@ export const AdminPlannerPage = () => {
             <button
               type="submit"
               disabled={busyKey === "template-create"}
-              className="rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className={ADMIN_BUTTON_PRIMARY_CLASS}
             >
               Create plan
             </button>
@@ -822,10 +827,10 @@ export const AdminPlannerPage = () => {
               <article
                 key={template.id}
                 onClick={() => selectTemplate(template.id)}
-                className={`rounded-xl border p-4 ${
+                className={`rounded-xl border p-4 transition ${
                   template.id === selectedTemplateId
-                    ? "border-cyan-400/70 bg-cyan-500/10"
-                    : "border-slate-700 bg-slate-950/40 hover:border-slate-500"
+                    ? "border-teal-300 bg-teal-50/70"
+                    : "border-stone-200 bg-stone-50 hover:border-stone-300"
                 }`}
               >
                 <div className="flex flex-wrap items-center gap-3">
@@ -837,8 +842,8 @@ export const AdminPlannerPage = () => {
                     }}
                     className={`min-w-[16rem] flex-1 rounded-lg border px-4 py-3 text-left text-base font-semibold ${
                       template.id === selectedTemplateId
-                        ? "border-cyan-300 bg-slate-950/50 text-cyan-50"
-                        : "border-slate-700 bg-slate-950/60 text-slate-100 hover:border-slate-500"
+                        ? "border-teal-300 bg-white text-teal-900"
+                        : "border-stone-200 bg-white text-stone-800 hover:border-stone-300"
                     }`}
                   >
                     {template.name}
@@ -849,7 +854,7 @@ export const AdminPlannerPage = () => {
                       event.stopPropagation();
                       selectTemplate(template.id);
                     }}
-                    className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-400"
+                    className={ADMIN_BUTTON_SECONDARY_CLASS}
                   >
                     Edit
                   </button>
@@ -861,7 +866,7 @@ export const AdminPlannerPage = () => {
                       void onDuplicateTemplate(template);
                     }}
                     disabled={busyKey === `template-duplicate-${template.id}`}
-                    className="rounded-lg border border-cyan-400/60 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+                    className={ADMIN_BUTTON_SECONDARY_CLASS}
                   >
                     Duplicate
                   </button>
@@ -873,14 +878,14 @@ export const AdminPlannerPage = () => {
                       void onDeleteTemplate(template);
                     }}
                     disabled={busyKey === `template-delete-${template.id}`}
-                    className="rounded-lg border border-rose-500/60 px-4 py-2 text-sm font-semibold text-rose-100 hover:border-rose-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    className={ADMIN_BUTTON_DANGER_CLASS}
                   >
                     Delete
                   </button>
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-300">Display On:</span>
+                  <span className="text-sm font-semibold text-stone-700">Display on</span>
                   {repeatDayOrder.map((day) => {
                     const ownedByTemplateId = assignedRepeatDays.get(day);
                     const isSelected = template.repeatDays.includes(day);
@@ -898,10 +903,10 @@ export const AdminPlannerPage = () => {
                         }}
                         className={`rounded-lg border px-3 py-1.5 text-sm font-semibold transition ${
                           isSelected
-                            ? "border-cyan-300 bg-cyan-400/15 text-cyan-50"
+                            ? "border-teal-700 bg-teal-700 text-white"
                             : isLocked
-                              ? "cursor-not-allowed border-slate-800 bg-slate-900/50 text-slate-500"
-                              : "border-slate-600 text-slate-200 hover:border-slate-400"
+                              ? "cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400"
+                              : "border-stone-300 bg-white text-stone-700 hover:border-teal-500"
                         }`}
                       >
                         {weekdayLabels[day]}
@@ -909,7 +914,7 @@ export const AdminPlannerPage = () => {
                     );
                   })}
                   {template.repeatDays.length === 0 ? (
-                    <span className="text-sm text-slate-400">No repeat days yet</span>
+                    <span className="text-sm text-stone-500">No repeat days yet</span>
                   ) : null}
                 </div>
               </article>
@@ -968,7 +973,7 @@ export const AdminPlannerPage = () => {
           />
 
           {validationError ? (
-            <div className="mt-4 rounded-lg border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               {validationError}
             </div>
           ) : null}
@@ -994,21 +999,21 @@ export const AdminPlannerPage = () => {
                 disabled={busyKey !== null || isAutosavingBlocks}
               />
 
-              <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
-                <h3 className="text-base font-semibold text-slate-100">Selected activity</h3>
+              <div className={ADMIN_PANEL_CLASS}>
+                <h3 className="text-base font-semibold text-stone-900">Selected activity</h3>
                 {selectedBlock ? (
                   <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
                     <div className="space-y-3">
-                      <label className="block text-sm text-slate-200">
+                      <label className={ADMIN_FIELD_LABEL_CLASS}>
                         <span className="mb-1 block">Name</span>
                         <input
                           value={selectedBlock.name}
                           onChange={(event) => updateSelectedBlock({ name: event.target.value })}
-                          className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
+                          className={ADMIN_INPUT_CLASS}
                         />
                       </label>
 
-                      <label className="block text-sm text-slate-200">
+                      <label className={ADMIN_FIELD_LABEL_CLASS}>
                         <span className="mb-1 block">Notes</span>
                         <textarea
                           value={selectedBlock.notes ?? ""}
@@ -1016,14 +1021,14 @@ export const AdminPlannerPage = () => {
                             updateSelectedBlock({ notes: event.target.value || null })
                           }
                           rows={4}
-                          className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
+                          className={ADMIN_INPUT_CLASS}
                         />
                       </label>
                     </div>
 
                     <div className="space-y-3">
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="block text-sm text-slate-200">
+                        <label className={ADMIN_FIELD_LABEL_CLASS}>
                           <span className="mb-1 block">Colour</span>
                           <ThemePalettePicker
                             value={selectedBlock.colour}
@@ -1032,14 +1037,14 @@ export const AdminPlannerPage = () => {
                           />
                         </label>
 
-                        <label className="block text-sm text-slate-200">
+                        <label className={ADMIN_FIELD_LABEL_CLASS}>
                           <span className="mb-1 block">User column</span>
                           <select
                             value={String(selectedBlock.userId)}
                             onChange={(event) =>
                               updateSelectedBlock({ userId: Number(event.target.value) })
                             }
-                            className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
+                            className={ADMIN_INPUT_CLASS}
                           >
                             {users.map((user) => (
                               <option key={user.id} value={String(user.id)}>
@@ -1051,14 +1056,14 @@ export const AdminPlannerPage = () => {
                       </div>
 
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="block text-sm text-slate-200">
+                        <label className={ADMIN_FIELD_LABEL_CLASS}>
                           <span className="mb-1 block">Start</span>
                           <select
                             value={selectedBlock.startTime}
                             onChange={(event) =>
                               updateSelectedBlock({ startTime: event.target.value })
                             }
-                            className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
+                            className={ADMIN_INPUT_CLASS}
                           >
                             {withCurrentValue(
                               activityTimeOptions.slice(0, -1),
@@ -1071,14 +1076,14 @@ export const AdminPlannerPage = () => {
                           </select>
                         </label>
 
-                        <label className="block text-sm text-slate-200">
+                        <label className={ADMIN_FIELD_LABEL_CLASS}>
                           <span className="mb-1 block">End</span>
                           <select
                             value={selectedBlock.endTime}
                             onChange={(event) =>
                               updateSelectedBlock({ endTime: event.target.value })
                             }
-                            className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
+                            className={ADMIN_INPUT_CLASS}
                           >
                             {withCurrentValue(
                               activityTimeOptions.slice(1),
@@ -1095,14 +1100,14 @@ export const AdminPlannerPage = () => {
                       <button
                         type="button"
                         onClick={onDeleteSelectedBlock}
-                        className="rounded-lg border border-rose-500/60 px-4 py-2 text-sm font-semibold text-rose-100 hover:border-rose-400"
+                        className={ADMIN_BUTTON_DANGER_CLASS}
                       >
                         Delete activity
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <p className="mt-4 text-sm text-slate-300">
+                  <p className="mt-4 text-sm text-stone-600">
                     Select a timetable activity to edit its name, colour, notes, or times.
                   </p>
                 )}
@@ -1117,11 +1122,11 @@ export const AdminPlannerPage = () => {
             description="Download the latest weekly summary PDF, or open an older PDF below."
             meta={
               latestSummaryArchive ? (
-                <span className="text-cyan-100">
+                <span className="text-teal-800">
                   {latestSummaryArchive.weekStartDate} to {latestSummaryArchive.weekEndDate}
                 </span>
               ) : (
-                <span className="text-slate-400">Waiting for the latest PDF summary</span>
+                <span className="text-stone-500">Waiting for the latest PDF summary</span>
               )
             }
             actions={
@@ -1129,7 +1134,7 @@ export const AdminPlannerPage = () => {
                 type="button"
                 onClick={() => void onDownloadSummary()}
                 disabled={!latestSummaryArchive}
-                className="rounded-lg border border-cyan-400/60 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+                className={ADMIN_BUTTON_SECONDARY_CLASS}
               >
                 Download latest PDF
               </button>
@@ -1137,30 +1142,30 @@ export const AdminPlannerPage = () => {
           />
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <p className="max-w-2xl text-sm text-slate-400">
+            <p className="max-w-2xl text-sm text-stone-600">
               PDFs group the week by child, then by completed and incomplete activities.
             </p>
             {summaryStatus ? (
-              <span className="rounded-full border border-slate-600 bg-slate-900/70 px-2 py-1 text-xs font-semibold text-slate-200">
+              <span className="rounded-full border border-stone-200 bg-stone-100 px-2 py-1 text-xs font-semibold text-stone-700">
                 {summaryStatus}
               </span>
             ) : null}
           </div>
 
           {summaryArchiveQuery.error ? (
-            <div className="mt-4 rounded-lg border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
               {summaryArchiveQuery.error}
             </div>
           ) : null}
 
           {summaryLoading ? (
-            <p className="mt-4 text-sm text-slate-300">Preparing the latest weekly PDF...</p>
+            <p className="mt-4 text-sm text-stone-600">Preparing the latest weekly PDF...</p>
           ) : latestSummaryArchive ? (
-            <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+            <div className={`mt-4 ${ADMIN_PANEL_CLASS}`}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-semibold text-slate-100">Latest PDF summary</h3>
-                  <p className="text-sm text-slate-400">
+                  <h3 className="text-base font-semibold text-stone-900">Latest PDF summary</h3>
+                  <p className="text-sm text-stone-500">
                     {latestSummaryArchive.weekStartDate} to {latestSummaryArchive.weekEndDate}
                   </p>
                 </div>
@@ -1168,7 +1173,7 @@ export const AdminPlannerPage = () => {
                   type="button"
                   onClick={() => void onDownloadSummary()}
                   disabled={!latestSummaryArchive}
-                  className="rounded-lg border border-cyan-400/60 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  className={ADMIN_BUTTON_SECONDARY_CLASS}
                 >
                   Download PDF
                 </button>
@@ -1178,25 +1183,25 @@ export const AdminPlannerPage = () => {
             <p className={`mt-4 ${ADMIN_EMPTY_STATE_CLASS}`}>No weekly PDF summary yet.</p>
           )}
 
-          <div className="mt-6 rounded-xl border border-slate-700 bg-slate-950/40 p-4">
-            <h3 className="text-base font-semibold text-slate-100">Archived PDFs</h3>
+          <div className={`mt-6 ${ADMIN_PANEL_CLASS}`}>
+            <h3 className="text-base font-semibold text-stone-900">Archived PDFs</h3>
             <div className="mt-3 space-y-2">
               {archivedSummaryArchives.length > 0 ? (
                 archivedSummaryArchives.map((archive) => (
                   <div
                     key={archive.weekStartDate}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-700 bg-slate-950/50 px-3 py-3"
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white px-3 py-3"
                   >
                     <div>
-                      <p className="font-semibold text-slate-100">
+                      <p className="font-semibold text-stone-800">
                         {archive.weekStartDate} to {archive.weekEndDate}
                       </p>
-                      <p className="text-xs text-slate-400">School summary PDF</p>
+                      <p className={ADMIN_META_TEXT_CLASS}>School summary PDF</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => void onDownloadArchivedSummary(archive.weekStartDate)}
-                      className="rounded-lg border border-cyan-400/60 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-300"
+                      className={ADMIN_BUTTON_SECONDARY_CLASS}
                     >
                       Download PDF
                     </button>
@@ -1209,7 +1214,7 @@ export const AdminPlannerPage = () => {
           </div>
         </AdminSection>
 
-        {loading ? <p className="text-sm text-slate-300">Loading school plans...</p> : null}
+        {loading ? <p className="text-sm text-stone-600">Loading school plans...</p> : null}
       </div>
     </PageShell>
   );
