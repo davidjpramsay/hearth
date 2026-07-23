@@ -1,4 +1,11 @@
 const LAYOUT_NAME_MAX_LENGTH = 80;
+const STARTER_LAYOUT_FAMILIES = [
+  { prefix: "Hearth Week · ", displayName: "Family Week" },
+  { prefix: "Hearth Agenda · ", displayName: "Today & Agenda" },
+  { prefix: "Hearth Focus · ", displayName: "Family Focus" },
+  { prefix: "Hearth Photo · ", displayName: "Photo Focus" },
+] as const;
+const PHOTO_LAYOUT_PREFIX = "Hearth Photo · ";
 
 const normalizeNameKey = (value: string): string => value.trim().toLowerCase();
 
@@ -29,3 +36,20 @@ export const buildDuplicateLayoutName = (input: {
   const timestampSuffix = ` (${Date.now().toString(36)})`;
   return clampBaseWithSuffix(baseName, timestampSuffix);
 };
+
+export const getStarterLayoutRatio = (name: string): string | null => {
+  const family = STARTER_LAYOUT_FAMILIES.find(({ prefix }) => name.startsWith(prefix));
+  return family ? name.slice(family.prefix.length) : null;
+};
+
+export const getStarterLayoutExperienceName = (name: string): string =>
+  STARTER_LAYOUT_FAMILIES.find(({ prefix }) => name.startsWith(prefix))?.displayName ?? name;
+
+export const getLayoutDisplayName = (name: string): string => {
+  const ratio = getStarterLayoutRatio(name);
+  if (!ratio) return name;
+  return `${getStarterLayoutExperienceName(name)} · ${ratio}`;
+};
+
+export const isPhotoStarterLayoutName = (name: string): boolean =>
+  name.startsWith(PHOTO_LAYOUT_PREFIX);

@@ -200,6 +200,24 @@ test.describe("Hearth smoke", () => {
     await expect(deviceCard).toContainText("ID:");
     await expect(deviceCard).toContainText("Last seen:");
     await expect(deviceCard).toContainText("Remove device");
+
+    await deviceCard.getByLabel("Routing mode").selectOption("layout");
+    const pinnedLayout = deviceCard.getByLabel("Pinned layout");
+    await expect(pinnedLayout).toBeVisible();
+    const starterOptions = await pinnedLayout.locator("option").evaluateAll((options) =>
+      options.map((option) => ({
+        label: (option as HTMLOptionElement).textContent?.trim(),
+        value: (option as HTMLOptionElement).value,
+      })),
+    );
+    expect(starterOptions).toEqual(
+      expect.arrayContaining([
+        { label: "Family Week · 16:9", value: "Hearth Week · 16:9" },
+        { label: "Today & Agenda · 9:16", value: "Hearth Agenda · 9:16" },
+        { label: "Family Focus · 1:1", value: "Hearth Focus · 1:1" },
+        { label: "Photo Focus · 4:3", value: "Hearth Photo · 4:3" },
+      ]),
+    );
   });
 
   test("admin shows a reload prompt when a newer build is detected", async ({ page }) => {

@@ -44,6 +44,7 @@ import { PageShell } from "../components/PageShell";
 import { ThemePreviewStrip } from "../components/ThemePreviewStrip";
 import { getSupportedTimeZoneOptions } from "../time-zone-options";
 import { THEME_OPTIONS, type ThemeId } from "../theme/theme";
+import { getLayoutDisplayName } from "./layout-name-utils";
 
 type DeviceRoutingMode = "set" | "layout";
 type AutosaveState = "idle" | "saving" | "saved" | "error";
@@ -1562,7 +1563,7 @@ const AdminSettingsPage = ({ section }: { section: SettingsSection }) => {
                             </option>
                             {layoutNames.map((layoutName) => (
                               <option key={layoutName} value={layoutName}>
-                                {layoutName}
+                                {getLayoutDisplayName(layoutName)}
                               </option>
                             ))}
                           </select>

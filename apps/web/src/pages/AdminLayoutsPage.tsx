@@ -35,7 +35,12 @@ import {
 } from "../components/admin/AdminSection";
 import type { LogicBranchTrigger } from "../components/admin/logicNodeRegistry";
 import { PageShell } from "../components/PageShell";
-import { buildDuplicateLayoutName } from "./layout-name-utils";
+import {
+  buildDuplicateLayoutName,
+  getStarterLayoutExperienceName,
+  getStarterLayoutRatio,
+  isPhotoStarterLayoutName,
+} from "./layout-name-utils";
 import { analyzeSetRuntimeHealth, type RuntimeHealthReport } from "./layout-set-runtime-health";
 import {
   compileLayoutSetAuthoringToLogicGraph,
@@ -71,24 +76,8 @@ const GraphEditorLoading = () => (
 );
 
 const LAYOUT_PREVIEW_COLORS = ["#f6d8d1", "#e4ecdf", "#e3daf0", "#dbe8f1", "#f7e4b8"];
-const STARTER_LAYOUT_PREFIXES = ["Hearth Week · ", "Hearth Agenda · ", "Hearth Focus · "];
-const PHOTO_LAYOUT_PREFIX = "Hearth Photo · ";
 const STARTER_RATIO_ORDER = ["16:9", "4:3", "3:2", "1:1", "3:4", "9:16"];
 const LEGACY_LAYOUT_NAMES = new Set(["16:9 Standard Landscape", "16:9 Standard Portrait"]);
-
-const getStarterRatio = (name: string): string | null => {
-  const prefix = [...STARTER_LAYOUT_PREFIXES, PHOTO_LAYOUT_PREFIX].find((entry) =>
-    name.startsWith(entry),
-  );
-  return prefix ? name.slice(prefix.length) : null;
-};
-
-const getStarterExperienceName = (name: string): string => {
-  if (name.startsWith("Hearth Week · ")) return "Family Week";
-  if (name.startsWith("Hearth Agenda · ")) return "Today & Agenda";
-  if (name.startsWith("Hearth Focus · ")) return "Family Focus";
-  return "Photo Focus";
-};
 
 const LayoutPreview = ({ layout }: { layout: LayoutRecord }) => {
   const rows = Math.max(
@@ -1096,10 +1085,10 @@ export const AdminLayoutsPage = () => {
   const starterLayoutGroups = useMemo(() => {
     const groups = new Map<string, { home?: LayoutRecord; photo?: LayoutRecord }>();
     for (const layout of sortedLayouts) {
-      const ratio = getStarterRatio(layout.name);
+      const ratio = getStarterLayoutRatio(layout.name);
       if (!ratio) continue;
       const group = groups.get(ratio) ?? {};
-      if (layout.name.startsWith(PHOTO_LAYOUT_PREFIX)) group.photo = layout;
+      if (isPhotoStarterLayoutName(layout.name)) group.photo = layout;
       else group.home = layout;
       groups.set(ratio, group);
     }
@@ -1114,7 +1103,7 @@ export const AdminLayoutsPage = () => {
   }, [sortedLayouts]);
 
   const personalLayouts = useMemo(
-    () => sortedLayouts.filter((layout) => getStarterRatio(layout.name) === null),
+    () => sortedLayouts.filter((layout) => getStarterLayoutRatio(layout.name) === null),
     [sortedLayouts],
   );
   const hasCustomPersonalLayouts = personalLayouts.some(
@@ -1306,7 +1295,7 @@ export const AdminLayoutsPage = () => {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h3 className="text-lg font-semibold text-stone-900">
-                            {getStarterExperienceName(primary.name)}
+                            {getStarterLayoutExperienceName(primary.name)}
                           </h3>
                           <p className="mt-1 text-sm text-stone-500">Best for {ratio} screens</p>
                         </div>
