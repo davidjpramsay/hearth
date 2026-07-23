@@ -112,22 +112,20 @@ export const HearthIcon = ({ name, className = "", ...props }: HearthIconProps) 
 );
 
 export const HearthMark = ({ className = "", ...props }: SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 32 32" aria-hidden="true" className={className} fill="none" {...props}>
+  <svg viewBox="0 0 48 48" aria-hidden="true" className={className} fill="none" {...props}>
     <path
-      d="M4.75 14.1 16 4.75l11.25 9.35v12.65H4.75Z"
-      fill="currentColor"
-      fillOpacity="0.1"
-      stroke="currentColor"
-      strokeWidth="2.1"
+      d="M17.2 42H8.5A4.5 4.5 0 0 1 4 37.5V20.2a6 6 0 0 1 2.2-4.65L20.85 4.2a5 5 0 0 1 6.3 0L41.8 15.55A6 6 0 0 1 44 20.2v17.3a4.5 4.5 0 0 1-4.5 4.5h-8.7"
+      stroke="var(--hearth-mark-house, #0f7773)"
+      strokeWidth="4"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
-      d="M16 26c-3.2 0-5.4-2.25-5.4-5.35 0-2.45 1.4-4.2 3.65-6.2-.1 1.75.75 2.75 1.65 3.2.2-2.65 1.65-4.45 3.25-5.9.1 2.6 2.25 4.05 2.25 6.95 0 4.15-2.2 7.3-5.4 7.3Z"
-      fill="currentColor"
+      d="M21.5 43c-5-2-7.5-6-7-10.5.5-4 3.5-7 5-10 1.7-2.7 1.6-5.3.7-8 6.9 2.6 12.8 9.7 13.2 16.5.4 5.1-2.6 9.4-6.9 11.5-1.3-2.9-1.3-6.3 0-9.3-3.3 2.3-4.7 6.3-4.2 9.8Z"
+      fill="var(--hearth-mark-flame, #f36f50)"
     />
     <path
-      d="M16.1 23.6c-1.25 0-2.15-.9-2.15-2.15 0-1.05.55-1.85 1.5-2.75.1.9.55 1.3 1.05 1.55.15-1.05.7-1.8 1.35-2.4.15 1.15.95 1.8.95 2.95 0 1.6-1 2.8-2.7 2.8Z"
+      d="M26.8 43.7H22c-1.4-4.6-.1-9.5 4.4-14.2.9 3.3.1 7.5 2.4 11.2.7 1.1-.5 2.2-2 3Z"
       fill="var(--hearth-mark-cutout, #fffefa)"
     />
   </svg>

@@ -2229,24 +2229,19 @@ body {
   gap: 0.75rem;
   padding: 0 0.75rem 2.25rem;
   font-family: "Avenir Next", "Segoe UI", var(--font-display);
-  font-size: 1.65rem;
-  font-weight: 650;
+  font-size: 1.7rem;
+  font-weight: 600;
   letter-spacing: -0.03em;
 }
 
 .hearth-admin-brand__mark {
   display: grid;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.85rem;
+  height: 2.85rem;
   place-items: center;
-  border: 1px solid rgba(183, 94, 71, 0.16);
-  border-radius: 0.9rem;
-  background: #f6ded5;
-  color: #ae513d;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.7),
-    0 5px 14px rgba(114, 64, 50, 0.1);
-  --hearth-mark-cutout: #fffaf5;
+  --hearth-mark-house: #0f7773;
+  --hearth-mark-flame: #f36f50;
+  --hearth-mark-cutout: #fffefa;
 }
 
 .hearth-admin-nav__select {

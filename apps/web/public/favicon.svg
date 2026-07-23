@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Hearth home and flame icon">
-  <rect x="20" y="20" width="472" height="472" rx="112" fill="#0f6f6c"/>
-  <path d="M112 230 256 108l144 122v164H112Z" fill="#fffefa" fill-opacity=".1" stroke="#fffefa" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M256 396c-58 0-96-39-96-94 0-43 25-75 64-109-2 31 13 49 29 57 4-47 30-79 59-105 2 45 40 71 40 122 0 74-39 129-96 129Z" fill="#ef7a63"/>
-  <path d="M258 354c-23 0-39-16-39-38 0-19 10-33 27-49 2 16 10 23 19 28 3-19 13-32 24-43 3 21 17 32 17 52 0 29-18 50-48 50Z" fill="#fffefa"/>
+  <rect width="512" height="512" rx="104" fill="#fffaf5"/>
+  <path d="M188 430H101a45 45 0 0 1-45-45V212a60 60 0 0 1 22-46.5L224.5 52a50 50 0 0 1 63 0L434 165.5a60 60 0 0 1 22 46.5v173a45 45 0 0 1-45 45h-87" fill="none" stroke="#0f7773" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M229 458c-53-21-79-63-74-111 5-43 37-75 53-107 18-29 17-57 8-85 74 28 137 104 141 176 4 54-28 100-74 122-14-31-14-67 0-99-35 25-50 67-45 104Z" fill="#f36f50"/>
+  <path d="M286 466h-51c-15-49-1-101 47-151 10 35 1 79 25 119 8 12-5 24-21 32Z" fill="#fffaf5"/>
 </svg>

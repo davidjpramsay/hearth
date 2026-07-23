@@ -29,7 +29,7 @@ export const AdminNavActions = ({ current, onLogout }: AdminNavActionsProps) => 
     <nav aria-label="Admin section" className="hearth-admin-nav">
       <div className="hearth-admin-brand" aria-label="Hearth admin">
         <span className="hearth-admin-brand__mark" aria-hidden="true">
-          <HearthMark className="h-6 w-6" />
+          <HearthMark className="h-11 w-11" />
         </span>
         <span>Hearth</span>
       </div>
