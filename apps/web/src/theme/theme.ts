@@ -46,159 +46,53 @@ const DARK_FOREGROUND = "#020617";
 export const THEME_OPTIONS: ThemeOption[] = [
   {
     id: "default",
-    label: "Hearth",
-    primary: "#157B78",
+    label: "Hearth Light",
+    primary: "#0F7F78",
     palette: {
-      "color-1": "#F97066",
-      "color-2": "#F58B1F",
-      "color-3": "#E7B71E",
-      "color-4": "#86C453",
-      "color-5": "#32C18B",
-      "color-6": "#1FBDBD",
-      "color-7": "#3BA7F4",
-      "color-8": "#587CF3",
-      "color-9": "#8A63EB",
-      "color-10": "#CB5BC9",
-      "color-11": "#8E9AAF",
-      "color-12": "#D7C14D",
-    },
-  },
-  {
-    id: "nord",
-    label: "Nord",
-    primary: "#88C0D0",
-    palette: {
-      "color-1": "#BF616A",
-      "color-2": "#D08770",
-      "color-3": "#EBCB8B",
-      "color-4": "#A3BE8C",
-      "color-5": "#8FBCBB",
-      "color-6": "#88C0D0",
-      "color-7": "#81A1C1",
-      "color-8": "#5E81AC",
-      "color-9": "#7B88C7",
-      "color-10": "#B48EAD",
-      "color-11": "#9AA5B7",
-      "color-12": "#D9B56D",
-    },
-  },
-  {
-    id: "solarized",
-    label: "Solarized Dark",
-    primary: "#2AA198",
-    palette: {
-      "color-1": "#DC322F",
-      "color-2": "#CB4B16",
-      "color-3": "#B58900",
-      "color-4": "#859900",
-      "color-5": "#2AA198",
-      "color-6": "#2F9FB3",
-      "color-7": "#268BD2",
-      "color-8": "#4B7DCF",
-      "color-9": "#6C71C4",
-      "color-10": "#C05E9B",
-      "color-11": "#93A1A1",
-      "color-12": "#C89B3C",
-    },
-  },
-  {
-    id: "monokai",
-    label: "Monokai",
-    primary: "#66D9EF",
-    palette: {
-      "color-1": "#F92672",
-      "color-2": "#FD971F",
-      "color-3": "#E6DB74",
-      "color-4": "#A6E22E",
-      "color-5": "#58D68D",
-      "color-6": "#66D9EF",
-      "color-7": "#4FA3F7",
-      "color-8": "#7C7BFF",
-      "color-9": "#AE81FF",
-      "color-10": "#D979C8",
-      "color-11": "#A59F85",
-      "color-12": "#D2C15B",
-    },
-  },
-  {
-    id: "forest",
-    label: "Forest",
-    primary: "#34D399",
-    palette: {
-      "color-1": "#C65F46",
-      "color-2": "#A86F3A",
-      "color-3": "#D0A94A",
-      "color-4": "#7FA650",
-      "color-5": "#3F8F5F",
-      "color-6": "#2C7A78",
-      "color-7": "#2F6F8F",
-      "color-8": "#405F7A",
-      "color-9": "#6A5B8A",
-      "color-10": "#9C5F78",
-      "color-11": "#7D8A72",
-      "color-12": "#B08A45",
-    },
-  },
-  {
-    id: "ember",
-    label: "Ember",
-    primary: "#F97316",
-    palette: {
-      "color-1": "#FF5A3D",
-      "color-2": "#F97316",
-      "color-3": "#F59E0B",
-      "color-4": "#FBBF24",
-      "color-5": "#D97706",
-      "color-6": "#B45309",
-      "color-7": "#C2410C",
-      "color-8": "#9A3412",
-      "color-9": "#BE123C",
-      "color-10": "#E11D48",
-      "color-11": "#A16207",
-      "color-12": "#FACC15",
-    },
-  },
-  {
-    id: "aurora",
-    label: "Aurora",
-    primary: "#58C9F3",
-    palette: {
-      "color-1": "#4ADE80",
-      "color-2": "#22D3EE",
-      "color-3": "#38BDF8",
-      "color-4": "#60A5FA",
-      "color-5": "#818CF8",
-      "color-6": "#A78BFA",
-      "color-7": "#C084FC",
-      "color-8": "#E879F9",
-      "color-9": "#F0ABFC",
-      "color-10": "#67E8F9",
-      "color-11": "#94A3B8",
-      "color-12": "#BEF264",
+      "color-1": "#FF7566",
+      "color-2": "#EF8E52",
+      "color-3": "#F2AA1B",
+      "color-4": "#A8B998",
+      "color-5": "#54A99D",
+      "color-6": "#2C9DA0",
+      "color-7": "#7194C5",
+      "color-8": "#587CB5",
+      "color-9": "#9079B8",
+      "color-10": "#C8799B",
+      "color-11": "#8D9691",
+      "color-12": "#C7A84C",
     },
   },
   {
     id: "dusk",
-    label: "Dusk",
-    primary: "#C084FC",
+    label: "Hearth Dark",
+    primary: "#62C4BA",
     palette: {
-      "color-1": "#F472B6",
-      "color-2": "#E879F9",
-      "color-3": "#C084FC",
-      "color-4": "#A78BFA",
-      "color-5": "#7C3AED",
-      "color-6": "#4F46E5",
-      "color-7": "#F97316",
-      "color-8": "#F59E0B",
-      "color-9": "#EF4444",
-      "color-10": "#BE185D",
-      "color-11": "#78716C",
-      "color-12": "#D4AF37",
+      "color-1": "#FF8679",
+      "color-2": "#F39A60",
+      "color-3": "#F5B83D",
+      "color-4": "#B8C8A9",
+      "color-5": "#6BC0B5",
+      "color-6": "#5BBAC0",
+      "color-7": "#88A9D5",
+      "color-8": "#7692C6",
+      "color-9": "#A991CE",
+      "color-10": "#D792AE",
+      "color-11": "#A7B0AB",
+      "color-12": "#D6B968",
     },
   },
 ];
 
 const THEME_CLASS_PREFIX = "theme-";
+const LEGACY_DARK_THEME_IDS = new Set<ThemeId>([
+  "nord",
+  "solarized",
+  "monokai",
+  "forest",
+  "ember",
+  "aurora",
+]);
 const THEME_IDS = new Set<ThemeId>(THEME_OPTIONS.map((theme) => theme.id));
 let themeSyncStarted = false;
 
@@ -429,9 +323,13 @@ const applyThemePaletteVariables = (root: HTMLElement, themeId: ThemeId): void =
   }
 };
 
-const normalizeThemeId = (value: unknown): ThemeId => {
+export const normalizeThemeId = (value: unknown): ThemeId => {
   if (typeof value === "string" && THEME_IDS.has(value as ThemeId)) {
     return value as ThemeId;
+  }
+
+  if (typeof value === "string" && LEGACY_DARK_THEME_IDS.has(value as ThemeId)) {
+    return "dusk";
   }
 
   return DEFAULT_THEME_ID;
@@ -527,7 +425,7 @@ export const applyTheme = (themeId: ThemeId | string, options: ApplyThemeOptions
     }
     root.classList.add(`${THEME_CLASS_PREFIX}${nextThemeId}`);
     root.setAttribute("data-hearth-theme", nextThemeId);
-    root.style.colorScheme = "dark";
+    root.style.colorScheme = nextThemeId === "dusk" ? "dark" : "light";
     applyThemePaletteVariables(root, nextThemeId);
   }
 

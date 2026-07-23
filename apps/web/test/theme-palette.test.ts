@@ -72,7 +72,8 @@ test("theme palette slots maintain readable foreground contrast", () => {
 });
 
 test("theme preview palettes stay visually distinct", () => {
-  const minimumAverageDistance = 55;
+  // Light and dark deliberately share one product palette, with brighter dark-mode accents.
+  const minimumAverageDistance = 30;
 
   for (let leftIndex = 0; leftIndex < THEME_OPTIONS.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < THEME_OPTIONS.length; rightIndex += 1) {

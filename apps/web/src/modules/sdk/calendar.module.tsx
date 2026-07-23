@@ -574,13 +574,13 @@ export const moduleDefinition = defineModule({
       }
 
       return (
-        <div className="module-panel-shell relative flex h-full min-h-0 flex-col overflow-hidden p-2 text-slate-100">
+        <div className="calendar-module module-panel-shell relative flex h-full min-h-0 flex-col overflow-hidden p-2 text-slate-100">
           <ModuleConnectionBadge
             visible={connectivityState.showDisconnected}
             title={connectivityState.disconnectedTitle ?? undefined}
             label={connectivityState.disconnectedLabel}
           />
-          <header className="mb-2 flex items-center justify-between rounded border border-slate-700/80 bg-slate-900/80 px-3 py-2">
+          <header className="calendar-module__header mb-2 flex items-center justify-between rounded border border-slate-700/80 bg-slate-900/80 px-3 py-2">
             <p className="module-copy-title text-slate-100">{headerTitle}</p>
             <p className="module-copy-label text-slate-400">{headerViewLabel}</p>
           </header>
@@ -692,7 +692,7 @@ export const moduleDefinition = defineModule({
                   ))}
                 </div>
               ) : null}
-              <div className="grid min-h-full min-w-[680px] grid-cols-7 gap-2">
+              <div className="calendar-module__week grid min-h-full min-w-[680px] grid-cols-7 gap-2">
                 {weekDays.map((day) => {
                   const dayEvents = parsedEvents
                     .filter((event) => eventOccursOnDay(event, day, siteTimeZone))

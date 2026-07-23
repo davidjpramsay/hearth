@@ -458,7 +458,7 @@ export const moduleDefinition = defineModule({
       return (
         <div
           ref={ref}
-          className="module-panel-shell relative isolate flex h-full w-full text-[color:var(--color-text-primary)]"
+          className="clock-module module-panel-shell relative isolate flex h-full w-full text-[color:var(--color-text-primary)]"
         >
           <div className={contentShellClass}>
             {useInlineDateLayout ? (

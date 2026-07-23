@@ -601,7 +601,7 @@ export const moduleDefinition = defineModule({
       return (
         <div
           ref={tileRef}
-          className="module-panel-shell relative isolate flex h-full min-h-0 flex-col px-4 py-4 text-[color:var(--color-text-primary)]"
+          className="weather-module module-panel-shell relative isolate flex h-full min-h-0 flex-col px-4 py-4 text-[color:var(--color-text-primary)]"
           style={moduleAccentStyle}
         >
           <ModuleConnectionBadge

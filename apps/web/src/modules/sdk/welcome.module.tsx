@@ -26,8 +26,16 @@ export const moduleDefinition = defineModule({
   settingsSchema,
   runtime: {
     Component: ({ settings }) => (
-      <div className="module-panel-shell flex h-full w-full items-center justify-center px-4 text-center text-slate-100">
-        <p className="module-copy-title text-balance">{settings.message}</p>
+      <div className="welcome-module module-panel-shell flex h-full w-full items-center justify-center px-4 text-center text-slate-100">
+        <div className="welcome-module__content">
+          <p className="module-copy-title text-balance">{settings.message}</p>
+          <div className="welcome-module__family-dots" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
       </div>
     ),
   },

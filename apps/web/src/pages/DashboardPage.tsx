@@ -255,7 +255,7 @@ const PhotoFullscreenOverlay = ({
         aria-label={`Closing in ${remainingSeconds} seconds`}
       >
         <span>{remainingSeconds}</span>
-        <small>Closing</small>
+        <small>Closing in {remainingSeconds}s</small>
       </div>
     </section>
   );
@@ -882,8 +882,13 @@ export const DashboardPage = () => {
     );
     const baseWidth = Math.max(1, cols * storedRowHeight);
     const baseHeight = Math.max(1, rows * storedRowHeight);
-    const availableHeight = Math.max(1, viewportSize.height - DASHBOARD_DOCK_HEIGHT_PX);
-    const scale = Math.min(viewportSize.width / baseWidth, availableHeight / baseHeight);
+    const gutter = viewportSize.width < 720 ? 10 : Math.min(24, viewportSize.width * 0.015);
+    const availableWidth = Math.max(1, viewportSize.width - gutter * 2);
+    const availableHeight = Math.max(
+      1,
+      viewportSize.height - DASHBOARD_DOCK_HEIGHT_PX - gutter * 2,
+    );
+    const scale = Math.min(availableWidth / baseWidth, availableHeight / baseHeight);
     const rowHeight = Math.max(1, storedRowHeight * scale);
     const width = Math.max(1, cols * rowHeight);
     const height = Math.max(1, rows * rowHeight);
@@ -1040,7 +1045,7 @@ export const DashboardPage = () => {
             style={{ height: `calc(100% - ${DASHBOARD_DOCK_HEIGHT_PX}px)` }}
           >
             <div
-              className="relative overflow-hidden"
+              className="dashboard-home-frame relative overflow-hidden"
               style={{
                 width: `${gridDisplayMetrics.width}px`,
                 height: `${gridDisplayMetrics.height}px`,
@@ -1057,7 +1062,7 @@ export const DashboardPage = () => {
           </div>
         ) : null}
 
-        {activeLayout && activeHasPlacedModules ? (
+        {activeLayout && activeHasPlacedModules && !focusedModule ? (
           <nav className="dashboard-view-dock" aria-label="Dashboard views">
             <button
               type="button"

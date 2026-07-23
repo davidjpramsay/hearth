@@ -310,6 +310,7 @@ export const AdminLayoutEditorPage = () => {
   const [draggingModuleId, setDraggingModuleId] = useState<string | null>(null);
   const [customAspectWidth, setCustomAspectWidth] = useState("16");
   const [customAspectHeight, setCustomAspectHeight] = useState("9");
+  const [previewTheme, setPreviewTheme] = useState<"light" | "dark">("light");
   const [previewHostSize, setPreviewHostSize] = useState({ width: 0, height: 0 });
   const [draftGridItems, setDraftGridItems] = useState<GridItem[] | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -986,6 +987,24 @@ export const AdminLayoutEditorPage = () => {
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="hearth-studio-segmented" role="group" aria-label="Preview appearance">
+            <button
+              type="button"
+              className={previewTheme === "light" ? "is-active" : undefined}
+              onClick={() => setPreviewTheme("light")}
+              aria-pressed={previewTheme === "light"}
+            >
+              Light
+            </button>
+            <button
+              type="button"
+              className={previewTheme === "dark" ? "is-active" : undefined}
+              onClick={() => setPreviewTheme("dark")}
+              aria-pressed={previewTheme === "dark"}
+            >
+              Dark
+            </button>
+          </div>
           <div className="flex overflow-hidden rounded-xl border border-stone-300 bg-white">
             <button
               type="button"
@@ -1196,7 +1215,9 @@ export const AdminLayoutEditorPage = () => {
           >
             {previewScale > 0 ? (
               <div
-                className="relative overflow-hidden rounded-lg border border-slate-700/70 bg-slate-950"
+                className={`hearth-layout-preview relative overflow-hidden rounded-lg border ${
+                  previewTheme === "dark" ? "hearth-layout-preview--dark" : ""
+                }`}
                 style={{
                   width: `${previewDisplaySize.width}px`,
                   height: `${previewDisplaySize.height}px`,

@@ -731,7 +731,7 @@ const DEFAULT_LAYOUT_SEEDS: DefaultLayoutSeed[] = [
 ];
 
 type StarterLayoutItem = {
-  i: "clock" | "weather" | "calendar" | "chores" | "photos";
+  i: "clock" | "weather" | "welcome" | "calendar" | "chores" | "photos";
   x: number;
   y: number;
   w: number;
@@ -760,11 +760,12 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
     calendarView: "week",
     daysToShow: 7,
     items: [
-      { i: "clock", x: 0, y: 0, w: 8, h: 4 },
-      { i: "weather", x: 8, y: 0, w: 7, h: 4 },
-      { i: "calendar", x: 0, y: 4, w: 24, h: 14 },
-      { i: "photos", x: 24, y: 0, w: 8, h: 9 },
-      { i: "chores", x: 24, y: 9, w: 8, h: 9 },
+      { i: "clock", x: 0, y: 0, w: 7, h: 4 },
+      { i: "weather", x: 7, y: 0, w: 7, h: 4 },
+      { i: "welcome", x: 14, y: 0, w: 18, h: 4 },
+      { i: "calendar", x: 0, y: 4, w: 23, h: 14 },
+      { i: "photos", x: 23, y: 4, w: 9, h: 7 },
+      { i: "chores", x: 23, y: 11, w: 9, h: 7 },
     ],
     portraitPhotoItems: [
       { i: "clock", x: 0, y: 0, w: 7, h: 3 },
@@ -783,10 +784,11 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
     calendarView: "week",
     daysToShow: 7,
     items: [
-      { i: "clock", x: 0, y: 0, w: 6, h: 3 },
-      { i: "weather", x: 6, y: 0, w: 5, h: 3 },
+      { i: "clock", x: 0, y: 0, w: 5, h: 3 },
+      { i: "weather", x: 5, y: 0, w: 5, h: 3 },
+      { i: "welcome", x: 10, y: 0, w: 10, h: 3 },
       { i: "calendar", x: 0, y: 3, w: 14, h: 12 },
-      { i: "photos", x: 14, y: 0, w: 6, h: 8 },
+      { i: "photos", x: 14, y: 3, w: 6, h: 5 },
       { i: "chores", x: 14, y: 8, w: 6, h: 7 },
     ],
     portraitPhotoItems: [
@@ -806,11 +808,12 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
     calendarView: "week",
     daysToShow: 7,
     items: [
-      { i: "clock", x: 0, y: 0, w: 6, h: 3 },
-      { i: "weather", x: 6, y: 0, w: 5, h: 3 },
+      { i: "clock", x: 0, y: 0, w: 5, h: 3 },
+      { i: "weather", x: 5, y: 0, w: 5, h: 3 },
+      { i: "welcome", x: 10, y: 0, w: 11, h: 3 },
       { i: "calendar", x: 0, y: 3, w: 15, h: 11 },
-      { i: "photos", x: 15, y: 0, w: 6, h: 7 },
-      { i: "chores", x: 15, y: 7, w: 6, h: 7 },
+      { i: "photos", x: 15, y: 3, w: 6, h: 5 },
+      { i: "chores", x: 15, y: 8, w: 6, h: 6 },
     ],
     portraitPhotoItems: [
       { i: "clock", x: 0, y: 0, w: 5, h: 3 },
@@ -831,9 +834,9 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
     items: [
       { i: "clock", x: 0, y: 0, w: 10, h: 4 },
       { i: "weather", x: 10, y: 0, w: 8, h: 4 },
-      { i: "photos", x: 0, y: 4, w: 18, h: 10 },
-      { i: "calendar", x: 0, y: 14, w: 18, h: 10 },
-      { i: "chores", x: 0, y: 24, w: 18, h: 8 },
+      { i: "photos", x: 1, y: 4, w: 16, h: 12 },
+      { i: "calendar", x: 0, y: 16, w: 18, h: 10 },
+      { i: "chores", x: 0, y: 26, w: 18, h: 6 },
     ],
     portraitPhotoItems: [
       { i: "clock", x: 0, y: 0, w: 10, h: 4 },
@@ -854,9 +857,9 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
     items: [
       { i: "clock", x: 0, y: 0, w: 8, h: 3 },
       { i: "weather", x: 8, y: 0, w: 7, h: 3 },
-      { i: "photos", x: 0, y: 3, w: 15, h: 6 },
-      { i: "calendar", x: 0, y: 9, w: 15, h: 6 },
-      { i: "chores", x: 0, y: 15, w: 15, h: 5 },
+      { i: "photos", x: 1, y: 3, w: 13, h: 10 },
+      { i: "calendar", x: 0, y: 13, w: 15, h: 4 },
+      { i: "chores", x: 0, y: 17, w: 15, h: 3 },
     ],
     portraitPhotoItems: [
       { i: "clock", x: 0, y: 0, w: 8, h: 3 },
@@ -894,6 +897,8 @@ const STARTER_LAYOUT_DEFINITIONS: StarterLayoutDefinition[] = [
 const buildStarterLayoutSeed = (
   definition: StarterLayoutDefinition,
   variant: "home" | "portrait-photo",
+  homeItemsOverride?: StarterLayoutItem[],
+  photoOrientationOverride?: "landscape" | "portrait",
 ): DefaultLayoutSeed => {
   const instanceId = (module: StarterLayoutItem["i"]) =>
     variant === "home"
@@ -908,7 +913,10 @@ const buildStarterLayoutSeed = (
       cols: definition.cols,
       rows: definition.rows,
       rowHeight: 54,
-      items: (isPhotoVariant ? definition.portraitPhotoItems : definition.items).map((item) => ({
+      items: (isPhotoVariant
+        ? definition.portraitPhotoItems
+        : (homeItemsOverride ?? definition.items)
+      ).map((item) => ({
         ...item,
         i: instanceId(item.i),
       })),
@@ -933,6 +941,16 @@ const buildStarterLayoutSeed = (
             showTodayWind: false,
           },
         },
+        ...(!isPhotoVariant &&
+        (homeItemsOverride ?? definition.items).some((item) => item.i === "welcome")
+          ? [
+              {
+                id: instanceId("welcome"),
+                moduleId: "welcome",
+                config: { message: "Our Family" },
+              },
+            ]
+          : []),
         {
           id: instanceId("calendar"),
           moduleId: "calendar",
@@ -959,7 +977,8 @@ const buildStarterLayoutSeed = (
             collectionId: null,
             intervalSeconds: 20,
             shuffle: true,
-            layoutOrientation: definition.cols >= definition.rows ? "landscape" : "portrait",
+            layoutOrientation:
+              photoOrientationOverride ?? (isPhotoVariant ? "portrait" : "landscape"),
           },
         },
       ],
@@ -972,6 +991,63 @@ const STARTER_LAYOUT_SEEDS: DefaultLayoutSeed[] = STARTER_LAYOUT_DEFINITIONS.fla
     buildStarterLayoutSeed(definition, "home"),
     buildStarterLayoutSeed(definition, "portrait-photo"),
   ],
+);
+
+const STARTER_LAYOUT_V2_HOME_ITEMS: Record<string, StarterLayoutItem[]> = {
+  "wide-16-9": [
+    { i: "clock", x: 0, y: 0, w: 8, h: 4 },
+    { i: "weather", x: 8, y: 0, w: 7, h: 4 },
+    { i: "calendar", x: 0, y: 4, w: 24, h: 14 },
+    { i: "photos", x: 24, y: 0, w: 8, h: 9 },
+    { i: "chores", x: 24, y: 9, w: 8, h: 9 },
+  ],
+  "classic-4-3": [
+    { i: "clock", x: 0, y: 0, w: 6, h: 3 },
+    { i: "weather", x: 6, y: 0, w: 5, h: 3 },
+    { i: "calendar", x: 0, y: 3, w: 14, h: 12 },
+    { i: "photos", x: 14, y: 0, w: 6, h: 8 },
+    { i: "chores", x: 14, y: 8, w: 6, h: 7 },
+  ],
+  "balanced-3-2": [
+    { i: "clock", x: 0, y: 0, w: 6, h: 3 },
+    { i: "weather", x: 6, y: 0, w: 5, h: 3 },
+    { i: "calendar", x: 0, y: 3, w: 15, h: 11 },
+    { i: "photos", x: 15, y: 0, w: 6, h: 7 },
+    { i: "chores", x: 15, y: 7, w: 6, h: 7 },
+  ],
+  "portrait-9-16": [
+    { i: "clock", x: 0, y: 0, w: 10, h: 4 },
+    { i: "weather", x: 10, y: 0, w: 8, h: 4 },
+    { i: "photos", x: 0, y: 4, w: 18, h: 10 },
+    { i: "calendar", x: 0, y: 14, w: 18, h: 10 },
+    { i: "chores", x: 0, y: 24, w: 18, h: 8 },
+  ],
+  "portrait-3-4": [
+    { i: "clock", x: 0, y: 0, w: 8, h: 3 },
+    { i: "weather", x: 8, y: 0, w: 7, h: 3 },
+    { i: "photos", x: 0, y: 3, w: 15, h: 6 },
+    { i: "calendar", x: 0, y: 9, w: 15, h: 6 },
+    { i: "chores", x: 0, y: 15, w: 15, h: 5 },
+  ],
+};
+
+const STARTER_LAYOUT_V2_CONFIGS = new Map(
+  STARTER_LAYOUT_DEFINITIONS.flatMap((definition) => {
+    const oldHomeItems = STARTER_LAYOUT_V2_HOME_ITEMS[definition.id];
+    return oldHomeItems
+      ? [
+          [
+            definition.name,
+            buildStarterLayoutSeed(
+              definition,
+              "home",
+              oldHomeItems,
+              definition.cols >= definition.rows ? "landscape" : "portrait",
+            ).config,
+          ] as const,
+        ]
+      : [];
+  }),
 );
 
 const toStarterRule = (
@@ -1168,7 +1244,7 @@ const seedDefaultLayoutsAndSettings = (db: Database.Database): void => {
             { id: number; version: number; config_json: string }
           >("SELECT id, version, config_json FROM layouts WHERE name = @name")
           .get({ name: seed.name });
-        if (existing?.version === 1) {
+        if (existing && existing.version < 3) {
           try {
             const existingConfig = JSON.parse(existing.config_json) as {
               modules?: Array<{ id?: unknown }>;
@@ -1179,19 +1255,24 @@ const seedDefaultLayoutsAndSettings = (db: Database.Database): void => {
                 typeof module.id === "string" ? [module.id] : [],
               ) ?? [],
             );
-            const isUntouchedStarter =
+            const previousStarterConfig = STARTER_LAYOUT_V2_CONFIGS.get(seed.name);
+            const hasCanonicalModules =
               expectedModuleIds.size > 0 &&
-              existingConfig.modules?.length === expectedModuleIds.size &&
-              existingConfig.modules.every(
+              existingConfig.modules?.every(
                 (module) => typeof module.id === "string" && expectedModuleIds.has(module.id),
               );
+            const isUntouchedStarter =
+              (existing.version === 1 && hasCanonicalModules) ||
+              (existing.version === 2 &&
+                previousStarterConfig !== undefined &&
+                existing.config_json === JSON.stringify(previousStarterConfig));
             const configJson = JSON.stringify(seed.config);
             if (isUntouchedStarter && existing.config_json !== configJson) {
               db.prepare(
-                "UPDATE layouts SET config_json = @configJson, version = 2, updated_at = CURRENT_TIMESTAMP WHERE id = @id",
+                "UPDATE layouts SET config_json = @configJson, version = 3, updated_at = CURRENT_TIMESTAMP WHERE id = @id",
               ).run({ id: existing.id, configJson });
               db.prepare(
-                "INSERT OR IGNORE INTO layout_versions (layout_id, version, config_json) VALUES (@layoutId, 2, @configJson)",
+                "INSERT OR IGNORE INTO layout_versions (layout_id, version, config_json) VALUES (@layoutId, 3, @configJson)",
               ).run({ layoutId: existing.id, configJson });
             }
           } catch {

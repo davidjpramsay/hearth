@@ -262,16 +262,28 @@ export const sanitizeGridItems = (input: {
   const yScale = input.sourceRows > 0 ? input.targetRows / input.sourceRows : 1;
   const prepared = input.items
     .map((item) => {
-      let nextWidth = clamp(Math.round(Math.max(1, item.w) * xScale), 1, input.targetCols);
-      let nextHeight = clamp(Math.round(Math.max(1, item.h) * yScale), 1, input.targetRows);
+      const scaledX = clamp(Math.round(item.x * xScale), 0, Math.max(0, input.targetCols - 1));
+      const scaledY = clamp(Math.round(item.y * yScale), 0, Math.max(0, input.targetRows - 1));
+      const scaledRight = clamp(
+        Math.round((item.x + Math.max(1, item.w)) * xScale),
+        scaledX + 1,
+        input.targetCols,
+      );
+      const scaledBottom = clamp(
+        Math.round((item.y + Math.max(1, item.h)) * yScale),
+        scaledY + 1,
+        input.targetRows,
+      );
+      let nextWidth = scaledRight - scaledX;
+      let nextHeight = scaledBottom - scaledY;
       const lock = getPhotoLayoutLock(modulesById.get(item.i));
 
       if (lock !== null) {
         const quantized = quantizePhotoSize({
           desiredW: nextWidth,
           desiredH: nextHeight,
-          maxCols: input.targetCols,
-          maxRows: input.targetRows,
+          maxCols: Math.max(1, Math.min(nextWidth, input.targetCols - scaledX)),
+          maxRows: Math.max(1, Math.min(nextHeight, input.targetRows - scaledY)),
           lock,
         });
         nextWidth = quantized.w;
@@ -283,8 +295,8 @@ export const sanitizeGridItems = (input: {
 
       return {
         i: item.i,
-        x: clamp(Math.round(item.x * xScale), 0, Math.max(0, maxX)),
-        y: clamp(Math.round(item.y * yScale), 0, Math.max(0, maxY)),
+        x: clamp(scaledX, 0, Math.max(0, maxX)),
+        y: clamp(scaledY, 0, Math.max(0, maxY)),
         w: nextWidth,
         h: nextHeight,
       } satisfies GridItem;

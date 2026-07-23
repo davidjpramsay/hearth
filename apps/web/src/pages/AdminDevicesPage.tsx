@@ -43,7 +43,7 @@ import { ThemePalettePicker } from "../components/admin/ThemePalettePicker";
 import { PageShell } from "../components/PageShell";
 import { ThemePreviewStrip } from "../components/ThemePreviewStrip";
 import { getSupportedTimeZoneOptions } from "../time-zone-options";
-import { THEME_OPTIONS, type ThemeId } from "../theme/theme";
+import { THEME_OPTIONS, normalizeThemeId, type ThemeId } from "../theme/theme";
 import { getLayoutDisplayName } from "./layout-name-utils";
 
 type DeviceRoutingMode = "set" | "layout";
@@ -135,7 +135,7 @@ const toDeviceDraft = (input: {
   if (!normalizedTargetSelection) {
     return {
       name: input.device.name,
-      themeId: input.device.themeId,
+      themeId: normalizeThemeId(input.device.themeId),
       routingMode: "set",
       setId: input.firstAvailableSetId,
       layoutName: "",
@@ -151,7 +151,7 @@ const toDeviceDraft = (input: {
   if (normalizedTargetSelection.kind === "set") {
     return {
       name: input.device.name,
-      themeId: input.device.themeId,
+      themeId: normalizeThemeId(input.device.themeId),
       routingMode: "set",
       setId: normalizedTargetSelection.setId ?? "",
       layoutName: "",
@@ -162,7 +162,7 @@ const toDeviceDraft = (input: {
 
   return {
     name: input.device.name,
-    themeId: input.device.themeId,
+    themeId: normalizeThemeId(input.device.themeId),
     routingMode: "layout",
     setId: "",
     layoutName: normalizedTargetSelection.layoutName ?? "",

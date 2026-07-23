@@ -632,7 +632,7 @@ export const moduleDefinition = defineModule({
       return (
         <button
           type="button"
-          className="group relative block h-full w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 text-left disabled:cursor-default"
+          className="photos-module group relative block h-full w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-950 text-left disabled:cursor-default"
           disabled={!displayFrame}
           aria-label={
             displayFrame ? `Open ${displayFrame.filename} fullscreen for five seconds` : "Photos"
@@ -654,8 +654,13 @@ export const moduleDefinition = defineModule({
           {loading ? <ModuleSkeleton variant="media" /> : null}
 
           {!loading && connectivityState.blockingError ? (
-            <div className="module-copy-meta flex h-full items-center justify-center px-3 text-center text-rose-200">
-              {connectivityState.blockingError}
+            <div className="photos-module__empty module-copy-meta flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-rose-200">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none">
+                <rect x="3.5" y="4" width="17" height="16" rx="2.5" stroke="currentColor" />
+                <circle cx="9" cy="9" r="1.5" stroke="currentColor" />
+                <path d="m5.5 17 4.1-4.1 2.8 2.7 2.2-2.1 3.9 3.5" stroke="currentColor" />
+              </svg>
+              <span>{connectivityState.blockingError}</span>
             </div>
           ) : null}
 

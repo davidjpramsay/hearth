@@ -105,9 +105,10 @@ test("untouched starter layouts migrate to the polished arrangement", () => {
     const migratedConfig = JSON.parse(migrated.config_json) as {
       items: Array<{ i: string; y: number }>;
     };
-    assert.equal(migrated.version, 2);
-    assert.equal(migratedConfig.items.find((item) => item.i === "starter-wide-16-9-photos")?.y, 0);
-    assert.equal(migratedConfig.items.find((item) => item.i === "starter-wide-16-9-chores")?.y, 9);
+    assert.equal(migrated.version, 3);
+    assert.equal(migratedConfig.items.find((item) => item.i === "starter-wide-16-9-photos")?.y, 4);
+    assert.equal(migratedConfig.items.find((item) => item.i === "starter-wide-16-9-chores")?.y, 11);
+    assert.ok(migratedConfig.items.some((item) => item.i === "starter-wide-16-9-welcome"));
     migratedDb.close();
   } finally {
     rmSync(directory, { recursive: true, force: true });

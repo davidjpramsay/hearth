@@ -93,7 +93,7 @@ test("device refresh bootstrap falls back to local defaults instead of stale man
   const state = getDashboardDeviceBootstrapStateForDeviceRefresh();
 
   assert.deepEqual(state, {
-    reportedThemeId: "monokai",
+    reportedThemeId: "dusk",
     targetSelection: {
       kind: "set",
       setId: "set-local",
