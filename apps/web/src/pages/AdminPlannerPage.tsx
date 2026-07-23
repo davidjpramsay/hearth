@@ -148,10 +148,12 @@ export const AdminPlannerPage = () => {
   const [isInteractingWithBlocks, setIsInteractingWithBlocks] = useState(false);
   const [dayWindowDirty, setDayWindowDirty] = useState(false);
   const [createTemplateName, setCreateTemplateName] = useState("");
+  const [createTemplateNameError, setCreateTemplateNameError] = useState<string | null>(null);
   const [summaryStatus, setSummaryStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const blockAutosaveRevisionRef = useRef(0);
+  const createTemplateNameInputRef = useRef<HTMLInputElement>(null);
   const preferredTemplateIdRef = useRef<number | null | undefined>(undefined);
   const pendingTemplateBlocksSyncRef = useRef<{ templateId: number; signature: string } | null>(
     null,
@@ -390,11 +392,19 @@ export const AdminPlannerPage = () => {
       return;
     }
 
+    const name = createTemplateName.trim();
+    if (!name) {
+      setCreateTemplateNameError("Enter a plan name.");
+      createTemplateNameInputRef.current?.focus();
+      return;
+    }
+
     try {
       setBusyKey("template-create");
       setError(null);
+      setCreateTemplateNameError(null);
       const created = await createPlannerTemplate(token, {
-        name: createTemplateName,
+        name,
         repeatDays: [],
       });
       pendingTemplateBlocksSyncRef.current = null;
@@ -771,13 +781,33 @@ export const AdminPlannerPage = () => {
             description="Create plans, then choose which weekdays each one repeats on."
           />
 
-          <form className="mt-4 flex flex-wrap gap-3" onSubmit={onCreateTemplate}>
-            <input
-              value={createTemplateName}
-              onChange={(event) => setCreateTemplateName(event.target.value)}
-              placeholder="New plan name"
-              className="min-w-[16rem] flex-1 rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
-            />
+          <form
+            className="mt-4 flex flex-wrap items-end gap-3"
+            onSubmit={onCreateTemplate}
+            noValidate
+          >
+            <label className="min-w-[16rem] flex-1 text-sm text-slate-200">
+              <span className="mb-1 block">Plan name</span>
+              <input
+                ref={createTemplateNameInputRef}
+                value={createTemplateName}
+                onChange={(event) => {
+                  setCreateTemplateName(event.target.value);
+                  if (createTemplateNameError) setCreateTemplateNameError(null);
+                }}
+                placeholder="e.g. Monday school day"
+                required
+                maxLength={120}
+                aria-invalid={createTemplateNameError ? "true" : undefined}
+                aria-describedby={createTemplateNameError ? "new-plan-name-error" : undefined}
+                className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
+              />
+              {createTemplateNameError ? (
+                <span id="new-plan-name-error" className="mt-1 block text-sm text-rose-600">
+                  {createTemplateNameError}
+                </span>
+              ) : null}
+            </label>
             <button
               type="submit"
               disabled={busyKey === "template-create"}

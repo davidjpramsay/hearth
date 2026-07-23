@@ -274,6 +274,35 @@ test.describe("Hearth smoke", () => {
     await expect(page.getByRole("heading", { name: "Family", exact: true })).toBeVisible();
   });
 
+  test("school plan creation validates the name before saving", async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.getByRole("button", { name: "School", exact: true }).click();
+    await page.waitForURL("**/school");
+
+    let createRequestCount = 0;
+    page.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        new URL(request.url()).pathname === "/api/planner/templates"
+      ) {
+        createRequestCount += 1;
+      }
+    });
+
+    await page.getByRole("button", { name: "Create plan" }).click();
+    await expect(page.getByText("Enter a plan name.")).toBeVisible();
+    await expect(page.getByLabel("Plan name")).toBeFocused();
+    expect(createRequestCount).toBe(0);
+
+    const planName = `Monday school day ${Date.now()}`;
+    await page.getByLabel("Plan name").fill(`  ${planName}  `);
+    await page.getByRole("button", { name: "Create plan" }).click();
+
+    await expect(page.getByRole("button", { name: planName, exact: true })).toBeVisible();
+    expect(createRequestCount).toBe(1);
+    await expect(page.getByText("Enter a plan name.")).toBeHidden();
+  });
+
   test("admin can create a layout", async ({ page }) => {
     const layoutName = `Smoke Layout ${Date.now()}`;
 
