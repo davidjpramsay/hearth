@@ -2776,7 +2776,7 @@ body {
 }
 
 .dashboard-focus-view {
-  inset: 0;
+  inset: 0 0 var(--dashboard-dock-space, 5.15rem);
   background: var(--color-bg-app);
   padding: clamp(1rem, 2vw, 2rem);
 }

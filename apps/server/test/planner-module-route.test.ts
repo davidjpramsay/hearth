@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import Fastify from "fastify";
-import { toCalendarDateInTimeZone } from "@hearth/shared";
+import { HEARTH_DASHBOARD_SCHOOL_INSTANCE_ID, toCalendarDateInTimeZone } from "@hearth/shared";
 import { registerPlannerModuleRoutes } from "../src/routes/planner-module.js";
 import type { AppServices } from "../src/types.js";
 
@@ -122,6 +122,46 @@ test("planner today route returns an empty state when the module instance is mis
     assert.equal(payload.blocks.length, 0);
     assert.equal(payload.completions.length, 0);
     assert.equal(payload.users.length, 1);
+  } finally {
+    await app.close();
+  }
+});
+
+test("dashboard School view resolves the shared planner without a placed module", async () => {
+  const app = Fastify();
+  let dashboardRequested = false;
+  registerPlannerModuleRoutes(app, {
+    layoutEventBus: { publish: () => undefined },
+    layoutRepository: { findModuleInstance: () => null },
+    settingsRepository: {
+      getSiteTimeConfig: () => ({ siteTimezone: "Australia/Perth" }),
+      getPlannerDayWindow: () => ({ startTime: "08:00", endTime: "15:00", slotMinutes: 30 }),
+    },
+    plannerRepository: {
+      listUsers: () => [],
+      getTodayPlan: (input: { siteDate: string }) => {
+        dashboardRequested = true;
+        return {
+          generatedAt: new Date().toISOString(),
+          siteDate: input.siteDate,
+          dayWindow: { startTime: "08:00", endTime: "15:00", slotMinutes: 30 },
+          users: [],
+          template: null,
+          blocks: [],
+          completions: [],
+        };
+      },
+    },
+  } as unknown as AppServices);
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: `/modules/homeschool-planner/${HEARTH_DASHBOARD_SCHOOL_INSTANCE_ID}/today`,
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(dashboardRequested, true);
   } finally {
     await app.close();
   }

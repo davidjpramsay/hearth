@@ -1,4 +1,5 @@
 import {
+  HEARTH_DASHBOARD_SCHOOL_INSTANCE_ID,
   plannerModuleParamsSchema,
   plannerTodayResponseSchema,
   setPlannerActivityCompletionRequestSchema,
@@ -21,10 +22,11 @@ export const registerPlannerModuleRoutes = (app: FastifyInstance, services: AppS
       params.data.instanceId,
       "homeschool-planner",
     );
+    const isDashboardSchoolView = params.data.instanceId === HEARTH_DASHBOARD_SCHOOL_INSTANCE_ID;
 
     reply.header("cache-control", "no-store");
 
-    if (!moduleInstance) {
+    if (!moduleInstance && !isDashboardSchoolView) {
       return reply.send(
         plannerTodayResponseSchema.parse({
           generatedAt: new Date().toISOString(),
@@ -63,7 +65,8 @@ export const registerPlannerModuleRoutes = (app: FastifyInstance, services: AppS
       params.data.instanceId,
       "homeschool-planner",
     );
-    if (!moduleInstance) {
+    const isDashboardSchoolView = params.data.instanceId === HEARTH_DASHBOARD_SCHOOL_INSTANCE_ID;
+    if (!moduleInstance && !isDashboardSchoolView) {
       return reply.code(404).send({ message: "School planner module instance not found" });
     }
 

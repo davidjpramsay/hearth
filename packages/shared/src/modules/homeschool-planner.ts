@@ -2,6 +2,8 @@ import { z } from "zod";
 import { withModulePresentation } from "./presentation.js";
 import { themeColorSlotValueSchema } from "../theme-palette.js";
 
+export const HEARTH_DASHBOARD_SCHOOL_INSTANCE_ID = "hearth-dashboard-school";
+
 export const plannerIsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 export const plannerTimeSchema = z.string().regex(/^([01]\d|2[0-3]):(00|15|30|45)$/);
 export const plannerSlotMinutesSchema = z.union([z.literal(15), z.literal(30), z.literal(60)]);

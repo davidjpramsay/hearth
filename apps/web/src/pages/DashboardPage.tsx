@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  HEARTH_DASHBOARD_SCHOOL_INSTANCE_ID,
   type DisplayDeviceRuntime,
   type GridItem,
   type LayoutRecord,
@@ -197,11 +198,14 @@ interface FullscreenPhoto extends OpenPhotoEventDetail {
   closesAtMs: number;
 }
 
-const DashboardIcon = ({ name }: { name: "home" | "calendar" | "chores" | "photos" | "close" }) => {
+type DashboardIconName = "home" | "calendar" | "chores" | "school" | "photos" | "close";
+
+const DashboardIcon = ({ name }: { name: DashboardIconName }) => {
   const iconNames: Record<typeof name, HearthIconName> = {
     home: "home",
     calendar: "calendar",
     chores: "checklist",
+    school: "school",
     photos: "photos",
     close: "close",
   };
@@ -848,19 +852,47 @@ export const DashboardPage = () => {
   );
 
   const dashboardViewEntries = useMemo(() => {
-    const desiredModules = ["calendar", "chores", "photos"] as const;
-    return desiredModules.flatMap((moduleId) => {
-      const entry = activeRenderedModules.find(({ instance }) => instance.moduleId === moduleId);
-      return entry ? [{ moduleId, ...entry }] : [];
+    const desiredModules = [
+      { moduleId: "calendar", label: "Calendar", icon: "calendar" },
+      { moduleId: "chores", label: "Chores", icon: "chores" },
+      { moduleId: "homeschool-planner", label: "School", icon: "school" },
+      { moduleId: "photos", label: "Photos", icon: "photos" },
+    ] as const;
+
+    return desiredModules.flatMap((view) => {
+      const entry = activeRenderedModules.find(
+        ({ instance }) => instance.moduleId === view.moduleId,
+      );
+      if (entry) {
+        return [{ ...view, ...entry }];
+      }
+
+      if (view.moduleId === "homeschool-planner") {
+        return [
+          {
+            ...view,
+            instance: {
+              id: HEARTH_DASHBOARD_SCHOOL_INSTANCE_ID,
+              moduleId: "homeschool-planner",
+              config: {},
+            },
+            moduleManifest: moduleRegistry.getModuleManifest("homeschool-planner"),
+          },
+        ];
+      }
+
+      return [];
     });
   }, [activeRenderedModules]);
 
   const focusedModule = useMemo(
     () =>
       focusedInstanceId
-        ? (activeRenderedModules.find(({ instance }) => instance.id === focusedInstanceId) ?? null)
+        ? (dashboardViewEntries.find(({ instance }) => instance.id === focusedInstanceId) ??
+          activeRenderedModules.find(({ instance }) => instance.id === focusedInstanceId) ??
+          null)
         : null,
-    [activeRenderedModules, focusedInstanceId],
+    [activeRenderedModules, dashboardViewEntries, focusedInstanceId],
   );
 
   useEffect(() => {
@@ -1004,6 +1036,7 @@ export const DashboardPage = () => {
                 }
               >
                 <ModuleDashboardTile
+                  key={focusedModule.instance.id}
                   moduleId={focusedModule.instance.moduleId}
                   instanceId={focusedModule.instance.id}
                   config={focusedModule.instance.config}
@@ -1062,7 +1095,7 @@ export const DashboardPage = () => {
           </div>
         ) : null}
 
-        {activeLayout && activeHasPlacedModules && !focusedModule ? (
+        {activeLayout && activeHasPlacedModules ? (
           <nav className="dashboard-view-dock" aria-label="Dashboard views">
             <button
               type="button"
@@ -1073,7 +1106,7 @@ export const DashboardPage = () => {
               <DashboardIcon name="home" />
               <span>Home</span>
             </button>
-            {dashboardViewEntries.map(({ moduleId, instance, moduleManifest }) => (
+            {dashboardViewEntries.map(({ moduleId, label, icon, instance }) => (
               <button
                 key={moduleId}
                 type="button"
@@ -1081,8 +1114,8 @@ export const DashboardPage = () => {
                 onClick={() => setFocusedInstanceId(instance.id)}
                 aria-current={focusedInstanceId === instance.id ? "page" : undefined}
               >
-                <DashboardIcon name={moduleId} />
-                <span>{moduleManifest?.displayName ?? moduleId}</span>
+                <DashboardIcon name={icon} />
+                <span>{label}</span>
               </button>
             ))}
           </nav>
