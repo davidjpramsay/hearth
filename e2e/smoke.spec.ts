@@ -292,6 +292,26 @@ test.describe("Hearth smoke", () => {
     await expect(page.getByRole("heading", { name: "Family", exact: true })).toBeVisible();
   });
 
+  test("admin menu can leave School without a refresh", async ({ page }) => {
+    await loginAsAdmin(page);
+
+    await page.getByRole("button", { name: "School", exact: true }).click();
+    await page.waitForURL("**/school");
+    await expect(page.getByRole("heading", { name: "School", exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "Layouts", exact: true }).click();
+    await page.waitForURL("**/admin/layouts");
+    await expect(page.getByRole("heading", { name: "Layouts", exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "School", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "School", exact: true })).toBeVisible();
+
+    await page.setViewportSize({ width: 800, height: 900 });
+    await page.locator("select#admin-section-nav").selectOption("children");
+    await page.waitForURL("**/children");
+    await expect(page.getByRole("heading", { name: "Family", exact: true })).toBeVisible();
+  });
+
   test("school plan creation validates the name before saving", async ({ page }) => {
     await loginAsAdmin(page);
     await page.getByRole("button", { name: "School", exact: true }).click();

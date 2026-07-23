@@ -135,6 +135,7 @@ test("normalized version 2 starter layouts still receive the polished arrangemen
       { i: "starter-wide-16-9-photos", x: 24, y: 0, w: 8, h: 9 },
       { i: "starter-wide-16-9-chores", x: 24, y: 9, w: 8, h: 9 },
     ];
+    config.modules = config.modules.filter((module) => module.moduleId !== "welcome");
     config.typography = { mode: "auto", density: "standard" };
     const calendar = config.modules.find((module) => module.moduleId === "calendar");
     if (calendar) calendar.config.legacyCalendars = [];

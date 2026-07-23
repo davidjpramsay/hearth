@@ -1200,7 +1200,7 @@ const seedDefaultLayoutsAndSettings = (db: Database.Database): void => {
             );
             const hasCanonicalModules =
               expectedModuleIds.size > 0 &&
-              existingConfig.modules?.length === expectedModuleIds.size &&
+              existingConfig.modules?.length !== 0 &&
               existingConfig.modules?.every(
                 (module) => typeof module.id === "string" && expectedModuleIds.has(module.id),
               );

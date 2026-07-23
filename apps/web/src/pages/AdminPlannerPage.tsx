@@ -46,6 +46,7 @@ import {
   PlannerTimetableEditor,
   type PlannerEditorBlock,
 } from "../components/admin/PlannerTimetableEditor";
+import { arePlannerEditorBlocksEqual } from "../components/admin/planner-timetable";
 import { ThemePalettePicker } from "../components/admin/ThemePalettePicker";
 import { useModuleQuery } from "../modules/data/useModuleQuery";
 
@@ -312,7 +313,9 @@ export const AdminPlannerPage = () => {
         preferredTemplateIdInput === undefined && preferredTemplateId === selectedTemplateId;
       invalidateBlockAutosave();
       setTemplateNameDraft(preferredTemplate?.name ?? "");
-      setEditorBlocks(nextEditorBlocks);
+      if (!arePlannerEditorBlocksEqual(editorBlocks, nextEditorBlocks)) {
+        setEditorBlocks(nextEditorBlocks);
+      }
       setSelectedBlockId(
         preserveSelection ? getRetainedSelectedBlockId(nextEditorBlocks, selectedBlockId) : null,
       );
